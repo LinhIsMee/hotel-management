@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.spring3.hotel.management.dtos.request.CreateUserRequest;
@@ -50,10 +50,11 @@ public class UserServiceImpl implements UserService {
     
     @Autowired(required = false)
     EmailService emailService;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     ModelMapper modelMapper = new ModelMapper();
-    
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Override
     public UserResponse registerUser(RegisterRequest registerRequest) {
@@ -111,12 +112,8 @@ public class UserServiceImpl implements UserService {
 
         User savedUser = null;
 
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        String rawPassword = userRequest.getPassword();
-        String encodedPassword = encoder.encode(rawPassword);
-
         User user = modelMapper.map(userRequest, User.class);
-        user.setPassword(encodedPassword);
+        user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
         if(userRequest.getId() != null){
             User oldUser = userRepository.findFirstById(userRequest.getId());
             if(oldUser != null){
@@ -247,25 +244,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserProfileResponse createUser(CreateUserRequest request) {
-        User user = new User();
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        String rawPassword = request.getPassword();
-        String encodedPassword = encoder.encode(rawPassword);
-
-        user.setUsername(request.getUsername());
-        user.setPassword(encodedPassword);
-        user.setFullName(request.getFullName());
-        user.setAddress(request.getAddress());
-        user.setEmail(request.getEmail());
-        user.setPhoneNumber(request.getPhone());
-        user.setGender(request.getGender());
-        log.info("Setting date of birth: {}", request.getDateOfBirth());
-        if (request.getDateOfBirth() != null) {
-            user.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
-        }else {
-            user.setDateOfBirth(null);
-        }
-        user.setNationalId(request.getNationalId());
+        User user = modelMapper.map(request, User.class);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setUpdatedAt(LocalDateTime.now());
         user.setRole(request.getRole());
 
