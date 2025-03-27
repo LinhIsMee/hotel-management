@@ -187,28 +187,46 @@ public class UserController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
         try {
+            // Kiểm tra email có được cung cấp không
+            if (request.getEmail() == null || request.getEmail().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("Email không được để trống"));
+            }
+            
             boolean result = userService.processForgotPassword(request.getEmail());
             if (result) {
-                return ResponseEntity.ok(new MessageResponse("Password reset instructions sent to your email"));
+                return ResponseEntity.ok(new MessageResponse("Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn"));
             } else {
-                return ResponseEntity.badRequest().body(new MessageResponse("Email not found"));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Không tìm thấy email"));
             }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi xử lý quên mật khẩu: " + e.getMessage()));
         }
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
         try {
+            // Kiểm tra token và mật khẩu mới có được cung cấp không
+            if (request.getToken() == null || request.getToken().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("Token không được để trống"));
+            }
+            
+            if (request.getNewPassword() == null || request.getNewPassword().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("Mật khẩu mới không được để trống"));
+            }
+            
             boolean result = userService.resetPassword(request.getToken(), request.getNewPassword());
             if (result) {
-                return ResponseEntity.ok(new MessageResponse("Password has been reset successfully"));
+                return ResponseEntity.ok(new MessageResponse("Mật khẩu đã được đặt lại thành công"));
             } else {
-                return ResponseEntity.badRequest().body(new MessageResponse("Invalid or expired token"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Token không hợp lệ hoặc đã hết hạn"));
             }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi đặt lại mật khẩu: " + e.getMessage()));
         }
     }
 
