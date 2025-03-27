@@ -1,6 +1,8 @@
 package com.spring3.hotel.management.configurations;
 
-import com.spring3.hotel.management.helpers.UserDetailsServiceImpl;
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -23,8 +25,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.List;
+import com.spring3.hotel.management.helpers.UserDetailsServiceImpl;
 
 
 @Configuration
@@ -61,7 +62,16 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests((authorize) -> authorize
-                        .requestMatchers("/api/v1/save", "/api/v1/login", "/api/v1/refreshToken").permitAll()
+                        .requestMatchers(
+                            "/api/v1/save", 
+                            "/api/v1/login", 
+                            "/api/v1/register", 
+                            "/api/v1/validate-token", 
+                            "/api/v1/refresh-token",
+                            "/api/v1/forgot-password",
+                            "/api/v1/reset-password",
+                            "/api/v1/logout"
+                        ).permitAll()
                     .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
                     .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
                     .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
