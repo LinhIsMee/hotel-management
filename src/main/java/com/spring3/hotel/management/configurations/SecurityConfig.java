@@ -74,12 +74,13 @@ public class SecurityConfig {
                             "/api/v1/user",
                             "/api/v1/user/profile/**",
                             "/api/v1/users",
-                            "/api/v1/users/**"
+                            "/api/v1/users/**",
+                            "/api/v1/user/create",
+                            "/api/v1/user/update/**"
                         ).permitAll()
                     .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
                     .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
                     .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
-                    .requestMatchers("/api/v1/user/create", "/api/v1/user/update/**").hasAuthority("ROLE_ADMIN")
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
