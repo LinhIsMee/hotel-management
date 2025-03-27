@@ -1,5 +1,3 @@
-target/hotel-management.jar
-
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
@@ -43,7 +41,6 @@ build/
 *.zip
 *.tar.gz
 *.rar
-*.md
 
 ### Logs ###
 logs
