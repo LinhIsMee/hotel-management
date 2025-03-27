@@ -89,7 +89,6 @@ public class UserController {
         }
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping("/test")
     public String test() {
         try {
@@ -278,7 +277,6 @@ public class UserController {
     }
 
     @PostMapping("/user/create")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request) {
         try {
             UserProfileResponse userResponse = userService.createUser(request);
@@ -306,7 +304,6 @@ public class UserController {
     }
 
     @DeleteMapping("/users/{userId}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Integer userId) {
         try {
             userService.deleteUser(userId);
