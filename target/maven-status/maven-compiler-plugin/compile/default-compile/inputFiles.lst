@@ -92,6 +92,7 @@ D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\man
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\configurations\JwtAuthFilter.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\models\BookingService.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\response\UserResponse.java
+D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\config\DataInitializer.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\request\UpsertBookingRequest.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\response\PaymentHistoryResponse.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\response\StatisticResponse.java
