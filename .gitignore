@@ -42,6 +42,7 @@ build/
 *.zip
 *.tar.gz
 *.rar
+*.md
 
 ### Logs ###
 logs
