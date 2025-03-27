@@ -21,4 +21,5 @@ public class UserProfileResponse {
     private String nationalId;
     private String createdAt;
     private String updatedAt;
+    private String role;
 }
