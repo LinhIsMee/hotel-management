@@ -355,6 +355,32 @@ public class UserServiceImpl implements UserService {
     
     @Override
     @Transactional
+    public boolean changePassword(String oldPassword, String newPassword) {
+        // Lấy thông tin người dùng hiện tại từ SecurityContext
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        // Lấy thông tin người dùng từ database
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            return false;
+        }
+        
+        // Kiểm tra mật khẩu cũ
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return false;
+        }
+        
+        // Cập nhật mật khẩu mới
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+        
+        return true;
+    }
+    
+    @Override
+    @Transactional
     public void deleteUser(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));

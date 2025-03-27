@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.spring3.hotel.management.dtos.request.AuthRequestDTO;
+import com.spring3.hotel.management.dtos.request.ChangePasswordRequest;
 import com.spring3.hotel.management.dtos.request.CreateUserRequest;
 import com.spring3.hotel.management.dtos.request.ForgotPasswordRequest;
 import com.spring3.hotel.management.dtos.request.RefreshTokenRequest;
@@ -330,6 +331,33 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi lấy thông tin cá nhân: " + e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/user/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
+        try {
+            // Kiểm tra dữ liệu đầu vào
+            if (request.getOldPassword() == null || request.getOldPassword().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("Mật khẩu cũ không được để trống"));
+            }
+            
+            if (request.getNewPassword() == null || request.getNewPassword().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("Mật khẩu mới không được để trống"));
+            }
+            
+            // Thực hiện đổi mật khẩu
+            boolean result = userService.changePassword(request.getOldPassword(), request.getNewPassword());
+            
+            if (result) {
+                return ResponseEntity.ok(new MessageResponse("Đổi mật khẩu thành công"));
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new MessageResponse("Mật khẩu cũ không chính xác"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi đổi mật khẩu: " + e.getMessage()));
         }
     }
 }

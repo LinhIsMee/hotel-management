@@ -37,5 +37,7 @@ public interface UserService {
     
     boolean resetPassword(String token, String newPassword);
     
+    boolean changePassword(String oldPassword, String newPassword);
+    
     void deleteUser(Integer userId);
 }
