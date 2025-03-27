@@ -217,14 +217,22 @@ public class UserController {
         try {
             // Lấy thông tin người dùng hiện tại từ SecurityContext
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            // Kiểm tra xem có authentication không
+            if (authentication == null || authentication.getName() == null || 
+                "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.ok(new MessageResponse("Không có phiên đăng nhập nào đang hoạt động"));
+            }
+            
             String username = authentication.getName();
 
             // Xóa refresh token của người dùng khỏi cơ sở dữ liệu
             refreshTokenService.deleteByUsername(username);
 
-            return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
+            return ResponseEntity.ok(new MessageResponse("Đăng xuất thành công"));
         } catch (Exception e) {
-            throw new RuntimeException("Logout failed: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Đăng xuất thất bại: " + e.getMessage()));
         }
     }
 
