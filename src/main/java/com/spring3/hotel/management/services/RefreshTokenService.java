@@ -1,15 +1,17 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.models.RefreshToken;
-import com.spring3.hotel.management.repositories.RefreshTokenRepository;
-import com.spring3.hotel.management.repositories.UserRepository;
-import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.spring3.hotel.management.models.RefreshToken;
+import com.spring3.hotel.management.repositories.RefreshTokenRepository;
+import com.spring3.hotel.management.repositories.UserRepository;
+
+import jakarta.transaction.Transactional;
 
 
 @Service
@@ -25,7 +27,7 @@ public class RefreshTokenService {
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(userRepository.findByUsername(username))
                 .token(UUID.randomUUID().toString())
-                .expiryDate(Instant.now().plusMillis(600000))
+                .expiryDate(Instant.now().plusMillis(7 * 24 * 60 * 60 * 1000)) // 7 ngày
                 .build();
         return refreshTokenRepository.save(refreshToken);
     }
