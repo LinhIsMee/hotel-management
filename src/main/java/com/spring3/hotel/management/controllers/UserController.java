@@ -295,8 +295,13 @@ public class UserController {
             List<UserProfileResponse> userResponses = userService.getUserList();
             return ResponseEntity.ok(userResponses);
         } catch (Exception e) {
+            String errorMessage = e.getMessage();
+            if (errorMessage != null && errorMessage.contains("Access Denied")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Bạn không có quyền truy cập danh sách người dùng"));
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new MessageResponse("Lỗi khi lấy danh sách người dùng: " + e.getMessage()));
+                .body(new MessageResponse("Lỗi khi lấy danh sách người dùng: " + errorMessage));
         }
     }
 

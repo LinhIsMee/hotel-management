@@ -218,10 +218,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserProfileResponse> getUserList() {
-        List<User> users = userRepository.findAll();
-        return users.stream()
-            .map(this::mapToUserProfileResponse)
-            .collect(Collectors.toList());
+        try {
+            List<User> users = userRepository.findAll();
+            return users.stream()
+                .map(this::mapToUserProfileResponse)
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error retrieving user list: {}", e.getMessage());
+            return List.of(); // Return empty list instead of throwing exception
+        }
     }
 
     @Override
