@@ -30,6 +30,8 @@
 }
 ```
 
+**Lưu ý**: Khi đăng ký tài khoản mới, vai trò mặc định là "ROLE_USER". Chỉ admin mới có quyền tạo tài khoản với vai trò admin hoặc nhân viên.
+
 **Response (Error - 400 Bad Request)**:
 ```json
 {

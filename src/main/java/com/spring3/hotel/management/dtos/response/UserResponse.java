@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.dtos.response;
 
-import com.spring3.hotel.management.models.Role;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,10 +10,9 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 public class UserResponse {
-
     private Integer id;
     private String username;
-    private Role role;
-
-
+    private String email;
+    private String fullName;
+    private String role;
 }
