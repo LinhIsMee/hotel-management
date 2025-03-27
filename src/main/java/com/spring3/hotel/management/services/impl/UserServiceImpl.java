@@ -114,19 +114,43 @@ public class UserServiceImpl implements UserService {
 
         User user = modelMapper.map(userRequest, User.class);
         user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
+        
+        // Thiết lập vai trò mặc định là ROLE_USER nếu không có role trong request
+        if (user.getRole() == null) {
+            Role userRole = roleRepository.findByName("ROLE_USER")
+                .orElseThrow(() -> new RuntimeException("Error: Role USER is not found."));
+            user.setRole(userRole);
+        }
+        
         if(userRequest.getId() != null){
             User oldUser = userRepository.findFirstById(userRequest.getId());
             if(oldUser != null){
                 oldUser.setId(user.getId());
                 oldUser.setPassword(user.getPassword());
                 oldUser.setUsername(user.getUsername());
-                oldUser.setRole(user.getRole());
-
+                oldUser.setEmail(user.getEmail());
+                oldUser.setFullName(user.getFullName());
+                
+                // Cập nhật role nếu có
+                if (user.getRole() != null) {
+                    oldUser.setRole(user.getRole());
+                } else {
+                    // Giữ nguyên role cũ nếu không có role mới
+                    if (oldUser.getRole() == null) {
+                        Role userRole = roleRepository.findByName("ROLE_USER")
+                            .orElseThrow(() -> new RuntimeException("Error: Role USER is not found."));
+                        oldUser.setRole(userRole);
+                    }
+                }
+                
+                oldUser.setUpdatedAt(LocalDateTime.now());
                 savedUser = userRepository.save(oldUser);
             } else {
                 throw new RuntimeException("Can't find record with identifier: " + userRequest.getId());
             }
         } else {
+            // Thiết lập ngày tạo cho người dùng mới
+            user.setCreatedAt(LocalDateTime.now());
             savedUser = userRepository.save(user);
         }
         
