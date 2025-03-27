@@ -212,7 +212,9 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNjgwM
 
 **Endpoint**: `POST /api/v1/user/create`
 
-**Request Header**:
+**Quyền truy cập**: API này được cấu hình để cho phép truy cập công khai (permitAll) nhưng nên được sử dụng bởi Admin
+
+**Request Header** (không bắt buộc):
 ```
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4MDEyMzQ1NiwiZXhwIjoxNjgwMTI3MDU2fQ.abcdefghijklmnopqrstuvwxyz
 ```
@@ -331,12 +333,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4MDEyM
 }
 ```
 
-**Response (Error - 400 Bad Request)**:
+**Response (Error - 500 Internal Server Error)**:
 ```json
 {
-  "message": "User not found with id: 999"
+  "message": "Error deleting user: User not found with id: 999"
 }
 ```
+
+**Lưu ý**: Khi xóa người dùng, hệ thống sẽ tự động xóa các refresh token và password reset token liên quan đến người dùng đó để tránh lỗi foreign key constraint. Không cần thực hiện thêm bất kỳ thao tác nào khác.
 
 ## 12. Lấy danh sách người dùng (Quyền Admin hoặc Staff)
 
