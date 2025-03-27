@@ -164,12 +164,22 @@ public class UserController {
     @PostMapping("/validate-token")
     public ResponseEntity<?> validateToken(@RequestBody ValidateTokenRequest request) {
         try {
+            // Kiểm tra token có được cung cấp không
+            if (request.getToken() == null || request.getToken().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Token không được cung cấp"));
+            }
+            
             String username = jwtService.extractUsername(request.getToken());
             boolean isValid = !jwtService.isTokenExpired(request.getToken());
             
             TokenValidationResponse response = new TokenValidationResponse(isValid, username);
             return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new MessageResponse(e.getMessage()));
         } catch (Exception e) {
+            // Nếu có lỗi khi xác thực token, trả về token không hợp lệ thay vì lỗi
             return ResponseEntity.ok(new TokenValidationResponse(false, null));
         }
     }
