@@ -290,7 +290,6 @@ public class UserController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('ROLE_STAFF')")
     public ResponseEntity<?> getUserList() {
         try {
             List<UserProfileResponse> userResponses = userService.getUserList();
