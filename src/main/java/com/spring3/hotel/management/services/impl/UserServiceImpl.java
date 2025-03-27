@@ -27,6 +27,7 @@ import com.spring3.hotel.management.models.PasswordResetToken;
 import com.spring3.hotel.management.models.Role;
 import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.PasswordResetTokenRepository;
+import com.spring3.hotel.management.repositories.RefreshTokenRepository;
 import com.spring3.hotel.management.repositories.RoleRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.EmailService;
@@ -47,6 +48,9 @@ public class UserServiceImpl implements UserService {
     
     @Autowired
     PasswordResetTokenRepository passwordResetTokenRepository;
+    
+    @Autowired
+    RefreshTokenRepository refreshTokenRepository;
     
     @Autowired(required = false)
     EmailService emailService;
@@ -354,6 +358,9 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
+        
+        // Xóa các refresh token liên quan đến user
+        refreshTokenRepository.deleteByUser(user);
         
         // Xóa token reset mật khẩu nếu có
         passwordResetTokenRepository.findByUser(user).ifPresent(token -> {
