@@ -314,8 +314,8 @@ public class UserController {
         }
     }
 
-    @PutMapping("/user/profile")
-    public ResponseEntity<?> updateUserProfile(@RequestBody UpdateUserRequest request) {
+    @GetMapping("/user/profile")
+    public ResponseEntity<?> getCurrentUserProfile() {
         try {
             // Lấy thông tin người dùng hiện tại từ SecurityContext
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -324,12 +324,12 @@ public class UserController {
             // Lấy ID người dùng từ username
             Integer userId = userService.getUserIdByUsername(username);
             
-            // Cập nhật thông tin người dùng
-            UserProfileResponse userResponse = userService.updateUser(request, userId);
+            // Lấy thông tin đầy đủ của người dùng
+            UserProfileResponse userResponse = userService.getUserProfile(userId);
             return ResponseEntity.ok(userResponse);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new MessageResponse("Lỗi khi cập nhật thông tin cá nhân: " + e.getMessage()));
+                .body(new MessageResponse("Lỗi khi lấy thông tin cá nhân: " + e.getMessage()));
         }
     }
 }
