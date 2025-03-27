@@ -80,6 +80,7 @@ com\spring3\hotel\management\exceptions\BadRequestException.class
 com\spring3\hotel\management\services\impl\StatisticServiceImpl.class
 com\spring3\hotel\management\dtos\response\RoomResponseDTO.class
 com\spring3\hotel\management\repositories\OfferingsRepository.class
+com\spring3\hotel\management\dtos\request\ChangePasswordRequest.class
 com\spring3\hotel\management\repositories\BookingDetailRepository.class
 com\spring3\hotel\management\controllers\ReviewController.class
 com\spring3\hotel\management\dtos\response\JwtResponseDTO$JwtResponseDTOBuilder.class

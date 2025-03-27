@@ -102,6 +102,7 @@ D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\man
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\repositories\RoomRepository.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\request\StatusRequestDTO.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\models\Room.java
+D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\request\ChangePasswordRequest.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\response\TokenValidationResponse.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\services\RefreshTokenService.java
 D:\Source Code\IdeaProjects\hotel-management\src\main\java\com\spring3\hotel\management\dtos\response\DashboardInfoCountResponse.java

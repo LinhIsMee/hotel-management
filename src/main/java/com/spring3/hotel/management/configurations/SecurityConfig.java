@@ -76,7 +76,8 @@ public class SecurityConfig {
                             "/api/v1/users",
                             "/api/v1/users/**",
                             "/api/v1/user/create",
-                            "/api/v1/user/update/**"
+                            "/api/v1/user/update/**",
+                            "/api/v1/user/change-password"
                         ).permitAll()
                     .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
                     .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
