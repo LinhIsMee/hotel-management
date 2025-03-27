@@ -79,12 +79,13 @@ public class UserController {
 
 
     @PostMapping("/user")
-    public ResponseEntity<UserResponse> getUserProfile() {
+    public ResponseEntity<?> getUserProfile() {
         try {
-        UserResponse userResponse = userService.getUser();
-        return ResponseEntity.ok().body(userResponse);
+            UserResponse userResponse = userService.getUser();
+            return ResponseEntity.ok().body(userResponse);
         } catch (Exception e){
-            throw new RuntimeException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi lấy thông tin người dùng: " + e.getMessage()));
         }
     }
 
@@ -256,20 +257,36 @@ public class UserController {
 
     @GetMapping("/user/profile/{userId}")
     public ResponseEntity<?> getProfile(@PathVariable Integer userId) {
-        return ResponseEntity.ok(userService.getUserProfile(userId));
+        try {
+            UserProfileResponse userResponse = userService.getUserProfile(userId);
+            return ResponseEntity.ok(userResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi lấy thông tin người dùng: " + e.getMessage()));
+        }
     }
 
     @PutMapping("/user/update/{userId}")
     public ResponseEntity<?> updateUser(@RequestBody UpdateUserRequest request, @PathVariable Integer userId) {
-        UserProfileResponse userResponse = userService.updateUser(request, userId);
-        return new ResponseEntity<>(userResponse, HttpStatus.CREATED);
+        try {
+            UserProfileResponse userResponse = userService.updateUser(request, userId);
+            return ResponseEntity.ok(userResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi cập nhật thông tin người dùng: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/user/create")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request) {
-        UserProfileResponse userResponse = userService.createUser(request);
-        return new ResponseEntity<>(userResponse, HttpStatus.CREATED);
+        try {
+            UserProfileResponse userResponse = userService.createUser(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi tạo người dùng mới: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/users")
@@ -278,8 +295,9 @@ public class UserController {
         try {
             List<UserProfileResponse> userResponses = userService.getUserList();
             return ResponseEntity.ok(userResponses);
-        } catch (Exception e){
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi lấy danh sách người dùng: " + e.getMessage()));
         }
     }
 
@@ -288,9 +306,10 @@ public class UserController {
     public ResponseEntity<?> deleteUser(@PathVariable Integer userId) {
         try {
             userService.deleteUser(userId);
-            return ResponseEntity.ok(new MessageResponse("User deleted successfully"));
+            return ResponseEntity.ok(new MessageResponse("Xóa người dùng thành công"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi xóa người dùng: " + e.getMessage()));
         }
     }
 }

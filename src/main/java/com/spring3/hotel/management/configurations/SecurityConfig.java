@@ -70,11 +70,15 @@ public class SecurityConfig {
                             "/api/v1/refresh-token",
                             "/api/v1/forgot-password",
                             "/api/v1/reset-password",
-                            "/api/v1/logout"
+                            "/api/v1/logout",
+                            "/api/v1/user",
+                            "/api/v1/user/profile/**",
+                            "/api/v1/users"
                         ).permitAll()
                     .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
                     .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
                     .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
+                    .requestMatchers("/api/v1/user/create", "/api/v1/user/update/**", "/api/v1/users/**").hasAuthority("ROLE_ADMIN")
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
