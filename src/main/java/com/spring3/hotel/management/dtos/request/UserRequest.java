@@ -1,6 +1,7 @@
 package com.spring3.hotel.management.dtos.request;
 
 import com.spring3.hotel.management.models.Role;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,7 @@ public class UserRequest {
     private String username;
     private String password;
     private Role role;
-
+    private String email;
+    private String fullName;
 
 }
