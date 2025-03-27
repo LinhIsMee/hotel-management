@@ -129,10 +129,17 @@ public class UserController {
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
+            // Kiểm tra token có được cung cấp không
+            if (request.getToken() == null || request.getToken().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Refresh token không được cung cấp"));
+            }
+            
             return refreshTokenService.findByToken(request.getToken())
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshToken::getUser)
                 .map(user -> {
+                    // Tạo token mới
                     String accessToken = jwtService.GenerateToken(user.getUsername());
                     Integer userId = user.getId();
                     String role = user.getRole().getName();
@@ -144,9 +151,13 @@ public class UserController {
                         .token(request.getToken())
                         .build());
                 })
-                .orElseThrow(() -> new RuntimeException("Refresh token is not in database!"));
+                .orElseThrow(() -> new RuntimeException("Refresh token không tồn tại trong cơ sở dữ liệu"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new MessageResponse(e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Đã xảy ra lỗi khi làm mới token: " + e.getMessage()));
         }
     }
 
