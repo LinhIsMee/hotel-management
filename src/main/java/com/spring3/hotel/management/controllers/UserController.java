@@ -313,4 +313,23 @@ public class UserController {
                 .body(new MessageResponse("Lỗi khi xóa người dùng: " + e.getMessage()));
         }
     }
+
+    @PutMapping("/user/profile")
+    public ResponseEntity<?> updateUserProfile(@RequestBody UpdateUserRequest request) {
+        try {
+            // Lấy thông tin người dùng hiện tại từ SecurityContext
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // Lấy ID người dùng từ username
+            Integer userId = userService.getUserIdByUsername(username);
+            
+            // Cập nhật thông tin người dùng
+            UserProfileResponse userResponse = userService.updateUser(request, userId);
+            return ResponseEntity.ok(userResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi cập nhật thông tin cá nhân: " + e.getMessage()));
+        }
+    }
 }
