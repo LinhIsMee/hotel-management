@@ -2,7 +2,6 @@ package com.spring3.hotel.management.config;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +17,11 @@ import com.spring3.hotel.management.models.Role;
 import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.EmployeeRepository;
 import com.spring3.hotel.management.repositories.RoleRepository;
+import com.spring3.hotel.management.repositories.RoomRepository;
+import com.spring3.hotel.management.repositories.RoomTypeRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
+import com.spring3.hotel.management.services.interfaces.RoomService;
+import com.spring3.hotel.management.services.interfaces.RoomTypeService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,6 +37,18 @@ public class DataInitializer implements CommandLineRunner {
     
     @Autowired
     private EmployeeRepository employeeRepository;
+    
+    @Autowired
+    private RoomTypeRepository roomTypeRepository;
+    
+    @Autowired
+    private RoomRepository roomRepository;
+    
+    @Autowired
+    private RoomTypeService roomTypeService;
+    
+    @Autowired
+    private RoomService roomService;
     
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -113,6 +128,28 @@ public class DataInitializer implements CommandLineRunner {
             employeeRepository.saveAll(employees);
             
             log.info("Sample employees created successfully");
+        }
+        
+        // Khởi tạo dữ liệu loại phòng nếu chưa có
+        if (roomTypeRepository.count() == 0) {
+            log.info("Initializing room types from JSON...");
+            try {
+                roomTypeService.initRoomTypesFromJson();
+                log.info("Room types initialized successfully");
+            } catch (Exception e) {
+                log.error("Failed to initialize room types from JSON: {}", e.getMessage());
+            }
+        }
+        
+        // Khởi tạo dữ liệu phòng nếu chưa có
+        if (roomRepository.count() == 0 && roomTypeRepository.count() > 0) {
+            log.info("Initializing rooms from JSON...");
+            try {
+                roomService.initRoomsFromJson();
+                log.info("Rooms initialized successfully");
+            } catch (Exception e) {
+                log.error("Failed to initialize rooms from JSON: {}", e.getMessage());
+            }
         }
     }
     
