@@ -3,6 +3,7 @@ package com.spring3.hotel.management.services.impl;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -14,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 
 import com.spring3.hotel.management.dtos.request.CreateUserRequest;
 import com.spring3.hotel.management.dtos.request.RegisterRequest;
@@ -22,6 +24,7 @@ import com.spring3.hotel.management.dtos.request.UserRequest;
 import com.spring3.hotel.management.dtos.response.UserProfileResponse;
 import com.spring3.hotel.management.dtos.response.UserResponse;
 import com.spring3.hotel.management.exceptions.BadRequestException;
+import com.spring3.hotel.management.exceptions.DuplicateResourceException;
 import com.spring3.hotel.management.exceptions.NotFoundException;
 import com.spring3.hotel.management.models.PasswordResetToken;
 import com.spring3.hotel.management.models.Role;
@@ -212,25 +215,36 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserProfileResponse getUserProfile(Integer id) {
-        User user = userRepository.findFirstById(id);
-        if(user == null){
-            throw new NotFoundException("Can't find record with identifier: " + id);
+    public UserProfileResponse getUserProfile(Integer userId) {
+        // Kiểm tra quyền truy cập nếu không phải là thông tin cá nhân
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+        User currentUser = userRepository.findByUsername(currentUsername);
+        
+        if (currentUser == null) {
+            throw new NotFoundException("User not found");
         }
+        
+        if (!currentUser.getId().equals(userId) && 
+            !currentUser.getRole().getName().equals("ROLE_ADMIN")) {
+            throw new AccessDeniedException("Access Denied: Không có quyền xem thông tin người dùng khác");
+        }
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
+        
         return mapToUserProfileResponse(user);
     }
 
     @Override
     public List<UserProfileResponse> getUserList() {
-        try {
-            List<User> users = userRepository.findAll();
-            return users.stream()
-                .map(this::mapToUserProfileResponse)
-                .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.error("Error retrieving user list: {}", e.getMessage());
-            return List.of(); // Return empty list instead of throwing exception
-        }
+        // Kiểm tra quyền admin
+        checkAdminRole();
+        
+        List<User> users = userRepository.findAll();
+        return users.stream()
+            .map(this::mapToUserProfileResponse)
+            .collect(Collectors.toList());
     }
 
     @Override
@@ -276,16 +290,57 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserProfileResponse createUser(CreateUserRequest request) {
-        User user = modelMapper.map(request, User.class);
+        // Kiểm tra quyền admin
+        checkAdminRole();
+        
+        // Kiểm tra username đã tồn tại chưa
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new DuplicateResourceException("Username already exists");
+        }
+        
+        // Kiểm tra email đã tồn tại chưa
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateResourceException("Email already exists");
+        }
+        
+        // Tạo người dùng mới
+        User user = new User();
+        user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setUpdatedAt(LocalDateTime.now());
-        user.setRole(request.getRole());
-
-        log.info("Creating user: {}", user);
+        user.setEmail(request.getEmail());
+        user.setFullName(request.getFullName());
+        user.setPhoneNumber(request.getPhone());
+        user.setGender(request.getGender());
+        user.setAddress(request.getAddress());
+        user.setNationalId(request.getNationalId());
+        
+        if (request.getDateOfBirth() != null) {
+            try {
+                LocalDate dateOfBirth = LocalDate.parse(request.getDateOfBirth());
+                user.setDateOfBirth(dateOfBirth);
+            } catch (DateTimeParseException e) {
+                throw new BadRequestException("Invalid date format. Please use YYYY-MM-DD format");
+            }
+        }
+        
+        // Xử lý role
+        if (request.getRole() != null) {
+            user.setRole(request.getRole());
+        } else {
+            // Mặc định là ROLE_USER
+            Role role = roleRepository.findByName("ROLE_USER")
+                .orElseThrow(() -> new NotFoundException("Default role not found"));
+            user.setRole(role);
+        }
+        
+        // Set thời gian tạo
+        user.setCreatedAt(LocalDateTime.now());
+        
+        // Lưu người dùng
         User savedUser = userRepository.save(user);
-        log.info("User created successfully: {}", savedUser);
-
+        
         return mapToUserProfileResponse(savedUser);
     }
     
@@ -419,6 +474,20 @@ public class UserServiceImpl implements UserService {
             userProfileResponse.setRole(user.getRole().getName());
         }
         return userProfileResponse;
+    }
+
+    private void checkAdminRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Chưa đăng nhập");
+        }
+        
+        boolean isAdmin = authentication.getAuthorities().stream()
+            .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!isAdmin) {
+            throw new AccessDeniedException("Access Denied: Chỉ admin mới có quyền thực hiện thao tác này");
+        }
     }
 
 }
