@@ -9,7 +9,7 @@ import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.models.Review.ReviewStatus;
 import com.spring3.hotel.management.repositories.ReviewRepository;
-import com.spring3.hotel.management.services.ReviewService;
+import com.spring3.hotel.management.services.interfaces.ReviewService;
 import com.spring3.hotel.management.utils.exceptions.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -192,20 +192,20 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public ReviewResponseDTO replyToReview(Integer id, ReplyReviewRequest request) {
         Review review = reviewRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Đánh giá không tìm thấy với ID: " + id));
-        
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + id));
+
+        // Cập nhật phản hồi
         review.setReplyComment(request.getReplyComment());
         review.setReplyBy(request.getReplyBy());
-        review.setStatus(ReviewStatus.REPLIED);
         review.setReplyDate(LocalDateTime.now());
-        review.setUpdatedAt(LocalDateTime.now());
-        
-        Review updatedReview = reviewRepository.save(review);
-        return ReviewResponseDTO.fromEntity(updatedReview);
+        review.setStatus(ReviewStatus.REPLIED);
+
+        Review savedReview = reviewRepository.save(review);
+        return mapToDto(savedReview);
     }
     
     @Override
-    public ReviewResponseDTO updateReview(UpdateReviewRequest request, Integer id) {
+    public ReviewResponseDTO updateReview(Integer id, UpdateReviewRequest request) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đánh giá không tìm thấy với ID: " + id));
         
@@ -233,13 +233,18 @@ public class ReviewServiceImpl implements ReviewService {
     }
     
     @Override
+    public ReviewResponseDTO updateReview(UpdateReviewRequest request, Integer id) {
+        return updateReview(id, request);
+    }
+    
+    @Override
     public ReviewResponseDTO deleteReview(Integer id) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đánh giá không tìm thấy với ID: " + id));
         
-        ReviewResponseDTO reviewResponseDTO = ReviewResponseDTO.fromEntity(review);
-        reviewRepository.deleteById(id);
-        return reviewResponseDTO;
+        ReviewResponseDTO response = ReviewResponseDTO.fromEntity(review);
+        reviewRepository.delete(review);
+        return response;
     }
     
     @Override
@@ -251,21 +256,29 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public Map<String, Object> getReviewStatistics() {
-        Map<String, Object> statistics = new HashMap<>();
-        
         long totalReviews = reviewRepository.count();
         long pendingReviews = reviewRepository.countByStatus(ReviewStatus.PENDING);
         long repliedReviews = reviewRepository.countByStatus(ReviewStatus.REPLIED);
         long hiddenReviews = reviewRepository.countByStatus(ReviewStatus.HIDDEN);
         
-        Double averageRating = reviewRepository.calculateAverageRating();
+        double averageRating = reviewRepository.findAll().stream()
+                .mapToDouble(Review::getRating)
+                .average()
+                .orElse(0.0);
         
-        long fiveStarCount = reviewRepository.countByRatingStar(5);
-        long fourStarCount = reviewRepository.countByRatingStar(4);
-        long threeStarCount = reviewRepository.countByRatingStar(3);
-        long twoStarCount = reviewRepository.countByRatingStar(2);
-        long oneStarCount = reviewRepository.countByRatingStar(1);
+        long fiveStarCount = reviewRepository.countByRating(5);
+        long fourStarCount = reviewRepository.countByRating(4);
+        long threeStarCount = reviewRepository.countByRating(3);
+        long twoStarCount = reviewRepository.countByRating(2);
+        long oneStarCount = reviewRepository.countByRating(1);
         
+        double fiveStarPercent = totalReviews > 0 ? (double) fiveStarCount / totalReviews * 100 : 0;
+        double fourStarPercent = totalReviews > 0 ? (double) fourStarCount / totalReviews * 100 : 0;
+        double threeStarPercent = totalReviews > 0 ? (double) threeStarCount / totalReviews * 100 : 0;
+        double twoStarPercent = totalReviews > 0 ? (double) twoStarCount / totalReviews * 100 : 0;
+        double oneStarPercent = totalReviews > 0 ? (double) oneStarCount / totalReviews * 100 : 0;
+        
+        Map<String, Object> statistics = new HashMap<>();
         statistics.put("totalReviews", totalReviews);
         statistics.put("pendingReviews", pendingReviews);
         statistics.put("repliedReviews", repliedReviews);
@@ -276,15 +289,11 @@ public class ReviewServiceImpl implements ReviewService {
         statistics.put("threeStarCount", threeStarCount);
         statistics.put("twoStarCount", twoStarCount);
         statistics.put("oneStarCount", oneStarCount);
-        
-        // Thêm phân phối đánh giá theo phần trăm
-        if (totalReviews > 0) {
-            statistics.put("fiveStarPercent", (fiveStarCount * 100.0) / totalReviews);
-            statistics.put("fourStarPercent", (fourStarCount * 100.0) / totalReviews);
-            statistics.put("threeStarPercent", (threeStarCount * 100.0) / totalReviews);
-            statistics.put("twoStarPercent", (twoStarCount * 100.0) / totalReviews);
-            statistics.put("oneStarPercent", (oneStarCount * 100.0) / totalReviews);
-        }
+        statistics.put("fiveStarPercent", fiveStarPercent);
+        statistics.put("fourStarPercent", fourStarPercent);
+        statistics.put("threeStarPercent", threeStarPercent);
+        statistics.put("twoStarPercent", twoStarPercent);
+        statistics.put("oneStarPercent", oneStarPercent);
         
         return statistics;
     }
