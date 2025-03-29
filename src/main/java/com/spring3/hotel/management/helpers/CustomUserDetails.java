@@ -25,7 +25,7 @@ public class CustomUserDetails extends User implements UserDetails {
         // Lấy role của user
         Role role = byUsername.getRole();
         if (role != null) {
-            auths.add(new SimpleGrantedAuthority(role.getName().toUpperCase()));
+            auths.add(new SimpleGrantedAuthority(role.getName()));
         }
         this.authorities = auths;
     }
