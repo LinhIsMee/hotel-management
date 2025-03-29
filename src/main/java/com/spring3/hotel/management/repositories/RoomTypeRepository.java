@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface RoomTypeRepository extends JpaRepository<RoomType, Integer> {
     Optional<RoomType> findByNameIgnoreCase(String name);
+    Optional<RoomType> findByCodeIgnoreCase(String code);
 }
