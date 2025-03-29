@@ -24,6 +24,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpMethod;
 
 import com.spring3.hotel.management.helpers.UserDetailsServiceImpl;
 
@@ -74,6 +75,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/v1/reviews", "/api/v1/reviews/").permitAll()
                         .requestMatchers("/api/v1/reviews/room/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/reviews", "/api/v1/reviews/").permitAll()
                         .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
                         .requestMatchers(
                             "/api/v1/users", 

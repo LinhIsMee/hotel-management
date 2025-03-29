@@ -33,7 +33,7 @@ public class ReviewController {
     }
 
     // Tạo mới một review
-    @PostMapping("/create")
+    @PostMapping("/")
     public ResponseEntity<ReviewResponseDTO> createReview(@RequestBody CreateReviewRequest request) {
         ReviewResponseDTO newReview = reviewService.createReview(request);
         return new ResponseEntity<>(newReview, HttpStatus.CREATED);
