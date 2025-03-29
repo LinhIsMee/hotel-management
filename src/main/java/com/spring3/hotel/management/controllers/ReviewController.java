@@ -1,15 +1,17 @@
 package com.spring3.hotel.management.controllers;
 
 import com.spring3.hotel.management.dtos.request.CreateReviewRequest;
+import com.spring3.hotel.management.dtos.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dtos.request.UpdateReviewRequest;
 import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
-import com.spring3.hotel.management.services.ReviewService;
+import com.spring3.hotel.management.services.interfaces.ReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/reviews")
@@ -60,5 +62,21 @@ public class ReviewController {
     public ResponseEntity<List<ReviewResponseDTO>> getReviewsByRoomId(@PathVariable Integer roomId) {
         List<ReviewResponseDTO> reviews = reviewService.getReviewsByRoomId(roomId);
         return ResponseEntity.ok(reviews);
+    }
+    
+    // Phản hồi review
+    @PostMapping("/{id}/reply")
+    public ResponseEntity<ReviewResponseDTO> replyToReview(
+            @PathVariable Integer id,
+            @RequestBody ReplyReviewRequest request) {
+        ReviewResponseDTO updatedReview = reviewService.replyToReview(id, request);
+        return ResponseEntity.ok(updatedReview);
+    }
+    
+    // Lấy thống kê đánh giá
+    @GetMapping("/statistics")
+    public ResponseEntity<Map<String, Object>> getReviewStatistics() {
+        Map<String, Object> statistics = reviewService.getReviewStatistics();
+        return ResponseEntity.ok(statistics);
     }
 }
