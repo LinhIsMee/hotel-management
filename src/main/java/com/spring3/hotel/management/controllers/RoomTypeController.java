@@ -49,10 +49,4 @@ public class RoomTypeController {
         List<RoomTypeResponseDTO> roomTypes = roomTypeService.getAllRoomTypes();
         return ResponseEntity.ok(roomTypes);
     }
-    
-    @PostMapping("/init")
-    public ResponseEntity<String> initRoomTypes() {
-        roomTypeService.initRoomTypesFromJson();
-        return ResponseEntity.ok("Khởi tạo dữ liệu loại phòng thành công");
-    }
 }
