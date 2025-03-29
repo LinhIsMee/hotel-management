@@ -21,9 +21,11 @@ import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
 import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
+import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import com.spring3.hotel.management.services.interfaces.RoomTypeService;
 import com.spring3.hotel.management.services.interfaces.ServiceService;
+import com.spring3.hotel.management.services.interfaces.ReviewService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -60,6 +62,12 @@ public class DataInitializer implements CommandLineRunner {
     
     @Autowired
     private PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    private ReviewRepository reviewRepository;
+    
+    @Autowired
+    private ReviewService reviewService;
     
     @Override
     public void run(String... args) throws Exception {
@@ -168,6 +176,17 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("Services initialized successfully");
             } catch (Exception e) {
                 log.error("Failed to initialize services from JSON: {}", e.getMessage());
+            }
+        }
+        
+        // Khởi tạo dữ liệu đánh giá nếu chưa có
+        if (reviewRepository.count() == 0) {
+            log.info("Initializing reviews from JSON...");
+            try {
+                reviewService.initReviewsFromJson();
+                log.info("Reviews initialized successfully");
+            } catch (Exception e) {
+                log.error("Failed to initialize reviews from JSON: {}", e.getMessage());
             }
         }
     }
