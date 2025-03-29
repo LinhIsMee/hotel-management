@@ -295,7 +295,18 @@ public class ReviewServiceImpl implements ReviewService {
             ClassPathResource resource = new ClassPathResource("data/reviews.json");
             InputStream inputStream = resource.getInputStream();
             
-            List<Review> reviews = objectMapper.readValue(inputStream, new TypeReference<List<Review>>() {});
+            // Đọc dữ liệu từ JSON với cấu trúc { "data": [ ... ] }
+            Map<String, List<Review>> reviewsMap = objectMapper.readValue(
+                inputStream, 
+                new TypeReference<Map<String, List<Review>>>() {}
+            );
+            
+            List<Review> reviews = reviewsMap.get("data");
+            
+            if (reviews == null || reviews.isEmpty()) {
+                log.warn("Không tìm thấy dữ liệu đánh giá trong file JSON hoặc danh sách rỗng");
+                return;
+            }
             
             // Kiểm tra dữ liệu và thiết lập thời gian
             reviews.forEach(review -> {
