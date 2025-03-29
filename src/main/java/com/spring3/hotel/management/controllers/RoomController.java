@@ -7,12 +7,14 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/rooms")
+@RequestMapping("/api/v1/admin/rooms")
+@PreAuthorize("hasRole('ADMIN')")
 public class RoomController {
     @Autowired
     private RoomService roomService;
@@ -41,8 +43,8 @@ public class RoomController {
     // Cập nhật thông tin phòng
     @PutMapping("/{id}")
     public ResponseEntity<RoomResponseDTO> updateRoom(
-        @PathVariable Integer id,
-        @Valid @RequestBody UpsertRoomRequest request) {
+        @Valid @RequestBody UpsertRoomRequest request,
+        @PathVariable Integer id) {
         RoomResponseDTO roomResponseDTO = roomService.updateRoom(request, id);
         return ResponseEntity.ok(roomResponseDTO);
     }
@@ -73,5 +75,11 @@ public class RoomController {
     public ResponseEntity<List<RoomResponseDTO>> getRoomsByStatus(@PathVariable String status) {
         List<RoomResponseDTO> rooms = roomService.getRoomsByStatus(status);
         return ResponseEntity.ok(rooms);
+    }
+
+    @PostMapping("/init")
+    public ResponseEntity<String> initRooms() {
+        roomService.initRoomsFromJson();
+        return ResponseEntity.ok("Khởi tạo dữ liệu phòng thành công");
     }
 }
