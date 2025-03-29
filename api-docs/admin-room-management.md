@@ -375,7 +375,9 @@ Authorization: Bearer <your_admin_jwt_token>
 
 **Endpoint**: `POST /api/v1/admin/rooms/init`
 
-**Mô tả**: Khởi tạo dữ liệu phòng từ file JSON. Chỉ khởi tạo nếu không có dữ liệu trong cơ sở dữ liệu. **Chỉ dành cho Admin**.
+**Mô tả**: Khởi tạo dữ liệu phòng từ file JSON có sẵn (data/rooms.json). **Chỉ dành cho Admin**. Lưu ý rằng cần phải khởi tạo dữ liệu loại phòng trước khi khởi tạo dữ liệu phòng.
+
+**Yêu cầu tiên quyết**: Phải có dữ liệu loại phòng trong cơ sở dữ liệu.
 
 **Request Header**:
 ```
@@ -387,7 +389,59 @@ Authorization: Bearer <your_admin_jwt_token>
 "Khởi tạo dữ liệu phòng thành công"
 ```
 
-**Lưu ý**:
-- API này chỉ thêm dữ liệu từ file JSON nếu cơ sở dữ liệu chưa có dữ liệu phòng nào
-- Nếu đã có dữ liệu phòng trong cơ sở dữ liệu, API vẫn trả về thành công nhưng không thực hiện thêm mới dữ liệu
-- API này phụ thuộc vào dữ liệu loại phòng đã tồn tại trong cơ sở dữ liệu (cần phải chạy API khởi tạo loại phòng trước)
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
+```json
+{
+  "timestamp": "2023-10-27T10:30:00.123+00:00",
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access Denied",
+  "path": "/api/v1/admin/rooms/init"
+}
+```
+
+**Response (Error - 500 Internal Server Error)**:
+```json
+{
+  "message": "Lỗi khi khởi tạo dữ liệu phòng: [chi tiết lỗi]"
+}
+```
+
+**Lưu ý quan trọng**: 
+- Các số phòng trong file JSON phải là duy nhất.
+- Các ID loại phòng được tham chiếu trong file rooms.json phải tồn tại trong cơ sở dữ liệu.
+- Nếu cơ sở dữ liệu đã có dữ liệu phòng, API sẽ không thực hiện thêm dữ liệu mới.
+
+## 10. Khởi tạo dữ liệu loại phòng từ file JSON
+
+**Endpoint**: `POST /api/v1/admin/room-types/init`
+
+**Mô tả**: Khởi tạo dữ liệu loại phòng từ file JSON có sẵn (data/room-types.json). **Chỉ dành cho Admin**.
+
+**Request Header**:
+```
+Authorization: Bearer <your_admin_jwt_token>
+```
+
+**Response (Success - 200 OK)**:
+```json
+"Khởi tạo dữ liệu loại phòng thành công"
+```
+
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
+```json
+{
+  "timestamp": "2023-10-27T10:30:00.123+00:00",
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access Denied",
+  "path": "/api/v1/admin/room-types/init"
+}
+```
+
+**Response (Error - 500 Internal Server Error)**:
+```json
+{
+  "message": "Lỗi khi khởi tạo dữ liệu loại phòng: [chi tiết lỗi]"
+}
+```
