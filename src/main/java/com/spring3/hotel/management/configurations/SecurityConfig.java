@@ -72,7 +72,7 @@ public class SecurityConfig {
                             "/api/v1/reset-password",
                             "/api/v1/logout"
                         ).permitAll()
-                        .requestMatchers("/api/v1/reviews/").permitAll()
+                        .requestMatchers("/api/v1/reviews", "/api/v1/reviews/").permitAll()
                         .requestMatchers("/api/v1/reviews/room/**").permitAll()
                         .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
                         .requestMatchers(
