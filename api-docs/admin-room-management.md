@@ -370,3 +370,24 @@ Authorization: Bearer <your_admin_jwt_token>
   }
 ]
 ```
+
+## 9. Khởi tạo dữ liệu phòng từ file JSON
+
+**Endpoint**: `POST /api/v1/admin/rooms/init`
+
+**Mô tả**: Khởi tạo dữ liệu phòng từ file JSON. Chỉ khởi tạo nếu không có dữ liệu trong cơ sở dữ liệu. **Chỉ dành cho Admin**.
+
+**Request Header**:
+```
+Authorization: Bearer <your_admin_jwt_token>
+```
+
+**Response (Success - 200 OK)**:
+```json
+"Khởi tạo dữ liệu phòng thành công"
+```
+
+**Lưu ý**:
+- API này chỉ thêm dữ liệu từ file JSON nếu cơ sở dữ liệu chưa có dữ liệu phòng nào
+- Nếu đã có dữ liệu phòng trong cơ sở dữ liệu, API vẫn trả về thành công nhưng không thực hiện thêm mới dữ liệu
+- API này phụ thuộc vào dữ liệu loại phòng đã tồn tại trong cơ sở dữ liệu (cần phải chạy API khởi tạo loại phòng trước)
