@@ -61,27 +61,23 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers(
-                            "/api/v1/save", 
-                            "/api/v1/login", 
-                            "/api/v1/register", 
-                            "/api/v1/validate-token", 
+                            "/api/v1/login",
+                            "/api/v1/register",
+                            "/api/v1/validate-token",
                             "/api/v1/refresh-token",
                             "/api/v1/forgot-password",
                             "/api/v1/reset-password",
-                            "/api/v1/logout",
-                            "/api/v1/user",
-                            "/api/v1/user/profile/**",
-                            "/api/v1/users",
-                            "/api/v1/users/**",
-                            "/api/v1/user/create",
-                            "/api/v1/user/update/**",
-                            "/api/v1/user/change-password"
+                            "/api/v1/logout"
                         ).permitAll()
-                    .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
-                    .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
-                    .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
+                        .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
+                        .requestMatchers("/api/v1/users", "/api/v1/users/{userId}", "/api/v1/user/create", "/api/v1/user/update/{userId}").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
+                        .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
