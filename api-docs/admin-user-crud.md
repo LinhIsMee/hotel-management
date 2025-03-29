@@ -4,22 +4,24 @@ File tài liệu này mô tả các API dành riêng cho Admin để quản lý 
 
 ## Yêu cầu xác thực
 
-Tất cả các API trong tài liệu này đều yêu cầu quyền Admin và cần gửi kèm JWT token trong header.
+Tất cả các API trong tài liệu này **đều yêu cầu quyền Admin (`ROLE_ADMIN`)** và cần gửi kèm JWT token hợp lệ của người dùng có quyền Admin trong header `Authorization`.
 
 **Header xác thực**:
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Authorization: Bearer <your_admin_jwt_token>
 ```
+
+**Lưu ý quan trọng**: Nếu bạn nhận được lỗi `403 Forbidden` khi gọi các API này, điều đó có nghĩa là JWT token bạn đang sử dụng không thuộc về một người dùng có vai trò `ADMIN` hoặc token không hợp lệ/hết hạn.
 
 ## 1. Lấy danh sách người dùng
 
 **Endpoint**: `GET /api/v1/users`
 
-**Mô tả**: Lấy danh sách tất cả người dùng trong hệ thống.
+**Mô tả**: Lấy danh sách tất cả người dùng trong hệ thống. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Authorization: Bearer <your_admin_jwt_token>
 ```
 
 **Response (Success - 200 OK)**:
@@ -56,10 +58,25 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 ]
 ```
 
-**Response (Error - 403 Forbidden)**:
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
 ```json
 {
-  "message": "Bạn không có quyền truy cập danh sách người dùng"
+  "timestamp": "2023-10-27T10:30:00.123+00:00", // Ví dụ
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Forbidden", // Hoặc thông báo cụ thể hơn tùy cấu hình
+  "path": "/api/v1/users"
+}
+```
+
+**Response (Error - 401 Unauthorized)**: _(Khi token không hợp lệ hoặc thiếu)_ 
+```json
+{
+  "timestamp": "2023-10-27T10:30:00.123+00:00", // Ví dụ
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Unauthorized", // Hoặc thông báo cụ thể hơn
+  "path": "/api/v1/users"
 }
 ```
 
@@ -74,11 +91,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 
 **Endpoint**: `GET /api/v1/users/{userId}`
 
-**Mô tả**: Lấy thông tin chi tiết của một người dùng dựa trên ID.
+**Mô tả**: Lấy thông tin chi tiết của một người dùng dựa trên ID. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Authorization: Bearer <your_admin_jwt_token>
 ```
 
 **Response (Success - 200 OK)**:
@@ -106,10 +123,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 }
 ```
 
-**Response (Error - 403 Forbidden)**:
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
 ```json
 {
-  "message": "Bạn không có quyền truy cập thông tin người dùng"
+  "timestamp": "2023-10-27T10:31:00.456+00:00", // Ví dụ
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Forbidden",
+  "path": "/api/v1/users/999"
 }
 ```
 
@@ -124,11 +145,12 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 
 **Endpoint**: `POST /api/v1/user/create`
 
-**Mô tả**: Tạo một người dùng mới trong hệ thống.
+**Mô tả**: Tạo một người dùng mới trong hệ thống. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Authorization: Bearer <your_admin_jwt_token>
+Content-Type: application/json
 ```
 
 **Request Body**:
@@ -140,16 +162,19 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
   "email": "new.user@example.com",
   "phone": "0123456789",
   "gender": "Female",
-  "dateOfBirth": "1992-03-15",
+  "dateOfBirth": "1992-03-15", // Định dạng YYYY-MM-DD
   "address": "789 New Street, City",
   "nationalId": "456789123012",
   "role": {
-    "name": "ROLE_STAFF"
+    "id": 3, // ID của Role (ví dụ: 1: ADMIN, 2: USER, 3: STAFF)
+    "name": "ROLE_STAFF" // Tên Role
   }
 }
 ```
 
-**Lưu ý**: Tham số `role` là một object với thuộc tính name có thể là "ROLE_ADMIN", "ROLE_STAFF" hoặc "ROLE_USER". Nếu không cung cấp, mặc định sẽ là "ROLE_USER".
+**Lưu ý**: 
+*   Trường `role` trong request body là một object chứa `id` và `name` của Role muốn gán. Bạn cần đảm bảo Role này tồn tại trong database.
+*   Nếu không cung cấp trường `role`, người dùng sẽ được tạo với vai trò mặc định là `ROLE_USER`.
 
 **Response (Success - 201 Created)**:
 ```json
@@ -163,9 +188,30 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
   "gender": "Female",
   "dateOfBirth": "1992-03-15",
   "nationalId": "456789123012",
-  "createdAt": "14:25:10 - 29/03/2023",
+  "createdAt": "14:25:10 - 29/03/2023", // Ví dụ
   "updatedAt": null,
   "role": "ROLE_STAFF"
+}
+```
+
+**Response (Error - 400 Bad Request)**: _(Ví dụ: username/email đã tồn tại, sai định dạng ngày sinh, role không tồn tại)_ 
+```json
+{
+  "message": "Username already exists" 
+  // Hoặc "Email already exists"
+  // Hoặc "Invalid date format. Please use YYYY-MM-DD format"
+  // Hoặc "Role not found: ROLE_INVALID"
+}
+```
+
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
+```json
+{
+  "timestamp": "2023-10-27T10:32:00.789+00:00", // Ví dụ
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Forbidden",
+  "path": "/api/v1/user/create"
 }
 ```
 
@@ -180,41 +226,75 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 
 **Endpoint**: `PUT /api/v1/user/update/{userId}`
 
-**Mô tả**: Cập nhật thông tin của một người dùng dựa trên ID.
+**Mô tả**: Cập nhật thông tin của một người dùng dựa trên ID. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Authorization: Bearer <your_admin_jwt_token>
+Content-Type: application/json
 ```
 
-**Request Body**:
+**Request Body**: _(Chỉ chứa các trường cần cập nhật)_ 
 ```json
 {
-  "fullName": "John Smith Doe",
-  "email": "john.smith@example.com",
+  "fullName": "John Smith Doe Updated",
+  "email": "john.smith.updated@example.com",
   "phone": "0987123456",
   "gender": "Male",
-  "dateOfBirth": "1990-01-15",
+  "dateOfBirth": "1990-01-15", // Định dạng YYYY-MM-DD
   "address": "123 Updated Street, City",
-  "nationalId": "123456789012"
+  "nationalId": "123456789012",
+  "role": {
+      "id": 2, 
+      "name": "ROLE_USER"
+  } // Có thể cập nhật cả Role
 }
 ```
+
+**Lưu ý**: 
+*   Bạn không thể cập nhật `username`.
+*   Trường `role` nếu có sẽ cập nhật vai trò của người dùng.
 
 **Response (Success - 200 OK)**:
 ```json
 {
   "id": 2,
   "username": "johndoe",
-  "fullName": "John Smith Doe",
-  "email": "john.smith@example.com",
+  "fullName": "John Smith Doe Updated",
+  "email": "john.smith.updated@example.com",
   "phone": "0987123456",
   "address": "123 Updated Street, City",
   "gender": "Male",
   "dateOfBirth": "1990-01-15",
   "nationalId": "123456789012",
   "createdAt": "15:30:45 - 27/03/2023",
-  "updatedAt": "16:45:22 - 29/03/2023",
+  "updatedAt": "16:45:22 - 29/03/2023", // Ví dụ
   "role": "ROLE_USER"
+}
+```
+
+**Response (Error - 404 Not Found)**:
+```json
+{
+  "message": "User not found with id: 999"
+}
+```
+
+**Response (Error - 400 Bad Request)**: _(Ví dụ: sai định dạng dữ liệu)_ 
+```json
+{
+  "message": "Invalid date format. Please use YYYY-MM-DD format"
+}
+```
+
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
+```json
+{
+  "timestamp": "2023-10-27T10:33:00.111+00:00", // Ví dụ
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Forbidden",
+  "path": "/api/v1/user/update/2"
 }
 ```
 
@@ -229,17 +309,35 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 
 **Endpoint**: `DELETE /api/v1/users/{userId}`
 
-**Mô tả**: Xóa một người dùng khỏi hệ thống dựa trên ID.
+**Mô tả**: Xóa một người dùng khỏi hệ thống dựa trên ID. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Authorization: Bearer <your_admin_jwt_token>
 ```
 
 **Response (Success - 200 OK)**:
 ```json
 {
   "message": "Xóa người dùng thành công"
+}
+```
+
+**Response (Error - 404 Not Found)**:
+```json
+{
+  "message": "User not found with id: 999"
+}
+```
+
+**Response (Error - 403 Forbidden)**: _(Khi token không có quyền Admin)_ 
+```json
+{
+  "timestamp": "2023-10-27T10:34:00.222+00:00", // Ví dụ
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Forbidden",
+  "path": "/api/v1/users/999"
 }
 ```
 
@@ -250,4 +348,4 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 }
 ```
 
-**Lưu ý**: Khi xóa người dùng, hệ thống sẽ tự động xóa các refresh token và password reset token liên quan đến người dùng đó để tránh lỗi foreign key constraint. 
+**Lưu ý chung**: Khi xóa người dùng, hệ thống sẽ tự động xóa các refresh token và password reset token liên quan đến người dùng đó. 
