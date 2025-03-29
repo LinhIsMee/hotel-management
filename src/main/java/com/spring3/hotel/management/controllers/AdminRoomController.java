@@ -77,4 +77,11 @@ public class AdminRoomController {
         List<RoomResponseDTO> rooms = roomService.getRoomsByStatus(status);
         return ResponseEntity.ok(rooms);
     }
+
+    // Khởi tạo dữ liệu phòng từ file JSON
+    @PostMapping("/init")
+    public ResponseEntity<String> initRooms() {
+        roomService.initRoomsFromJson();
+        return ResponseEntity.ok("Khởi tạo dữ liệu phòng thành công");
+    }
 } 
