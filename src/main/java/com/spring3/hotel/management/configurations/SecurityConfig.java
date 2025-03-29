@@ -73,7 +73,12 @@ public class SecurityConfig {
                             "/api/v1/logout"
                         ).permitAll()
                         .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
-                        .requestMatchers("/api/v1/users", "/api/v1/users/{userId}", "/api/v1/user/create", "/api/v1/user/update/{userId}").hasRole("ADMIN")
+                        .requestMatchers(
+                            "/api/v1/users", 
+                            "/api/v1/users/**", 
+                            "/api/v1/user/create", 
+                            "/api/v1/user/update/**"
+                        ).hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
                         .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
