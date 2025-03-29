@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.controllers;
 
-
-import com.spring3.hotel.management.models.RoomType;
+import com.spring3.hotel.management.dtos.request.UpsertRoomTypeRequest;
+import com.spring3.hotel.management.dtos.response.RoomTypeResponseDTO;
 import com.spring3.hotel.management.services.interfaces.RoomTypeService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,34 +19,40 @@ public class RoomTypeController {
     private RoomTypeService roomTypeService;
 
     @GetMapping("/{id}")
-    public ResponseEntity<RoomType> getRoomTypeById(@PathVariable Integer id) {
-        RoomType roomType = roomTypeService.getRoomTypeById(id);
+    public ResponseEntity<RoomTypeResponseDTO> getRoomTypeById(@PathVariable Integer id) {
+        RoomTypeResponseDTO roomType = roomTypeService.getRoomTypeById(id);
         return ResponseEntity.ok(roomType);
     }
 
     @PostMapping
-    public ResponseEntity<RoomType> createRoomType(@Valid @RequestBody RoomType roomType) {
-        RoomType createdRoomType = roomTypeService.createRoomType(roomType);
+    public ResponseEntity<RoomTypeResponseDTO> createRoomType(@Valid @RequestBody UpsertRoomTypeRequest request) {
+        RoomTypeResponseDTO createdRoomType = roomTypeService.createRoomType(request);
         return new ResponseEntity<>(createdRoomType, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<RoomType> updateRoomType(
+    public ResponseEntity<RoomTypeResponseDTO> updateRoomType(
         @PathVariable Integer id,
-        @Valid @RequestBody RoomType roomType) {
-        RoomType updatedRoomType = roomTypeService.updateRoomType(roomType, id);
+        @Valid @RequestBody UpsertRoomTypeRequest request) {
+        RoomTypeResponseDTO updatedRoomType = roomTypeService.updateRoomType(request, id);
         return ResponseEntity.ok(updatedRoomType);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteRoomType(@PathVariable Integer id) {
-        roomTypeService.deleteRoomType(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<RoomTypeResponseDTO> deleteRoomType(@PathVariable Integer id) {
+        RoomTypeResponseDTO deletedRoomType = roomTypeService.deleteRoomType(id);
+        return ResponseEntity.ok(deletedRoomType);
     }
 
     @GetMapping
-    public ResponseEntity<List<RoomType>> getAllRoomTypes() {
-        List<RoomType> roomTypes = roomTypeService.getAllRoomTypes();
+    public ResponseEntity<List<RoomTypeResponseDTO>> getAllRoomTypes() {
+        List<RoomTypeResponseDTO> roomTypes = roomTypeService.getAllRoomTypes();
         return ResponseEntity.ok(roomTypes);
+    }
+    
+    @PostMapping("/init")
+    public ResponseEntity<String> initRoomTypes() {
+        roomTypeService.initRoomTypesFromJson();
+        return ResponseEntity.ok("Khởi tạo dữ liệu loại phòng thành công");
     }
 }
