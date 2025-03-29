@@ -79,6 +79,7 @@ public class SecurityConfig {
                             "/api/v1/user/create", 
                             "/api/v1/user/update/**"
                         ).hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/employees/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
                         .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")

@@ -1,14 +1,22 @@
 package com.spring3.hotel.management.config;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import com.spring3.hotel.management.models.Department;
+import com.spring3.hotel.management.models.Employee;
+import com.spring3.hotel.management.models.Position;
 import com.spring3.hotel.management.models.Role;
 import com.spring3.hotel.management.models.User;
+import com.spring3.hotel.management.repositories.EmployeeRepository;
 import com.spring3.hotel.management.repositories.RoleRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 
@@ -23,6 +31,9 @@ public class DataInitializer implements CommandLineRunner {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private EmployeeRepository employeeRepository;
     
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -70,5 +81,52 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("Default admin account created successfully");
             }
         }
+        
+        // Khởi tạo dữ liệu nhân viên mẫu nếu chưa có
+        if (employeeRepository.count() == 0) {
+            log.info("Creating sample employees...");
+            
+            List<Employee> employees = new ArrayList<>();
+            
+            // Dữ liệu mẫu từ JSON
+            addEmployee(employees, "Nguyễn Thị Anh", "nguyenthianh@hotel.com", "0901122334", Department.MANAGEMENT, Position.MANAGER, "2022-01-10", true);
+            addEmployee(employees, "Trần Văn Bình", "tranvanbinh@hotel.com", "0912233445", Department.FRONT_DESK, Position.RECEPTIONIST, "2022-02-15", true);
+            addEmployee(employees, "Phạm Thị Châu", "phamthichau@hotel.com", "0923344556", Department.FRONT_DESK, Position.RECEPTIONIST, "2022-03-01", true);
+            addEmployee(employees, "Lê Văn Đức", "levanduc@hotel.com", "0934455667", Department.RESTAURANT, Position.SERVER, "2022-03-15", false);
+            addEmployee(employees, "Hoàng Thị Giang", "hoangthigiang@hotel.com", "0945566778", Department.HOUSEKEEPING, Position.CLEANING, "2022-04-01", true);
+            addEmployee(employees, "Đỗ Văn Hùng", "dovanhung@hotel.com", "0956677889", Department.SECURITY, Position.SECURITY, "2022-04-15", true);
+            addEmployee(employees, "Ngô Thị Lan", "ngothilan@hotel.com", "0967788990", Department.RESTAURANT, Position.SERVER, "2022-05-01", true);
+            addEmployee(employees, "Vũ Văn Minh", "vuvanminh@hotel.com", "0978899001", Department.TECHNICAL, Position.MANAGER, "2022-05-15", true);
+            addEmployee(employees, "Lý Thị Ngọc", "lythingoc@hotel.com", "0989900112", Department.HOUSEKEEPING, Position.CLEANING, "2022-06-01", true);
+            addEmployee(employees, "Phan Văn Phúc", "phanvanphuc@hotel.com", "0990011223", Department.FRONT_DESK, Position.MANAGER, "2022-06-15", true);
+            addEmployee(employees, "Trịnh Thị Quỳnh", "trinhthiquynh@hotel.com", "0901122334", Department.RESTAURANT, Position.MANAGER, "2022-07-01", true);
+            addEmployee(employees, "Mai Văn Sơn", "maivanson@hotel.com", "0912233445", Department.SECURITY, Position.SECURITY, "2022-07-15", true);
+            addEmployee(employees, "Đặng Thị Thảo", "dangthithao@hotel.com", "0923344556", Department.FRONT_DESK, Position.RECEPTIONIST, "2022-08-01", true);
+            addEmployee(employees, "Bùi Văn Uy", "buivanuy@hotel.com", "0934455667", Department.TECHNICAL, Position.MANAGER, "2022-08-15", false);
+            addEmployee(employees, "Hồ Thị Vân", "hothivan@hotel.com", "0945566778", Department.HOUSEKEEPING, Position.MANAGER, "2022-09-01", true);
+            addEmployee(employees, "Dương Văn X", "duongvanx@hotel.com", "0956677889", Department.RESTAURANT, Position.CHEF, "2022-09-15", true);
+            addEmployee(employees, "Trương Thị Y", "truongthiy@hotel.com", "0967788990", Department.HOUSEKEEPING, Position.SUPERVISOR, "2022-10-01", true);
+            addEmployee(employees, "Đinh Văn Z", "dinhvanz@hotel.com", "0978899001", Department.SECURITY, Position.SUPERVISOR, "2022-10-15", true);
+            addEmployee(employees, "Lương Thị W", "luongthiw@hotel.com", "0989900112", Department.SPA, Position.THERAPIST, "2022-11-01", true);
+            addEmployee(employees, "Võ Văn T", "vovant@hotel.com", "0990011223", Department.FRONT_DESK, Position.SUPERVISOR, "2022-11-15", true);
+            
+            employeeRepository.saveAll(employees);
+            
+            log.info("Sample employees created successfully");
+        }
+    }
+    
+    // Helper method to create an employee
+    private void addEmployee(List<Employee> employees, String name, String email, String phone, 
+                           Department department, Position position, String joinDateStr, Boolean status) {
+        Employee employee = new Employee();
+        employee.setName(name);
+        employee.setEmail(email);
+        employee.setPhone(phone);
+        employee.setDepartment(department);
+        employee.setPosition(position);
+        employee.setJoinDate(LocalDate.parse(joinDateStr));
+        employee.setStatus(status);
+        employees.add(employee);
     }
 } 
