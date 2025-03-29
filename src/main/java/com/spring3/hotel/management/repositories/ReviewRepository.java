@@ -51,4 +51,6 @@ public interface ReviewRepository extends JpaRepository<Review, Integer> {
     
     @Query("SELECT COUNT(r) FROM Review r WHERE r.rating = :star")
     long countByRatingStar(int star);
+    
+    long countByRating(int rating);
 }

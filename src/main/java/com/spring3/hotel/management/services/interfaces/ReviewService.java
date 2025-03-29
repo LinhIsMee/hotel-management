@@ -12,6 +12,8 @@ import java.util.Map;
 
 public interface ReviewService {
     
+    List<ReviewResponseDTO> getAllReviews();
+    
     Page<ReviewResponseDTO> getAllReviews(Pageable pageable);
     
     Page<ReviewResponseDTO> getPublicReviews(Pageable pageable);
@@ -30,6 +32,8 @@ public interface ReviewService {
     
     List<ReviewResponseDTO> getReviewsByRoomType(String roomType);
     
+    List<ReviewResponseDTO> getReviewsByRoomId(Integer roomId);
+    
     List<ReviewResponseDTO> getFeaturedReviews();
     
     Page<ReviewResponseDTO> getReviewsByMinRating(Integer minRating, Pageable pageable);
@@ -42,7 +46,9 @@ public interface ReviewService {
     
     ReviewResponseDTO updateReview(Integer id, UpdateReviewRequest request);
     
-    void deleteReview(Integer id);
+    ReviewResponseDTO updateReview(UpdateReviewRequest request, Integer id);
+    
+    ReviewResponseDTO deleteReview(Integer id);
     
     Map<String, Object> getReviewStatistics();
     
