@@ -360,4 +360,24 @@ public class UserController {
                 .body(new MessageResponse("Lỗi khi đổi mật khẩu: " + e.getMessage()));
         }
     }
+
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<?> getUserById(@PathVariable Integer userId) {
+        try {
+            UserProfileResponse userResponse = userService.getUserProfile(userId);
+            return ResponseEntity.ok(userResponse);
+        } catch (Exception e) {
+            String errorMessage = e.getMessage();
+            if (errorMessage != null && errorMessage.contains("User not found")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Không tìm thấy người dùng với ID: " + userId));
+            }
+            if (errorMessage != null && errorMessage.contains("Access Denied")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Bạn không có quyền truy cập thông tin người dùng"));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi lấy thông tin người dùng: " + errorMessage));
+        }
+    }
 }
