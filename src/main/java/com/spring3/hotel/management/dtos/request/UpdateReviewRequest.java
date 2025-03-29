@@ -1,15 +1,17 @@
 package com.spring3.hotel.management.dtos.request;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 
 @Data
-@AllArgsConstructor
+@Builder
 @NoArgsConstructor
-@ToString
+@AllArgsConstructor
 public class UpdateReviewRequest {
-    private String comment;
-    private Integer rating;
+    
+    private Boolean isFeatured;
+    private Boolean isAnonymous;
+    private String status; // PENDING, REPLIED, HIDDEN
 }

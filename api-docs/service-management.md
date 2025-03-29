@@ -7,7 +7,7 @@ API quản lý dịch vụ cho phép người dùng (có quyền phù hợp) th�
 ## Base URL
 
 ```
-https://api.hotel-management.com/api
+http://localhost:9000/api
 ```
 
 ## Xác thực

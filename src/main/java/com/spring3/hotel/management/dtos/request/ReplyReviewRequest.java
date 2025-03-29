@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReplyRatingRequest {
+public class ReplyReviewRequest {
     
     @NotBlank(message = "Nội dung phản hồi không được để trống")
     private String replyComment;
