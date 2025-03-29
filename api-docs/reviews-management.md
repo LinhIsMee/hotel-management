@@ -39,7 +39,7 @@ API này cung cấp các endpoint để quản lý đánh giá của khách hàn
 ### 1. Lấy danh sách đánh giá
 
 ```
-GET /api/reviews
+GET /api/v1/reviews
 ```
 
 Trả về danh sách tất cả các đánh giá, có phân trang và sắp xếp.
@@ -122,7 +122,7 @@ Trả về danh sách tất cả các đánh giá, có phân trang và sắp x�
 ### 2. Lấy danh sách đánh giá công khai
 
 ```
-GET /api/reviews/public
+GET /api/v1/reviews/public
 ```
 
 Trả về danh sách các đánh giá có thể hiển thị công khai (không bao gồm các đánh giá đã ẩn).
@@ -154,7 +154,7 @@ Trả về danh sách các đánh giá có thể hiển thị công khai (không
 ### 3. Lấy danh sách đánh giá đang chờ xử lý
 
 ```
-GET /api/reviews/pending
+GET /api/v1/reviews/pending
 ```
 
 Trả về danh sách các đánh giá đang chờ xử lý (chưa được phản hồi).
@@ -190,7 +190,7 @@ Yêu cầu vai trò: ADMIN hoặc STAFF
 ### 4. Lấy danh sách đánh giá đã được phản hồi
 
 ```
-GET /api/reviews/replied
+GET /api/v1/reviews/replied
 ```
 
 Trả về danh sách các đánh giá đã được phản hồi.
@@ -222,7 +222,7 @@ Trả về danh sách các đánh giá đã được phản hồi.
 ### 5. Lấy danh sách đánh giá đã ẩn
 
 ```
-GET /api/reviews/hidden
+GET /api/v1/reviews/hidden
 ```
 
 Trả về danh sách các đánh giá đã bị ẩn.
@@ -258,7 +258,7 @@ Yêu cầu vai trò: ADMIN hoặc STAFF
 ### 6. Lấy thông tin đánh giá theo ID
 
 ```
-GET /api/reviews/{id}
+GET /api/v1/reviews/{id}
 ```
 
 Trả về thông tin chi tiết của một đánh giá theo ID.
@@ -318,7 +318,7 @@ Trả về thông tin chi tiết của một đánh giá theo ID.
 ### 7. Lấy thông tin đánh giá theo mã đặt phòng
 
 ```
-GET /api/reviews/booking/{bookingId}
+GET /api/v1/reviews/booking/{bookingId}
 ```
 
 Trả về thông tin chi tiết của một đánh giá theo mã đặt phòng.
@@ -356,7 +356,7 @@ Trả về thông tin chi tiết của một đánh giá theo mã đặt phòng.
 ### 8. Lấy danh sách đánh giá theo số phòng
 
 ```
-GET /api/reviews/room/{roomNumber}
+GET /api/v1/reviews/room/{roomNumber}
 ```
 
 Trả về danh sách các đánh giá theo số phòng.
@@ -384,7 +384,7 @@ Trả về danh sách các đánh giá theo số phòng.
 ### 9. Lấy danh sách đánh giá theo loại phòng
 
 ```
-GET /api/reviews/room-type/{roomType}
+GET /api/v1/reviews/room-type/{roomType}
 ```
 
 Trả về danh sách các đánh giá theo loại phòng.
@@ -412,7 +412,7 @@ Trả về danh sách các đánh giá theo loại phòng.
 ### 10. Lấy danh sách đánh giá nổi bật
 
 ```
-GET /api/reviews/featured
+GET /api/v1/reviews/featured
 ```
 
 Trả về danh sách các đánh giá được đánh dấu là nổi bật.
@@ -434,7 +434,7 @@ Trả về danh sách các đánh giá được đánh dấu là nổi bật.
 ### 11. Lấy danh sách đánh giá theo điểm tối thiểu
 
 ```
-GET /api/reviews/min-rating/{minRating}
+GET /api/v1/reviews/min-rating/{minRating}
 ```
 
 Trả về danh sách các đánh giá có điểm số từ một mức tối thiểu.
@@ -472,7 +472,7 @@ Trả về danh sách các đánh giá có điểm số từ một mức tối t
 ### 12. Tìm kiếm đánh giá theo tên khách hàng
 
 ```
-GET /api/reviews/search
+GET /api/v1/reviews/search
 ```
 
 Tìm kiếm đánh giá theo tên khách hàng.
@@ -505,7 +505,7 @@ Tìm kiếm đánh giá theo tên khách hàng.
 ### 13. Tạo đánh giá mới
 
 ```
-POST /api/reviews
+POST /api/v1/reviews
 ```
 
 Tạo một đánh giá mới.
@@ -558,7 +558,7 @@ Tạo một đánh giá mới.
 ### 14. Phản hồi đánh giá
 
 ```
-POST /api/reviews/{id}/reply
+POST /api/v1/reviews/{id}/reply
 ```
 
 Phản hồi một đánh giá.
@@ -609,7 +609,7 @@ Yêu cầu vai trò: ADMIN hoặc STAFF
 ### 15. Cập nhật đánh giá
 
 ```
-PUT /api/reviews/{id}
+PUT /api/v1/reviews/{id}
 ```
 
 Cập nhật thông tin của một đánh giá.
@@ -661,7 +661,7 @@ Yêu cầu vai trò: ADMIN hoặc STAFF
 ### 16. Xóa đánh giá
 
 ```
-DELETE /api/reviews/{id}
+DELETE /api/v1/reviews/{id}
 ```
 
 Xóa một đánh giá.
@@ -701,7 +701,7 @@ Yêu cầu vai trò: ADMIN
 ### 17. Lấy thống kê đánh giá
 
 ```
-GET /api/reviews/statistics
+GET /api/v1/reviews/statistics
 ```
 
 Lấy thông tin thống kê đánh giá.
@@ -735,30 +735,6 @@ Yêu cầu vai trò: ADMIN hoặc STAFF
     "twoStarPercent": 4.0,
     "oneStarPercent": 2.0
   }
-}
-```
-
-### 18. Khởi tạo dữ liệu đánh giá từ file JSON
-
-```
-POST /api/reviews/init
-```
-
-Khởi tạo dữ liệu đánh giá từ file JSON.
-
-#### Yêu cầu xác thực
-
-Yêu cầu vai trò: ADMIN
-
-#### Response
-
-**Thành công (200)**
-
-```json
-{
-  "statusCode": 200,
-  "message": "Khởi tạo dữ liệu đánh giá từ file JSON thành công",
-  "data": null
 }
 ```
 
