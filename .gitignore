@@ -20,7 +20,7 @@ target/
 *.iml
 *.ipr
 
-### NetBeans ###
+### NetBeans ###    
 /nbproject/private/
 /nbbuild/
 /dist/
@@ -31,6 +31,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+/target/
+/api-docs/
+data/   
 ### VS Code ###
 .vscode/
 

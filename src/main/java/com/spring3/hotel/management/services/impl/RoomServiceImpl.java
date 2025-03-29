@@ -2,108 +2,138 @@ package com.spring3.hotel.management.services.impl;
 
 import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
-import com.spring3.hotel.management.exceptions.NotFoundException;
+import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
-import com.spring3.hotel.management.services.RoomService;
+import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class RoomServiceImpl implements RoomService {
 
     @Autowired
-    RoomRepository roomRepository;
-
+    private RoomRepository roomRepository;
+    
     @Autowired
-    RoomTypeRepository roomTypeRepository;
-
+    private RoomTypeRepository roomTypeRepository;
+    
+    @Override
+    public List<RoomResponseDTO> getAllRooms() {
+        return roomRepository.findAll()
+                .stream()
+                .map(RoomResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
     @Override
     public RoomResponseDTO getRoomById(Integer id) {
-        return roomRepository.findById(id)
-                .map(this::convertToRoomResponseDTO)
-                .orElseThrow(() -> new RuntimeException("Room not found"));
-
+        Room room = roomRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
+        return RoomResponseDTO.fromEntity(room);
     }
-
+    
     @Override
     public RoomResponseDTO getRoomByRoomNumber(String roomNumber) {
-        Room room = roomRepository.findByRoomNumber(roomNumber);
-        if (room == null) {
-            throw new NotFoundException("Room not found with room number: " + roomNumber);
-        }
-        return convertToRoomResponseDTO(room);
+        Room room = roomRepository.findByRoomNumber(roomNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với số phòng: " + roomNumber));
+        return RoomResponseDTO.fromEntity(room);
     }
-
+    
+    @Override
+    public List<RoomResponseDTO> getRoomsByRoomType(Integer roomTypeId) {
+        return roomRepository.findByRoomTypeId(roomTypeId)
+                .stream()
+                .map(RoomResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<RoomResponseDTO> getRoomsByStatus(String status) {
+        return roomRepository.findByStatus(status)
+                .stream()
+                .map(RoomResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
     @Override
     public RoomResponseDTO createRoom(UpsertRoomRequest request) {
-        Room room = new Room();
+        // Kiểm tra phòng đã tồn tại chưa
+        if (roomRepository.findByRoomNumber(request.getRoomNumber()).isPresent()) {
+            throw new IllegalArgumentException("Số phòng đã tồn tại: " + request.getRoomNumber());
+        }
+        
+        // Lấy loại phòng
         RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
-                .orElseThrow(() -> new NotFoundException("Room type not found with ID: " + request.getRoomTypeId()));
-        room.setRoomNumber(request.getRoomNumber());
-        room.setRoomType(roomType);
-        room.setStatus(request.getStatus());
-        room.setDescription(request.getDescription());
-        Room createdRoom = roomRepository.save(room);
-        return convertToRoomResponseDTO(createdRoom);
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + request.getRoomTypeId()));
+        
+        // Tạo phòng mới
+        Room room = Room.builder()
+                .roomNumber(request.getRoomNumber())
+                .roomType(roomType)
+                .status(request.getStatus())
+                .floor(request.getFloor())
+                .isActive(request.getIsActive())
+                .notes(request.getNotes())
+                .build();
+        
+        Room savedRoom = roomRepository.save(room);
+        return RoomResponseDTO.fromEntity(savedRoom);
     }
-
+    
     @Override
     public RoomResponseDTO updateRoom(UpsertRoomRequest request, Integer id) {
-        Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Room not found with ID: " + id));
+        Room existingRoom = roomRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
+        
+        // Kiểm tra nếu số phòng thay đổi và số phòng mới đã tồn tại
+        if (!existingRoom.getRoomNumber().equals(request.getRoomNumber()) &&
+                roomRepository.findByRoomNumber(request.getRoomNumber()).isPresent()) {
+            throw new IllegalArgumentException("Số phòng đã tồn tại: " + request.getRoomNumber());
+        }
+        
+        // Lấy loại phòng
         RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
-                .orElseThrow(() -> new NotFoundException("Room type not found with ID: " + request.getRoomTypeId()));
-        room.setRoomNumber(request.getRoomNumber());
-        room.setRoomType(roomType);
-        room.setStatus(request.getStatus());
-        room.setDescription(request.getDescription());
-        Room updatedRoom = roomRepository.save(room);
-        return convertToRoomResponseDTO(updatedRoom);
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + request.getRoomTypeId()));
+        
+        // Cập nhật thông tin
+        existingRoom.setRoomNumber(request.getRoomNumber());
+        existingRoom.setRoomType(roomType);
+        
+        if (request.getStatus() != null) {
+            existingRoom.setStatus(request.getStatus());
+        }
+        
+        if (request.getFloor() != null) {
+            existingRoom.setFloor(request.getFloor());
+        }
+        
+        if (request.getIsActive() != null) {
+            existingRoom.setIsActive(request.getIsActive());
+        }
+        
+        if (request.getNotes() != null) {
+            existingRoom.setNotes(request.getNotes());
+        }
+        
+        Room updatedRoom = roomRepository.save(existingRoom);
+        return RoomResponseDTO.fromEntity(updatedRoom);
     }
-
+    
     @Override
     public void deleteRoom(Integer id) {
         Room room = roomRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Room not found with ID: " + id));
-        roomRepository.delete(room);
-    }
-
-    @Override
-    public List<RoomResponseDTO> getAllRooms() {
-        return roomRepository.findAll().stream()
-                .map(this::convertToRoomResponseDTO)
-                .toList();
-    }
-
-    @Override
-    public List<RoomResponseDTO> getRoomsByRoomType(Integer roomTypeId) {
-        return roomRepository.findByRoomType_Id(roomTypeId).stream()
-                .map(this::convertToRoomResponseDTO)
-                .toList();
-    }
-
-    @Override
-    public List<RoomResponseDTO> getRoomsByStatus(String status) {
-        return roomRepository.findByStatus(status).stream()
-                .map(this::convertToRoomResponseDTO)
-                .toList();
-    }
-
-    private RoomResponseDTO convertToRoomResponseDTO(Room room) {
-        RoomResponseDTO roomResponseDTO = new RoomResponseDTO();
-        roomResponseDTO.setId(room.getId());
-        roomResponseDTO.setRoomNumber(room.getRoomNumber());
-        roomResponseDTO.setRoomTypeId(room.getRoomType().getId());
-        roomResponseDTO.setRoomTypeName(room.getRoomType().getName());
-        roomResponseDTO.setStatus(room.getStatus());
-        roomResponseDTO.setDescription(room.getDescription());
-        return roomResponseDTO;
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
+        
+        // Xóa logic bằng cách đặt isActive = false
+        room.setIsActive(false);
+        roomRepository.save(room);
     }
 }

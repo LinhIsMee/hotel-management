@@ -2,7 +2,7 @@ package com.spring3.hotel.management.controllers;
 
 
 import com.spring3.hotel.management.models.RoomType;
-import com.spring3.hotel.management.services.RoomTypeService;
+import com.spring3.hotel.management.services.interfaces.RoomTypeService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

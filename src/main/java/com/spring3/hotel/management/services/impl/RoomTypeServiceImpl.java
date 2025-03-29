@@ -1,8 +1,9 @@
 package com.spring3.hotel.management.services.impl;
 
+import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
-import com.spring3.hotel.management.services.RoomTypeService;
+import com.spring3.hotel.management.services.interfaces.RoomTypeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,40 +15,45 @@ import java.util.List;
 public class RoomTypeServiceImpl implements RoomTypeService {
 
     @Autowired
-    RoomTypeRepository roomTypeRepository;
+    private RoomTypeRepository roomTypeRepository;
 
     @Override
     public RoomType getRoomTypeById(Integer id) {
         return roomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room type not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + id));
     }
 
     @Override
     public RoomType createRoomType(RoomType roomType) {
-        log.info("Creating room type: {}", roomType);
+        // Kiểm tra xem tên loại phòng đã tồn tại chưa
+        if (roomTypeRepository.findByNameIgnoreCase(roomType.getName()).isPresent()) {
+            throw new IllegalArgumentException("Tên loại phòng đã tồn tại: " + roomType.getName());
+        }
+        
         return roomTypeRepository.save(roomType);
     }
 
     @Override
     public RoomType updateRoomType(RoomType roomType, Integer id) {
-        log.info("Updating room type with ID: {}", id);
-        RoomType existingRoomType = roomTypeRepository.findById(id)
-            .orElseThrow(() -> {
-                log.error("Room type not found with ID: {}", id);
-                return new RuntimeException("Room type not found");
-            });
+        RoomType existingRoomType = getRoomTypeById(id);
+        
+        // Kiểm tra nếu tên thay đổi và tên mới đã tồn tại
+        if (!existingRoomType.getName().equalsIgnoreCase(roomType.getName()) &&
+                roomTypeRepository.findByNameIgnoreCase(roomType.getName()).isPresent()) {
+            throw new IllegalArgumentException("Tên loại phòng đã tồn tại: " + roomType.getName());
+        }
+        
         existingRoomType.setName(roomType.getName());
         existingRoomType.setDescription(roomType.getDescription());
         existingRoomType.setBasePrice(roomType.getBasePrice());
         existingRoomType.setCapacity(roomType.getCapacity());
-        log.info("Room type updated: {}", existingRoomType);
+        
         return roomTypeRepository.save(existingRoomType);
     }
 
     @Override
     public void deleteRoomType(Integer id) {
-        RoomType roomType = roomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room type not found"));
+        RoomType roomType = getRoomTypeById(id);
         roomTypeRepository.delete(roomType);
     }
 
