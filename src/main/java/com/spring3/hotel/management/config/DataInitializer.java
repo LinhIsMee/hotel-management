@@ -99,16 +99,16 @@ public class DataInitializer implements CommandLineRunner {
             addEmployee(employees, "Vũ Văn Minh", "vuvanminh@hotel.com", "0978899001", Department.TECHNICAL, Position.MANAGER, "2022-05-15", true);
             addEmployee(employees, "Lý Thị Ngọc", "lythingoc@hotel.com", "0989900112", Department.HOUSEKEEPING, Position.CLEANING, "2022-06-01", true);
             addEmployee(employees, "Phan Văn Phúc", "phanvanphuc@hotel.com", "0990011223", Department.FRONT_DESK, Position.MANAGER, "2022-06-15", true);
-            addEmployee(employees, "Trịnh Thị Quỳnh", "trinhthiquynh@hotel.com", "0901122334", Department.RESTAURANT, Position.MANAGER, "2022-07-01", true);
-            addEmployee(employees, "Mai Văn Sơn", "maivanson@hotel.com", "0912233445", Department.SECURITY, Position.SECURITY, "2022-07-15", true);
-            addEmployee(employees, "Đặng Thị Thảo", "dangthithao@hotel.com", "0923344556", Department.FRONT_DESK, Position.RECEPTIONIST, "2022-08-01", true);
-            addEmployee(employees, "Bùi Văn Uy", "buivanuy@hotel.com", "0934455667", Department.TECHNICAL, Position.MANAGER, "2022-08-15", false);
-            addEmployee(employees, "Hồ Thị Vân", "hothivan@hotel.com", "0945566778", Department.HOUSEKEEPING, Position.MANAGER, "2022-09-01", true);
-            addEmployee(employees, "Dương Văn X", "duongvanx@hotel.com", "0956677889", Department.RESTAURANT, Position.CHEF, "2022-09-15", true);
-            addEmployee(employees, "Trương Thị Y", "truongthiy@hotel.com", "0967788990", Department.HOUSEKEEPING, Position.SUPERVISOR, "2022-10-01", true);
-            addEmployee(employees, "Đinh Văn Z", "dinhvanz@hotel.com", "0978899001", Department.SECURITY, Position.SUPERVISOR, "2022-10-15", true);
-            addEmployee(employees, "Lương Thị W", "luongthiw@hotel.com", "0989900112", Department.SPA, Position.THERAPIST, "2022-11-01", true);
-            addEmployee(employees, "Võ Văn T", "vovant@hotel.com", "0990011223", Department.FRONT_DESK, Position.SUPERVISOR, "2022-11-15", true);
+            addEmployee(employees, "Trịnh Thị Quỳnh", "trinhthiquynh@hotel.com", "0901122335", Department.RESTAURANT, Position.MANAGER, "2022-07-01", true);
+            addEmployee(employees, "Mai Văn Sơn", "maivanson@hotel.com", "0912233446", Department.SECURITY, Position.SECURITY, "2022-07-15", true);
+            addEmployee(employees, "Đặng Thị Thảo", "dangthithao@hotel.com", "0923344557", Department.FRONT_DESK, Position.RECEPTIONIST, "2022-08-01", true);
+            addEmployee(employees, "Bùi Văn Uy", "buivanuy@hotel.com", "0934455668", Department.TECHNICAL, Position.MANAGER, "2022-08-15", false);
+            addEmployee(employees, "Hồ Thị Vân", "hothivan@hotel.com", "0945566779", Department.HOUSEKEEPING, Position.MANAGER, "2022-09-01", true);
+            addEmployee(employees, "Dương Văn X", "duongvanx@hotel.com", "0956677890", Department.RESTAURANT, Position.CHEF, "2022-09-15", true);
+            addEmployee(employees, "Trương Thị Y", "truongthiy@hotel.com", "0967788991", Department.HOUSEKEEPING, Position.SUPERVISOR, "2022-10-01", true);
+            addEmployee(employees, "Đinh Văn Z", "dinhvanz@hotel.com", "0978899002", Department.SECURITY, Position.SUPERVISOR, "2022-10-15", true);
+            addEmployee(employees, "Lương Thị W", "luongthiw@hotel.com", "0989900113", Department.SPA, Position.THERAPIST, "2022-11-01", true);
+            addEmployee(employees, "Võ Văn T", "vovant@hotel.com", "0990011224", Department.FRONT_DESK, Position.SUPERVISOR, "2022-11-15", true);
             
             employeeRepository.saveAll(employees);
             
