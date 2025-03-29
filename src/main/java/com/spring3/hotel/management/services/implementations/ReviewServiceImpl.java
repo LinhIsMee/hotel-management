@@ -201,7 +201,7 @@ public class ReviewServiceImpl implements ReviewService {
         review.setStatus(ReviewStatus.REPLIED);
 
         Review savedReview = reviewRepository.save(review);
-        return mapToDto(savedReview);
+        return ReviewResponseDTO.fromEntity(savedReview);
     }
     
     @Override
