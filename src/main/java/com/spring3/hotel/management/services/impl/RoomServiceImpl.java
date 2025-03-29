@@ -37,7 +37,7 @@ public class RoomServiceImpl implements RoomService {
     
     @Override
     public List<RoomResponseDTO> getAllRooms() {
-        return roomRepository.findAll()
+        return roomRepository.findByIsActive(true)
                 .stream()
                 .map(RoomResponseDTO::fromEntity)
                 .collect(Collectors.toList());
@@ -142,9 +142,8 @@ public class RoomServiceImpl implements RoomService {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
         
-        // Soft delete
-        room.setIsActive(false);
-        roomRepository.save(room);
+        // Hard delete
+        roomRepository.delete(room);
     }
     
     @Override
