@@ -325,15 +325,18 @@ public class UserServiceImpl implements UserService {
             }
         }
         
-        // Xử lý role
-        if (request.getRole() != null) {
-            user.setRole(request.getRole());
+        // Xử lý role - Sửa phần này
+        Role role;
+        if (request.getRole() != null && request.getRole().getName() != null) {
+            // Tìm role theo tên trong database
+            role = roleRepository.findByName(request.getRole().getName())
+                .orElseThrow(() -> new NotFoundException("Role not found with name: " + request.getRole().getName()));
         } else {
             // Mặc định là ROLE_USER
-            Role role = roleRepository.findByName("ROLE_USER")
+            role = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new NotFoundException("Default role not found"));
-            user.setRole(role);
         }
+        user.setRole(role);
         
         // Set thời gian tạo
         user.setCreatedAt(LocalDateTime.now());
