@@ -1,0 +1,204 @@
+{
+    "data": [
+        {
+            "name": "Dịch vụ giặt ủi",
+            "code": "LAUNDRY",
+            "type": "HOUSEKEEPING",
+            "description": "Giặt ủi quần áo cho khách hàng",
+            "price": 150000,
+            "unit": "Kg",
+            "isAvailable": true,
+            "createdAt": "2023-01-01"
+        },
+        {
+            "name": "Dịch vụ giặt ủi nhanh",
+            "code": "FAST_LAUNDRY",
+            "type": "HOUSEKEEPING",
+            "description": "Giặt ủi quần áo nhanh trong vòng 3 giờ",
+            "price": 250000,
+            "unit": "Kg",
+            "isAvailable": true,
+            "createdAt": "2023-01-01"
+        },
+        {
+            "name": "Dịch vụ giặt khô",
+            "code": "DRY_CLEANING",
+            "type": "HOUSEKEEPING",
+            "description": "Giặt khô quần áo cao cấp",
+            "price": 350000,
+            "unit": "Bộ",
+            "isAvailable": true,
+            "createdAt": "2023-01-01"
+        },
+        {
+            "name": "Spa - Massage toàn thân",
+            "code": "SPA_FULL_BODY",
+            "type": "SPA",
+            "description": "Massage toàn thân thư giãn với tinh dầu thiên nhiên",
+            "price": 650000,
+            "unit": "Giờ",
+            "isAvailable": true,
+            "createdAt": "2023-01-05"
+        },
+        {
+            "name": "Spa - Massage chân",
+            "code": "SPA_FOOT",
+            "type": "SPA",
+            "description": "Massage chân giúp lưu thông máu và thư giãn",
+            "price": 350000,
+            "unit": "Giờ",
+            "isAvailable": true,
+            "createdAt": "2023-01-05"
+        },
+        {
+            "name": "Spa - Chăm sóc da mặt",
+            "code": "SPA_FACIAL",
+            "type": "SPA",
+            "description": "Chăm sóc da mặt với mặt nạ thiên nhiên",
+            "price": 450000,
+            "unit": "Lần",
+            "isAvailable": true,
+            "createdAt": "2023-01-05"
+        },
+        {
+            "name": "Dịch vụ đưa đón sân bay",
+            "code": "AIRPORT_TRANSFER",
+            "type": "TRANSPORT",
+            "description": "Dịch vụ đón và đưa khách đến sân bay",
+            "price": 400000,
+            "unit": "Chiều",
+            "isAvailable": true,
+            "createdAt": "2023-01-10"
+        },
+        {
+            "name": "Thuê xe máy",
+            "code": "MOTORBIKE_RENTAL",
+            "type": "TRANSPORT",
+            "description": "Dịch vụ cho thuê xe máy tự lái",
+            "price": 200000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-01-10"
+        },
+        {
+            "name": "Thuê xe ô tô",
+            "code": "CAR_RENTAL",
+            "type": "TRANSPORT",
+            "description": "Dịch vụ cho thuê xe ô tô có tài xế",
+            "price": 1200000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-01-10"
+        },
+        {
+            "name": "Tour tham quan thành phố",
+            "code": "CITY_TOUR",
+            "type": "TOUR",
+            "description": "Tour tham quan các địa điểm nổi tiếng trong thành phố",
+            "price": 550000,
+            "unit": "Người",
+            "isAvailable": true,
+            "createdAt": "2023-01-15"
+        },
+        {
+            "name": "Tour du lịch sinh thái",
+            "code": "ECO_TOUR",
+            "type": "TOUR",
+            "description": "Tour tham quan các khu bảo tồn thiên nhiên",
+            "price": 850000,
+            "unit": "Người",
+            "isAvailable": true,
+            "createdAt": "2023-01-15"
+        },
+        {
+            "name": "Dịch vụ phòng họp",
+            "code": "MEETING_ROOM",
+            "type": "BUSINESS",
+            "description": "Cho thuê phòng họp đầy đủ thiết bị",
+            "price": 2000000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-01-20"
+        },
+        {
+            "name": "Dịch vụ tổ chức sự kiện",
+            "code": "EVENT_SERVICE",
+            "type": "BUSINESS",
+            "description": "Tổ chức sự kiện, hội nghị, tiệc cưới",
+            "price": 5000000,
+            "unit": "Sự kiện",
+            "isAvailable": true,
+            "createdAt": "2023-01-20"
+        },
+        {
+            "name": "Đồ ăn nhẹ trong phòng",
+            "code": "ROOM_SNACK",
+            "type": "FOOD",
+            "description": "Các loại đồ ăn nhẹ phục vụ trong phòng",
+            "price": 200000,
+            "unit": "Phần",
+            "isAvailable": true,
+            "createdAt": "2023-01-25"
+        },
+        {
+            "name": "Bữa sáng tự chọn",
+            "code": "BREAKFAST_BUFFET",
+            "type": "FOOD",
+            "description": "Bữa sáng tự chọn tại nhà hàng khách sạn",
+            "price": 250000,
+            "unit": "Người",
+            "isAvailable": true,
+            "createdAt": "2023-01-25"
+        },
+        {
+            "name": "Bữa tối tự chọn",
+            "code": "DINNER_BUFFET",
+            "type": "FOOD",
+            "description": "Bữa tối tự chọn tại nhà hàng khách sạn",
+            "price": 450000,
+            "unit": "Người",
+            "isAvailable": true,
+            "createdAt": "2023-01-25"
+        },
+        {
+            "name": "Minibar trong phòng",
+            "code": "MINIBAR",
+            "type": "FOOD",
+            "description": "Đồ uống và đồ ăn nhẹ trong tủ lạnh mini",
+            "price": 0,
+            "unit": "Theo tiêu thụ",
+            "isAvailable": true,
+            "createdAt": "2023-01-25"
+        },
+        {
+            "name": "Dịch vụ giữ trẻ",
+            "code": "BABYSITTING",
+            "type": "OTHER",
+            "description": "Dịch vụ trông giữ trẻ em",
+            "price": 300000,
+            "unit": "Giờ",
+            "isAvailable": true,
+            "createdAt": "2023-02-01"
+        },
+        {
+            "name": "Thuê máy tính",
+            "code": "COMPUTER_RENTAL",
+            "type": "BUSINESS",
+            "description": "Cho thuê máy tính xách tay trong thời gian lưu trú",
+            "price": 250000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-02-01"
+        },
+        {
+            "name": "Phòng tập gym",
+            "code": "GYM",
+            "type": "FITNESS",
+            "description": "Sử dụng phòng tập gym của khách sạn",
+            "price": 100000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-02-05"
+        }
+    ]
+}
