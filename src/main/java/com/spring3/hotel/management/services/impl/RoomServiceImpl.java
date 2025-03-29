@@ -1,5 +1,7 @@
 package com.spring3.hotel.management.services.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
@@ -12,6 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +31,9 @@ public class RoomServiceImpl implements RoomService {
     
     @Autowired
     private RoomTypeRepository roomTypeRepository;
+    
+    @Autowired
+    private ObjectMapper objectMapper;
     
     @Override
     public List<RoomResponseDTO> getAllRooms() {
@@ -132,8 +142,77 @@ public class RoomServiceImpl implements RoomService {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
         
-        // Xóa logic bằng cách đặt isActive = false
+        // Soft delete
         room.setIsActive(false);
         roomRepository.save(room);
+    }
+    
+    @Override
+    public void initRoomsFromJson() {
+        try {
+            log.info("Bắt đầu khởi tạo dữ liệu phòng từ file JSON...");
+            
+            // Kiểm tra xem đã có dữ liệu trong DB chưa
+            if (roomRepository.count() > 0) {
+                log.info("Dữ liệu phòng đã tồn tại trong DB, bỏ qua việc khởi tạo.");
+                return;
+            }
+            
+            // Đọc file JSON
+            File jsonFile = Paths.get("data", "rooms.json").toFile();
+            if (!jsonFile.exists()) {
+                log.warn("Không tìm thấy file dữ liệu phòng JSON: {}", jsonFile.getAbsolutePath());
+                return;
+            }
+            
+            JsonNode rootNode = objectMapper.readTree(jsonFile);
+            JsonNode dataNode = rootNode.get("data");
+            
+            if (dataNode == null || !dataNode.isArray() || dataNode.isEmpty()) {
+                log.warn("Không có dữ liệu hợp lệ trong file JSON.");
+                return;
+            }
+            
+            List<Room> rooms = new ArrayList<>();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            
+            for (JsonNode node : dataNode) {
+                // Lấy thông tin loại phòng
+                Integer roomTypeId = node.get("roomTypeId").asInt();
+                RoomType roomType = roomTypeRepository.findById(roomTypeId)
+                        .orElse(null);
+                
+                if (roomType == null) {
+                    log.warn("Không tìm thấy loại phòng ID: {} cho phòng: {}, bỏ qua.", 
+                            roomTypeId, node.get("roomNumber").asText());
+                    continue;
+                }
+                
+                LocalDate createdAt = null;
+                if (node.has("createdAt") && !node.get("createdAt").isNull()) {
+                    createdAt = LocalDate.parse(node.get("createdAt").asText(), formatter);
+                }
+                
+                // Tạo đối tượng phòng
+                Room room = Room.builder()
+                        .roomNumber(node.get("roomNumber").asText())
+                        .roomType(roomType)
+                        .status(node.get("status").asText())
+                        .floor(node.has("floor") ? String.valueOf(node.get("floor").asInt()) : null)
+                        .isActive(node.has("isActive") ? node.get("isActive").asBoolean() : true)
+                        .notes(node.has("specialFeatures") && node.get("specialFeatures").isArray() ? 
+                              String.join(", ", objectMapper.convertValue(node.get("specialFeatures"), String[].class)) : null)
+                        .createdAt(createdAt)
+                        .build();
+                
+                rooms.add(room);
+            }
+            
+            roomRepository.saveAll(rooms);
+            log.info("Đã khởi tạo thành công {} phòng từ file JSON.", rooms.size());
+            
+        } catch (Exception e) {
+            log.error("Lỗi khi khởi tạo dữ liệu phòng từ file JSON: {}", e.getMessage(), e);
+        }
     }
 }

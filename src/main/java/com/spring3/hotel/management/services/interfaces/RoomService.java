@@ -22,4 +22,6 @@ public interface RoomService {
     RoomResponseDTO updateRoom(UpsertRoomRequest request, Integer id);
     
     void deleteRoom(Integer id);
+    
+    void initRoomsFromJson();
 } 
