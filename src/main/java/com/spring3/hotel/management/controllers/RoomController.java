@@ -2,7 +2,7 @@ package com.spring3.hotel.management.controllers;
 
 import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
-import com.spring3.hotel.management.services.RoomService;
+import com.spring3.hotel.management.services.interfaces.RoomService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
