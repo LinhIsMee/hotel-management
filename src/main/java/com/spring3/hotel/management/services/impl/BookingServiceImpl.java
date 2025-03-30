@@ -70,9 +70,16 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingResponseDTO createBooking(UpsertBookingRequest request) {
         Booking booking = new Booking();
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        booking.setUser(user);
+        
+        // Kiểm tra userId và lấy thông tin user
+        if (request.getUserId() != null) {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            booking.setUser(user);
+        } else {
+            throw new RuntimeException("userId không được để trống");
+        }
+        
         booking.setCheckInDate(request.getCheckInDate());
         booking.setCheckOutDate(request.getCheckOutDate());
         booking.setTotalPrice(request.getTotalPrice());
@@ -83,16 +90,20 @@ public class BookingServiceImpl implements BookingService {
             booking.setDiscount(discount);
         }
         
-        booking.setStatus("PENDING"); // Mặc định trạng thái là 'PENDING' sau khi thanh toán sẽ chuyển sang 'CONFIRMED'
+        booking.setStatus(request.getStatus() != null ? request.getStatus() : "PENDING");
         
         // Lưu booking để có ID cho booking details
         booking = bookingRepository.save(booking);
         
-        // Tạo payment mặc định với trạng thái UNPAID
+        // Tạo payment với trạng thái từ request
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setAmount(booking.getTotalPrice().longValue());
-        payment.setStatus("UNPAID");
+        payment.setStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "UNPAID");
+        payment.setMethod(request.getPaymentMethod());
+        if (request.getPaymentDate() != null) {
+            payment.setPayDate(request.getPaymentDate().toString());
+        }
         paymentRepository.save(payment);
         
         // Tạo booking details cho các phòng được chọn
@@ -107,6 +118,8 @@ public class BookingServiceImpl implements BookingService {
                 bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
                 bookingDetailRepository.save(bookingDetail);
             }
+        } else {
+            throw new RuntimeException("Danh sách phòng không được để trống");
         }
         
         return convertToBookingResponseDTO(booking);
@@ -366,7 +379,7 @@ public class BookingServiceImpl implements BookingService {
         }
         
         bookingResponseDTO.setStatus(booking.getStatus());
-        bookingResponseDTO.setPaymentMethod("VnPay");
+        bookingResponseDTO.setPaymentMethod(payment.getMethod());
         bookingResponseDTO.setPaymentStatus(payment.getStatus());
         bookingResponseDTO.setPaymentDate(payment.getPayDate());
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");

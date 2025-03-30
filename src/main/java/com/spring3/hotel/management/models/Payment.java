@@ -28,6 +28,9 @@ public class Payment {
 
     private Long amount;
 
+    @Column(name = "method")
+    private String method;
+
     @Column(name = "transaction_no")
     private String transactionNo;
 

@@ -14,10 +14,24 @@ import java.util.List;
 @ToString
 public class UpsertBookingRequest {
     private Integer userId;
+    private List<Integer> roomIds;
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
     private Double totalPrice;
+    private Double finalPrice;
     private Integer discountId;
     private String status;
-    private List<Integer> roomIds;
+    
+    // Các trường mới
+    private String paymentStatus;
+    private String paymentMethod;
+    private Integer adults;
+    private Integer children;
+    private String fullName;
+    private String phone;
+    private String email;
+    private String nationalId;
+    private LocalDate paymentDate;
+    private String specialRequests;
+    private List<String> additionalServices;
 }
