@@ -215,6 +215,85 @@ public class ReviewServiceImpl implements ReviewService {
         
         boolean hasChanges = false;
         
+        // Cập nhật các trường cơ bản
+        if (request.getBookingId() != null) {
+            review.setBookingId(request.getBookingId());
+            hasChanges = true;
+        }
+        
+        if (request.getGuestName() != null) {
+            review.setGuestName(request.getGuestName());
+            hasChanges = true;
+        }
+        
+        if (request.getRoomNumber() != null) {
+            review.setRoomNumber(request.getRoomNumber());
+            hasChanges = true;
+        }
+        
+        if (request.getRoomType() != null) {
+            review.setRoomType(request.getRoomType());
+            hasChanges = true;
+        }
+        
+        // Cập nhật các trường đánh giá
+        if (request.getRating() != null) {
+            review.setRating(request.getRating());
+            hasChanges = true;
+        }
+        
+        if (request.getCleanliness() != null) {
+            review.setCleanliness(request.getCleanliness());
+            hasChanges = true;
+        }
+        
+        if (request.getService() != null) {
+            review.setService(request.getService());
+            hasChanges = true;
+        }
+        
+        if (request.getComfort() != null) {
+            review.setComfort(request.getComfort());
+            hasChanges = true;
+        }
+        
+        if (request.getLocation() != null) {
+            review.setLocation(request.getLocation());
+            hasChanges = true;
+        }
+        
+        if (request.getFacilities() != null) {
+            review.setFacilities(request.getFacilities());
+            hasChanges = true;
+        }
+        
+        if (request.getValueForMoney() != null) {
+            review.setValueForMoney(request.getValueForMoney());
+            hasChanges = true;
+        }
+        
+        if (request.getComment() != null) {
+            review.setComment(request.getComment());
+            hasChanges = true;
+        }
+        
+        if (request.getImages() != null) {
+            review.setImages(request.getImages());
+            hasChanges = true;
+        }
+        
+        // Cập nhật thông tin phản hồi
+        if (request.getReplyComment() != null) {
+            review.setReplyComment(request.getReplyComment());
+            hasChanges = true;
+        }
+        
+        if (request.getReplyBy() != null) {
+            review.setReplyBy(request.getReplyBy());
+            hasChanges = true;
+        }
+        
+        // Cập nhật trạng thái hiển thị
         if (request.getIsFeatured() != null) {
             log.info("Cập nhật trạng thái nổi bật từ {} thành {}", review.getIsFeatured(), request.getIsFeatured());
             review.setIsFeatured(request.getIsFeatured());
