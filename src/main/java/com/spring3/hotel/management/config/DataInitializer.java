@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -260,7 +261,13 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Creating sample bookings...");
             
             // Tạo một số user khách hàng nếu chưa có
-            Role userRole = roleRepository.findByName("ROLE_USER");
+            Optional<Role> userRoleOpt = roleRepository.findByName("ROLE_USER");
+            if (userRoleOpt.isEmpty()) {
+                log.error("User role not found");
+                return;
+            }
+            
+            Role userRole = userRoleOpt.get();
             List<User> customers = new ArrayList<>();
             
             if (userRepository.findByUsername("customer1") == null) {
