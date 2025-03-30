@@ -74,9 +74,9 @@ public class SecurityConfig {
                             "/api/v1/logout"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/reviews", "/api/v1/reviews/", "/api/v1/reviews/{id}", "/api/v1/reviews/room/{roomId}", "/api/v1/reviews/statistics").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/reviews/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/update/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/reviews/**").hasAnyAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/update/**").hasAnyAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/**").hasAnyAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/reviews/**").authenticated()
                         .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
                         .requestMatchers(
