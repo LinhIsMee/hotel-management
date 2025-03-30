@@ -206,29 +206,50 @@ public class ReviewServiceImpl implements ReviewService {
     
     @Override
     public ReviewResponseDTO updateReview(Integer id, UpdateReviewRequest request) {
+        log.info("Bắt đầu cập nhật đánh giá với ID: {} và dữ liệu: {}", id, request);
+        
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Đánh giá không tìm thấy với ID: " + id));
         
+        log.info("Tìm thấy đánh giá: {}", review);
+        
+        boolean hasChanges = false;
+        
         if (request.getIsFeatured() != null) {
+            log.info("Cập nhật trạng thái nổi bật từ {} thành {}", review.getIsFeatured(), request.getIsFeatured());
             review.setIsFeatured(request.getIsFeatured());
+            hasChanges = true;
         }
         
         if (request.getIsAnonymous() != null) {
+            log.info("Cập nhật trạng thái ẩn danh từ {} thành {}", review.getIsAnonymous(), request.getIsAnonymous());
             review.setIsAnonymous(request.getIsAnonymous());
+            hasChanges = true;
         }
         
         if (request.getStatus() != null) {
             try {
                 ReviewStatus status = ReviewStatus.valueOf(request.getStatus());
+                log.info("Cập nhật trạng thái từ {} thành {}", review.getStatus(), status);
                 review.setStatus(status);
+                hasChanges = true;
             } catch (IllegalArgumentException e) {
+                log.error("Trạng thái không hợp lệ: {}", request.getStatus());
                 throw new IllegalArgumentException("Trạng thái không hợp lệ. Các giá trị hợp lệ: PENDING, REPLIED, HIDDEN");
             }
         }
         
+        if (!hasChanges) {
+            log.info("Không có thay đổi nào được thực hiện");
+            return ReviewResponseDTO.fromEntity(review);
+        }
+        
         review.setUpdatedAt(LocalDateTime.now());
         
+        log.info("Lưu đánh giá đã cập nhật: {}", review);
         Review updatedReview = reviewRepository.save(review);
+        log.info("Đã lưu đánh giá thành công: {}", updatedReview);
+        
         return ReviewResponseDTO.fromEntity(updatedReview);
     }
     
