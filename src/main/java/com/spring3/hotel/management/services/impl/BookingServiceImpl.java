@@ -79,7 +79,31 @@ public class BookingServiceImpl implements BookingService {
         Discount discount = discountRepository.findDiscountById(request.getDiscountId());
         booking.setDiscount(discount);
         booking.setStatus("PENDING"); // Mặc định trạng thái là 'PENDING' sau khi thanh toán sẽ chuyển sang 'CONFIRMED'
-        bookingRepository.save(booking);
+        
+        // Lưu booking để có ID cho booking details
+        booking = bookingRepository.save(booking);
+        
+        // Tạo payment mặc định với trạng thái UNPAID
+        Payment payment = new Payment();
+        payment.setBooking(booking);
+        payment.setAmount(booking.getTotalPrice().longValue());
+        payment.setStatus("UNPAID");
+        paymentRepository.save(payment);
+        
+        // Tạo booking details cho các phòng được chọn
+        if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
+            for (Integer roomId : request.getRoomIds()) {
+                Room room = roomRepository.findById(roomId)
+                    .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+                
+                BookingDetail bookingDetail = new BookingDetail();
+                bookingDetail.setBooking(booking);
+                bookingDetail.setRoom(room);
+                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                bookingDetailRepository.save(bookingDetail);
+            }
+        }
+        
         return convertToBookingResponseDTO(booking);
     }
 
@@ -96,7 +120,28 @@ public class BookingServiceImpl implements BookingService {
         Discount discount = discountRepository.findDiscountById(request.getDiscountId());
         booking.setDiscount(discount);
         booking.setStatus(request.getStatus());
-        bookingRepository.save(booking);
+        
+        // Lưu booking để có ID cho booking details
+        booking = bookingRepository.save(booking);
+        
+        // Cập nhật booking details nếu có danh sách phòng mới
+        if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
+            // Xóa booking details cũ
+            bookingDetailRepository.deleteAllByBookingId(booking.getId());
+            
+            // Tạo booking details mới
+            for (Integer roomId : request.getRoomIds()) {
+                Room room = roomRepository.findById(roomId)
+                    .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+                
+                BookingDetail bookingDetail = new BookingDetail();
+                bookingDetail.setBooking(booking);
+                bookingDetail.setRoom(room);
+                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                bookingDetailRepository.save(bookingDetail);
+            }
+        }
+        
         return convertToBookingResponseDTO(booking);
     }
 
@@ -286,18 +331,28 @@ public class BookingServiceImpl implements BookingService {
         bookingResponseDTO.setCheckInDate(booking.getCheckInDate());
         bookingResponseDTO.setCheckOutDate(booking.getCheckOutDate());
         bookingResponseDTO.setTotalPrice(booking.getTotalPrice());
-        Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
-        if (discount == null) {
+        
+        // Xử lý trường hợp discount là null
+        if (booking.getDiscount() == null) {
             bookingResponseDTO.setFinalPrice(booking.getTotalPrice());
             bookingResponseDTO.setDiscountCode(null);
             bookingResponseDTO.setDiscountValue(0.0);
             bookingResponseDTO.setDiscountType(null);
-        }else {
-            bookingResponseDTO.setFinalPrice(booking.getTotalPrice() - booking.getTotalPrice() * discount.getDiscountValue());
-            bookingResponseDTO.setDiscountCode(discount.getCode());
-            bookingResponseDTO.setDiscountValue(discount.getDiscountValue());
-            bookingResponseDTO.setDiscountType(discount.getDiscountType());
+        } else {
+            Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
+            if (discount == null) {
+                bookingResponseDTO.setFinalPrice(booking.getTotalPrice());
+                bookingResponseDTO.setDiscountCode(null);
+                bookingResponseDTO.setDiscountValue(0.0);
+                bookingResponseDTO.setDiscountType(null);
+            } else {
+                bookingResponseDTO.setFinalPrice(booking.getTotalPrice() - booking.getTotalPrice() * discount.getDiscountValue());
+                bookingResponseDTO.setDiscountCode(discount.getCode());
+                bookingResponseDTO.setDiscountValue(discount.getDiscountValue());
+                bookingResponseDTO.setDiscountType(discount.getDiscountType());
+            }
         }
+        
         bookingResponseDTO.setStatus(booking.getStatus());
         bookingResponseDTO.setPaymentMethod("VnPay");
         bookingResponseDTO.setPaymentStatus(payment.getStatus());
