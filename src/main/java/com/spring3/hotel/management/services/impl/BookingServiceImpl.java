@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class BookingServiceImpl implements BookingService {
@@ -96,6 +98,115 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(request.getStatus());
         bookingRepository.save(booking);
         return convertToBookingResponseDTO(booking);
+    }
+
+    // Phương thức mới: hủy booking
+    @Override
+    public BookingResponseDTO cancelBooking(Integer id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
+        
+        // Chỉ có thể hủy booking nếu trạng thái là PENDING hoặc CONFIRMED
+        if (!"PENDING".equals(booking.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
+            throw new RuntimeException("Không thể hủy booking có trạng thái: " + booking.getStatus());
+        }
+        
+        // Cập nhật trạng thái booking thành CANCELLED
+        booking.setStatus("CANCELLED");
+        bookingRepository.save(booking);
+        
+        // Cập nhật trạng thái payment nếu có
+        paymentRepository.findByBookingId(id).ifPresent(payment -> {
+            payment.setStatus("REFUNDED");
+            paymentRepository.save(payment);
+        });
+        
+        return convertToBookingResponseDTO(booking);
+    }
+    
+    // Phương thức mới: lấy danh sách booking trong khoảng thời gian
+    @Override
+    public List<BookingResponseDTO> getBookingsByDateRange(LocalDate startDate, LocalDate endDate) {
+        // Tìm tất cả các booking có checkInDate nằm trong khoảng từ startDate đến endDate
+        // hoặc checkOutDate nằm trong khoảng từ startDate đến endDate
+        // hoặc bookings bao phủ khoảng thời gian từ startDate đến endDate
+        List<Booking> bookings = bookingRepository.findAll().stream()
+                .filter(booking -> 
+                    // checkInDate nằm trong khoảng
+                    (booking.getCheckInDate().isEqual(startDate) || booking.getCheckInDate().isAfter(startDate)) 
+                        && (booking.getCheckInDate().isEqual(endDate) || booking.getCheckInDate().isBefore(endDate))
+                    // hoặc checkOutDate nằm trong khoảng
+                    || (booking.getCheckOutDate().isEqual(startDate) || booking.getCheckOutDate().isAfter(startDate)) 
+                        && (booking.getCheckOutDate().isEqual(endDate) || booking.getCheckOutDate().isBefore(endDate))
+                    // hoặc booking bao phủ khoảng thời gian
+                    || (booking.getCheckInDate().isBefore(startDate) && booking.getCheckOutDate().isAfter(endDate))
+                )
+                .collect(Collectors.toList());
+        
+        return bookings.stream()
+                .map(this::convertToBookingResponseDTO)
+                .toList();
+    }
+    
+    // Phương thức mới: xác nhận booking sau khi thanh toán
+    @Override
+    public BookingResponseDTO confirmBooking(Integer id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
+        
+        // Chỉ có thể xác nhận booking nếu trạng thái là PENDING
+        if (!"PENDING".equals(booking.getStatus())) {
+            throw new RuntimeException("Không thể xác nhận booking có trạng thái: " + booking.getStatus());
+        }
+        
+        // Cập nhật trạng thái booking thành CONFIRMED
+        booking.setStatus("CONFIRMED");
+        bookingRepository.save(booking);
+        
+        return convertToBookingResponseDTO(booking);
+    }
+    
+    // Phương thức mới: lấy danh sách phòng đã được đặt trong khoảng thời gian
+    @Override
+    public List<RoomListResponseDTO> getBookedRoomsByDateRange(LocalDate startDate, LocalDate endDate) {
+        // Lấy tất cả các booking trong khoảng thời gian
+        List<Booking> bookings = bookingRepository.findAll().stream()
+                .filter(booking -> 
+                    // Bỏ qua các booking bị hủy
+                    !"CANCELLED".equals(booking.getStatus())
+                    // Lọc các booking có overlap với khoảng thời gian
+                    && (
+                        // checkInDate nằm trong khoảng
+                        (booking.getCheckInDate().isEqual(startDate) || booking.getCheckInDate().isAfter(startDate)) 
+                            && (booking.getCheckInDate().isEqual(endDate) || booking.getCheckInDate().isBefore(endDate))
+                        // hoặc checkOutDate nằm trong khoảng
+                        || (booking.getCheckOutDate().isEqual(startDate) || booking.getCheckOutDate().isAfter(startDate)) 
+                            && (booking.getCheckOutDate().isEqual(endDate) || booking.getCheckOutDate().isBefore(endDate))
+                        // hoặc booking bao phủ khoảng thời gian
+                        || (booking.getCheckInDate().isBefore(startDate) && booking.getCheckOutDate().isAfter(endDate))
+                    )
+                )
+                .collect(Collectors.toList());
+        
+        // Lấy tất cả các booking detail của các booking này
+        List<BookingDetail> bookingDetails = new ArrayList<>();
+        for (Booking booking : bookings) {
+            bookingDetails.addAll(bookingDetailRepository.findAllByBooking_Id(booking.getId()));
+        }
+        
+        // Lấy danh sách phòng từ booking detail
+        return bookingDetails.stream()
+                .map(bookingDetail -> {
+                    Room room = bookingDetail.getRoom();
+                    RoomListResponseDTO dto = new RoomListResponseDTO();
+                    dto.setRoomId(room.getId());
+                    dto.setRoomNumber(room.getRoomNumber());
+                    dto.setRoomType(room.getRoomType().getName());
+                    dto.setPrice(room.getRoomType().getBasePrice());
+                    return dto;
+                })
+                .distinct() // Loại bỏ các phòng trùng lặp
+                .toList();
     }
 
     // Scheduled task chạy mỗi ngày lúc 00:00:00

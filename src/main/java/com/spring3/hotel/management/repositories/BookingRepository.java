@@ -21,11 +21,11 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findByStatus(String status);
 
     // Tìm các booking có checkInDate bằng ngày hiện tại và trạng thái là 'pending' hoặc 'confirmed'
-    @Query("SELECT b FROM Booking b WHERE b.checkInDate = :today AND b.status IN ('pending', 'confirmed')")
+    @Query("SELECT b FROM Booking b WHERE b.checkInDate = :today AND b.status IN ('PENDING', 'CONFIRMED')")
     List<Booking> findBookingsToCheckIn(@Param("today") LocalDate today);
 
-    // Tìm các booking có checkOutDate bằng ngày hiện tại và trạng thái là 'CheckedIn'
-    @Query("SELECT b FROM Booking b WHERE b.checkOutDate = :today AND b.status = 'CheckedIn'")
+    // Tìm các booking có checkOutDate bằng ngày hiện tại và trạng thái là 'CHECKED_IN'
+    @Query("SELECT b FROM Booking b WHERE b.checkOutDate = :today AND b.status = 'CHECKED_IN'")
     List<Booking> findBookingsToCheckOut(@Param("today") LocalDate today);
 
     // Tính tổng doanh thu trong khoảng thời gian
@@ -52,7 +52,21 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT SUM(b.totalPrice) FROM Booking b")
     Double caculateTotalRevenue();
 
-    //lấy ra danh sách booking mới nhất trong 7 ngày
+    // Lấy ra danh sách booking mới nhất trong 7 ngày
     @Query("SELECT b FROM Booking b WHERE b.createdAt >= :startDate AND b.createdAt <= :endDate ORDER BY b.createdAt DESC")
     List<Booking> findRecentBookings(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+    
+    // Tìm các booking trong khoảng thời gian
+    @Query("SELECT b FROM Booking b WHERE " +
+           "(b.checkInDate >= :startDate AND b.checkInDate <= :endDate) OR " +
+           "(b.checkOutDate >= :startDate AND b.checkOutDate <= :endDate) OR " +
+           "(b.checkInDate <= :startDate AND b.checkOutDate >= :endDate)")
+    List<Booking> findBookingsBetweenDates(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    
+    // Tìm các booking không bị hủy trong khoảng thời gian (để kiểm tra phòng đã đặt)
+    @Query("SELECT b FROM Booking b WHERE b.status != 'CANCELLED' AND " +
+           "((b.checkInDate >= :startDate AND b.checkInDate <= :endDate) OR " +
+           "(b.checkOutDate >= :startDate AND b.checkOutDate <= :endDate) OR " +
+           "(b.checkInDate <= :startDate AND b.checkOutDate >= :endDate))")
+    List<Booking> findActiveBookingsBetweenDates(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }
