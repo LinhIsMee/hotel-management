@@ -290,10 +290,15 @@ Tạo một booking mới.
 ```json
 {
   "userId": 2,
+  "fullName": "Nguyễn Văn A",
+  "nationalId": "025123456789",
+  "email": "example@gmail.com",
+  "phone": "0912345678",
+  "roomIds": [1, 2],
   "checkInDate": "2023-05-01",
   "checkOutDate": "2023-05-03",
   "totalPrice": 3000000,
-  "discountId": 1,
+  "discountCode": "SUMMER10",
   "status": "PENDING"
 }
 ```
@@ -301,6 +306,7 @@ Tạo một booking mới.
 **Phản hồi:**
 - `201 Created`: Booking đã được tạo thành công
 - `400 Bad Request`: Dữ liệu không hợp lệ
+- `404 Not Found`: Không tìm thấy phòng hoặc mã giảm giá
 
 **Ví dụ phản hồi thành công:**
 ```json
@@ -311,7 +317,20 @@ Tạo một booking mới.
   "nationalId": "025123456789",
   "email": "example@gmail.com",
   "phone": "0912345678",
-  "rooms": [],
+  "rooms": [
+    {
+      "roomId": 1,
+      "roomNumber": "101",
+      "roomType": "Deluxe",
+      "price": 1500000
+    },
+    {
+      "roomId": 2,
+      "roomNumber": "102",
+      "roomType": "Deluxe",
+      "price": 1500000
+    }
+  ],
   "checkInDate": "2023-05-01",
   "checkOutDate": "2023-05-03",
   "totalPrice": 3000000,
@@ -320,7 +339,7 @@ Tạo một booking mới.
   "discountValue": 0.1,
   "discountType": "PERCENT",
   "status": "PENDING",
-  "paymentMethod": "VnPay",
+  "paymentMethod": null,
   "paymentStatus": "UNPAID",
   "paymentDate": null,
   "createdAt": "29-04-2023 15:30:45"
