@@ -316,11 +316,12 @@ public class DataInitializer implements CommandLineRunner {
             List<Room> rooms = roomRepository.findAll();
             List<Discount> discounts = discountRepository.findAll();
             
-            // Tạo dữ liệu booking mẫu
-            List<Booking> bookings = new ArrayList<>();
-            List<BookingDetail> bookingDetails = new ArrayList<>();
-            List<Payment> payments = new ArrayList<>();
+            if (rooms.isEmpty()) {
+                log.error("No rooms found for creating bookings");
+                return;
+            }
             
+            // Tạo dữ liệu booking mẫu
             Random random = new Random();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
             
@@ -335,16 +336,8 @@ public class DataInitializer implements CommandLineRunner {
                 LocalDate checkInDate = LocalDate.now().plusDays(random.nextInt(60) - 30); // +/- 30 ngày
                 LocalDate checkOutDate = checkInDate.plusDays(random.nextInt(5) + 1); // Từ 1 đến 5 đêm
                 
-                // Tạo booking mới
-                Booking booking = new Booking();
-                booking.setUser(user);
-                booking.setCheckInDate(checkInDate);
-                booking.setCheckOutDate(checkOutDate);
-                booking.setDiscount(discount);
-                
                 // Tính ngày tạo booking
                 LocalDateTime createdAt = LocalDateTime.now().minusDays(random.nextInt(10) + 1);
-                booking.setCreatedAt(createdAt);
                 
                 // Xác định trạng thái dựa vào ngày checkin/checkout
                 String status;
@@ -365,33 +358,42 @@ public class DataInitializer implements CommandLineRunner {
                     status = "CANCELLED";
                 }
                 
+                // Tạo booking detail (1-3 phòng mỗi booking)
+                int roomCount = random.nextInt(3) + 1;
+                double totalPrice = 0.0;
+                
+                List<Room> selectedRooms = new ArrayList<>();
+                for (int j = 0; j < roomCount && j < rooms.size(); j++) {
+                    Room room = rooms.get(random.nextInt(rooms.size()));
+                    selectedRooms.add(room);
+                    
+                    // Tính tổng giá
+                    long nights = checkInDate.datesUntil(checkOutDate).count();
+                    if (nights == 0) nights = 1; // Đảm bảo có ít nhất 1 đêm
+                    totalPrice += room.getRoomType().getBasePrice() * nights;
+                }
+                
+                // Tạo booking mới
+                Booking booking = new Booking();
+                booking.setUser(user);
+                booking.setCheckInDate(checkInDate);
+                booking.setCheckOutDate(checkOutDate);
+                booking.setDiscount(discount);
+                booking.setCreatedAt(createdAt);
                 booking.setStatus(status);
+                booking.setTotalPrice(totalPrice > 0 ? totalPrice : 1000000.0); // Đảm bảo totalPrice không null
                 
                 // Lưu booking để có ID cho booking detail
                 bookingRepository.save(booking);
                 
-                // Tạo booking detail (1-3 phòng mỗi booking)
-                int roomCount = random.nextInt(3) + 1;
-                double totalPrice = 0;
-                
-                for (int j = 0; j < roomCount; j++) {
-                    Room room = rooms.get(random.nextInt(rooms.size()));
-                    
+                // Tạo booking details
+                for (Room room : selectedRooms) {
                     BookingDetail bookingDetail = new BookingDetail();
                     bookingDetail.setBooking(booking);
                     bookingDetail.setRoom(room);
                     bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
-                    
-                    bookingDetails.add(bookingDetail);
                     bookingDetailRepository.save(bookingDetail);
-                    
-                    // Tính tổng giá
-                    long nights = checkInDate.datesUntil(checkOutDate).count();
-                    totalPrice += room.getRoomType().getBasePrice() * nights;
                 }
-                
-                booking.setTotalPrice(totalPrice);
-                bookingRepository.save(booking);
                 
                 // Tạo payment
                 Payment payment = new Payment();
@@ -414,7 +416,6 @@ public class DataInitializer implements CommandLineRunner {
                     payment.setResponseCode("00");
                 }
                 
-                payments.add(payment);
                 paymentRepository.save(payment);
             }
             
