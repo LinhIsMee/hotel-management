@@ -23,7 +23,7 @@ public class DiscountServiceImpl implements DiscountService {
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int CODE_LENGTH = 8;
-    
+
     @Autowired
     private DiscountRepository discountRepository;
 
@@ -171,7 +171,7 @@ public class DiscountServiceImpl implements DiscountService {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
-    
+
     @Override
     public List<DiscountDTO> generateRandomDiscounts(GenerateDiscountRequest request) {
         List<DiscountDTO> generatedDiscounts = new ArrayList<>();
