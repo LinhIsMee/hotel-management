@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/discounts")
+@RequestMapping("/api/v1/discounts")
 @CrossOrigin(origins = "*")
 public class DiscountController {
 
