@@ -1,89 +1,256 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dtos.request.UpsertDiscountRequest;
+import com.spring3.hotel.management.dto.DiscountDTO;
+import com.spring3.hotel.management.dto.GenerateDiscountRequest;
+import com.spring3.hotel.management.exceptions.DiscountExpiredException;
+import com.spring3.hotel.management.exceptions.DiscountNotFoundException;
+import com.spring3.hotel.management.exceptions.DiscountUsageExceededException;
 import com.spring3.hotel.management.models.Discount;
 import com.spring3.hotel.management.repositories.DiscountRepository;
-import com.spring3.hotel.management.services.DiscountService;
+import com.spring3.hotel.management.services.interfaces.DiscountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.random.RandomGenerator;
+import java.util.Optional;
+import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 public class DiscountServiceImpl implements DiscountService {
-    private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    private static final int CODE_LENGTH = 10;
 
+    private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int CODE_LENGTH = 8;
+    
     @Autowired
     private DiscountRepository discountRepository;
 
-    // Tạo mã giảm giá duy nhất
-    public String generateUniqueDiscountCode() {
-        String code;
-        do {
-            code = generateRandomCode();
-        } while (discountRepository.existsByCode(code)); // Kiểm tra trùng lặp
-        return code;
+    @Override
+    public List<DiscountDTO> getAllDiscounts() {
+        return discountRepository.findAll().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
-    // Tạo mã ngẫu nhiên sử dụng RandomGenerator
-    private String generateRandomCode() {
-        RandomGenerator random = RandomGenerator.getDefault();
-        StringBuilder code = new StringBuilder(CODE_LENGTH);
-        for (int i = 0; i < CODE_LENGTH; i++) {
-            int randomIndex = random.nextInt(CHARACTERS.length());
-            code.append(CHARACTERS.charAt(randomIndex));
+    @Override
+    public DiscountDTO getDiscountById(Integer id) {
+        Optional<Discount> discount = discountRepository.findById(id);
+        return discount.map(this::convertToDTO)
+                .orElseThrow(() -> new DiscountNotFoundException(id));
+    }
+
+    @Override
+    public DiscountDTO getDiscountByCode(String code) {
+        Optional<Discount> discount = discountRepository.findByCode(code);
+        return discount.map(this::convertToDTO)
+                .orElseThrow(() -> new DiscountNotFoundException(code, "code"));
+    }
+
+    @Override
+    public DiscountDTO createDiscount(DiscountDTO discountDTO) {
+        if (discountRepository.existsByCode(discountDTO.getCode())) {
+            throw new IllegalArgumentException("Mã giảm giá '" + discountDTO.getCode() + "' đã tồn tại");
         }
-        return code.toString();
+        
+        Discount discount = convertToEntity(discountDTO);
+        discount = discountRepository.save(discount);
+        return convertToDTO(discount);
     }
 
     @Override
-    public Discount getDiscountById(Integer id) {
-        return discountRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Discount not found"));
+    public DiscountDTO updateDiscount(Integer id, DiscountDTO discountDTO) {
+        Optional<Discount> existingDiscountOpt = discountRepository.findById(id);
+        
+        if (existingDiscountOpt.isEmpty()) {
+            throw new DiscountNotFoundException(id);
+        }
+        
+        Discount existingDiscount = existingDiscountOpt.get();
+        
+        // Kiểm tra nếu code bị thay đổi và code mới đã tồn tại
+        if (!existingDiscount.getCode().equals(discountDTO.getCode()) && 
+            discountRepository.existsByCode(discountDTO.getCode())) {
+            throw new IllegalArgumentException("Mã giảm giá '" + discountDTO.getCode() + "' đã tồn tại");
+        }
+        
+        // Cập nhật thông tin
+        existingDiscount.setCode(discountDTO.getCode());
+        existingDiscount.setDiscountType(discountDTO.getDiscountType());
+        existingDiscount.setDiscountValue(discountDTO.getDiscountValue());
+        existingDiscount.setValidFrom(discountDTO.getValidFrom());
+        existingDiscount.setValidTo(discountDTO.getValidTo());
+        existingDiscount.setMaxUses(discountDTO.getMaxUses());
+        existingDiscount.setUsedCount(discountDTO.getUsedCount());
+        
+        existingDiscount = discountRepository.save(existingDiscount);
+        return convertToDTO(existingDiscount);
     }
 
     @Override
-    public List<Discount> getAllDiscounts() {
-        return discountRepository.findAll();
+    public void deleteDiscount(Integer id) {
+        if (!discountRepository.existsById(id)) {
+            throw new DiscountNotFoundException(id);
+        }
+        discountRepository.deleteById(id);
     }
 
     @Override
-    public Discount createDiscount(UpsertDiscountRequest request) {
-        Discount discountCreate = new Discount();
-        String code;
-        do {
-            code = generateRandomCode();
-        } while (discountRepository.existsByCode(code)); // Kiểm tra trùng lặp
-        discountCreate.setCode(code);
-        discountCreate.setDiscountValue(request.getDiscountValue());
-        discountCreate.setDiscountType(request.getDiscountType());
-        discountCreate.setValidFrom(LocalDate.parse(request.getValidFrom()));
-        discountCreate.setValidTo(LocalDate.parse(request.getValidTo()));
-        discountCreate.setMaxUses(request.getMaxUsage());
-        discountCreate.setUsedCount(0);
-        return discountRepository.save(discountCreate);
+    public boolean isDiscountValid(String discountCode) {
+        Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
+        
+        if (discountOpt.isEmpty()) {
+            return false;
+        }
+        
+        Discount discount = discountOpt.get();
+        LocalDate today = LocalDate.now();
+        
+        // Kiểm tra ngày hết hạn
+        if (today.isBefore(discount.getValidFrom()) || today.isAfter(discount.getValidTo())) {
+            return false;
+        }
+        
+        // Kiểm tra số lần sử dụng
+        if (discount.getUsedCount() >= discount.getMaxUses()) {
+            return false;
+        }
+        
+        return true;
     }
 
     @Override
-    public Discount updateDiscount(UpsertDiscountRequest discount, Integer id) {
-        Discount discountUpdate = discountRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Discount not found"));
-        discountUpdate.setDiscountValue(discount.getDiscountValue());
-        discountUpdate.setDiscountType(discount.getDiscountType());
-        discountUpdate.setValidFrom(LocalDate.parse(discount.getValidFrom()));
-        discountUpdate.setValidTo(LocalDate.parse(discount.getValidTo()));
-        discountUpdate.setMaxUses(discount.getMaxUsage());
-        return discountRepository.save(discountUpdate);
+    public double applyDiscount(String discountCode, double amount) {
+        Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
+        
+        if (discountOpt.isEmpty()) {
+            throw new DiscountNotFoundException(discountCode, "code");
+        }
+        
+        Discount discount = discountOpt.get();
+        LocalDate today = LocalDate.now();
+        
+        // Kiểm tra ngày hết hạn
+        if (today.isBefore(discount.getValidFrom()) || today.isAfter(discount.getValidTo())) {
+            throw new DiscountExpiredException("Mã giảm giá '" + discountCode + "' đã hết hạn sử dụng");
+        }
+        
+        // Kiểm tra số lần sử dụng
+        if (discount.getUsedCount() >= discount.getMaxUses()) {
+            throw new DiscountUsageExceededException("Mã giảm giá '" + discountCode + "' đã đạt giới hạn số lần sử dụng");
+        }
+        
+        // Áp dụng giảm giá
+        if ("PERCENT".equals(discount.getDiscountType())) {
+            return amount * (1 - discount.getDiscountValue());
+        } else if ("FIXED".equals(discount.getDiscountType())) {
+            return Math.max(0, amount - discount.getDiscountValue());
+        }
+        
+        return amount;
     }
 
     @Override
-    public Discount deleteDiscount(Integer id) {
-        Discount discount = discountRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Discount not found"));
-        discountRepository.delete(discount);
+    public void incrementUsedCount(String discountCode) {
+        Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
+        
+        if (discountOpt.isEmpty()) {
+            throw new DiscountNotFoundException(discountCode, "code");
+        }
+        
+        Discount discount = discountOpt.get();
+        discount.setUsedCount(discount.getUsedCount() + 1);
+        discountRepository.save(discount);
+    }
+
+    @Override
+    public List<DiscountDTO> getActiveDiscounts() {
+        LocalDate today = LocalDate.now();
+        return discountRepository.findActiveDiscounts(today).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<DiscountDTO> generateRandomDiscounts(GenerateDiscountRequest request) {
+        List<DiscountDTO> generatedDiscounts = new ArrayList<>();
+        Random random = new Random();
+        
+        for (int i = 0; i < request.getCount(); i++) {
+            String code;
+            do {
+                // Tạo mã ngẫu nhiên
+                StringBuilder codeBuilder = new StringBuilder();
+                if (request.getPrefix() != null && !request.getPrefix().isEmpty()) {
+                    codeBuilder.append(request.getPrefix());
+                    if (!request.getPrefix().endsWith("-")) {
+                        codeBuilder.append("-");
+                    }
+                }
+                
+                // Thêm phần ngẫu nhiên
+                for (int j = 0; j < CODE_LENGTH; j++) {
+                    int randomIndex = random.nextInt(CHARACTERS.length());
+                    codeBuilder.append(CHARACTERS.charAt(randomIndex));
+                }
+                
+                code = codeBuilder.toString();
+            } while (discountRepository.existsByCode(code));
+            
+            // Tạo DTO mới từ request
+            DiscountDTO discountDTO = new DiscountDTO();
+            discountDTO.setCode(code);
+            discountDTO.setDiscountType(request.getDiscountType());
+            discountDTO.setDiscountValue(request.getDiscountValue());
+            discountDTO.setValidFrom(request.getValidFrom());
+            discountDTO.setValidTo(request.getValidTo());
+            discountDTO.setMaxUses(request.getMaxUses());
+            discountDTO.setUsedCount(0);
+            
+            // Lưu vào cơ sở dữ liệu
+            Discount discount = convertToEntity(discountDTO);
+            discount = discountRepository.save(discount);
+            
+            // Thêm vào danh sách kết quả
+            generatedDiscounts.add(convertToDTO(discount));
+        }
+        
+        return generatedDiscounts;
+    }
+    
+    // Phương thức chuyển đổi từ Entity sang DTO
+    private DiscountDTO convertToDTO(Discount discount) {
+        DiscountDTO dto = new DiscountDTO();
+        dto.setId(discount.getId());
+        dto.setCode(discount.getCode());
+        dto.setDiscountType(discount.getDiscountType());
+        dto.setDiscountValue(discount.getDiscountValue());
+        dto.setValidFrom(discount.getValidFrom());
+        dto.setValidTo(discount.getValidTo());
+        dto.setMaxUses(discount.getMaxUses());
+        dto.setUsedCount(discount.getUsedCount());
+        
+        // Kiểm tra tính hợp lệ
+        LocalDate today = LocalDate.now();
+        dto.setValid(today.isAfter(discount.getValidFrom().minusDays(1)) &&
+                    today.isBefore(discount.getValidTo().plusDays(1)) &&
+                    discount.getUsedCount() < discount.getMaxUses());
+        
+        return dto;
+    }
+    
+    // Phương thức chuyển đổi từ DTO sang Entity
+    private Discount convertToEntity(DiscountDTO dto) {
+        Discount discount = new Discount();
+        discount.setId(dto.getId());
+        discount.setCode(dto.getCode());
+        discount.setDiscountType(dto.getDiscountType());
+        discount.setDiscountValue(dto.getDiscountValue());
+        discount.setValidFrom(dto.getValidFrom());
+        discount.setValidTo(dto.getValidTo());
+        discount.setMaxUses(dto.getMaxUses());
+        discount.setUsedCount(dto.getUsedCount());
         return discount;
     }
 }

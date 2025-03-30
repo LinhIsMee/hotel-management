@@ -251,6 +251,26 @@ public class DataInitializer implements CommandLineRunner {
             welcome.setUsedCount(120);
             discounts.add(welcome);
             
+            Discount special = new Discount();
+            special.setCode("SPECIAL");
+            special.setDiscountType("PERCENT");
+            special.setDiscountValue(0.2); // 20%
+            special.setValidFrom(LocalDate.of(2023, 10, 1));
+            special.setValidTo(LocalDate.of(2023, 12, 31));
+            special.setMaxUses(100);
+            special.setUsedCount(0);
+            discounts.add(special);
+            
+            Discount loyal = new Discount();
+            loyal.setCode("LOYAL2023");
+            loyal.setDiscountType("PERCENT");
+            loyal.setDiscountValue(0.25); // 25%
+            loyal.setValidFrom(LocalDate.of(2023, 1, 1));
+            loyal.setValidTo(LocalDate.of(2023, 12, 31));
+            loyal.setMaxUses(50);
+            loyal.setUsedCount(10);
+            discounts.add(loyal);
+            
             discountRepository.saveAll(discounts);
             
             log.info("Sample discounts created successfully");
@@ -270,43 +290,21 @@ public class DataInitializer implements CommandLineRunner {
             Role userRole = userRoleOpt.get();
             List<User> customers = new ArrayList<>();
             
-            if (userRepository.findByUsername("customer1") == null) {
-                User customer1 = new User();
-                customer1.setUsername("customer1");
-                customer1.setPassword(passwordEncoder.encode("Customer1!"));
-                customer1.setEmail("customer1@example.com");
-                customer1.setFullName("Nguyễn Văn A");
-                customer1.setPhoneNumber("0912345678");
-                customer1.setRole(userRole);
-                customer1.setNationalId("031234567890");
-                customer1.setCreatedAt(LocalDateTime.now());
-                customers.add(customer1);
-            }
-            
-            if (userRepository.findByUsername("customer2") == null) {
-                User customer2 = new User();
-                customer2.setUsername("customer2");
-                customer2.setPassword(passwordEncoder.encode("Customer2!"));
-                customer2.setEmail("customer2@example.com");
-                customer2.setFullName("Trần Thị B");
-                customer2.setPhoneNumber("0923456789");
-                customer2.setRole(userRole);
-                customer2.setNationalId("032345678901");
-                customer2.setCreatedAt(LocalDateTime.now());
-                customers.add(customer2);
-            }
-            
-            if (userRepository.findByUsername("customer3") == null) {
-                User customer3 = new User();
-                customer3.setUsername("customer3");
-                customer3.setPassword(passwordEncoder.encode("Customer3!"));
-                customer3.setEmail("customer3@example.com");
-                customer3.setFullName("Lê Văn C");
-                customer3.setPhoneNumber("0934567890");
-                customer3.setRole(userRole);
-                customer3.setNationalId("033456789012");
-                customer3.setCreatedAt(LocalDateTime.now());
-                customers.add(customer3);
+            // Tạo 10 người dùng để có nhiều dữ liệu đa dạng hơn
+            for (int i = 1; i <= 10; i++) {
+                String username = "customer" + i;
+                if (userRepository.findByUsername(username) == null) {
+                    User customer = new User();
+                    customer.setUsername(username);
+                    customer.setPassword(passwordEncoder.encode("Customer" + i + "!"));
+                    customer.setEmail("customer" + i + "@example.com");
+                    customer.setFullName("Khách Hàng " + i);
+                    customer.setPhoneNumber("09" + (10000000 + i * 111111));
+                    customer.setRole(userRole);
+                    customer.setNationalId("03" + (1000000000 + i * 11111111));
+                    customer.setCreatedAt(LocalDateTime.now().minusDays(i * 5));
+                    customers.add(customer);
+                }
             }
             
             userRepository.saveAll(customers);
@@ -325,53 +323,99 @@ public class DataInitializer implements CommandLineRunner {
             Random random = new Random();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
             
+            // Phân bố trạng thái hợp lý
             String[] statuses = {"PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED"};
             String[] paymentStatuses = {"PENDING", "PAID", "REFUNDED"};
             
-            for (int i = 0; i < 10; i++) {
+            // Tạo 30 booking mẫu
+            for (int i = 0; i < 30; i++) {
                 User user = users.get(random.nextInt(users.size()));
                 Discount discount = discounts.get(random.nextInt(discounts.size()));
                 
-                // Tạo ngày check-in và check-out
-                LocalDate checkInDate = LocalDate.now().plusDays(random.nextInt(60) - 30); // +/- 30 ngày
-                LocalDate checkOutDate = checkInDate.plusDays(random.nextInt(5) + 1); // Từ 1 đến 5 đêm
+                // Tạo ngày check-in và check-out với phân bố hợp lý
+                LocalDate now = LocalDate.now();
+                LocalDate checkInDate;
+                LocalDate checkOutDate;
                 
-                // Tính ngày tạo booking
-                LocalDateTime createdAt = LocalDateTime.now().minusDays(random.nextInt(10) + 1);
+                // Phân bố các booking trong quá khứ, hiện tại và tương lai
+                int timeOffset;
+                if (i < 10) {
+                    // Booking trong quá khứ
+                    timeOffset = -random.nextInt(90) - 10; // -100 đến -10 ngày
+                } else if (i < 20) {
+                    // Booking hiện tại và sắp tới
+                    timeOffset = random.nextInt(20) - 10; // -10 đến 10 ngày
+                } else {
+                    // Booking trong tương lai
+                    timeOffset = random.nextInt(90) + 10; // 10 đến 100 ngày
+                }
                 
-                // Xác định trạng thái dựa vào ngày checkin/checkout
+                checkInDate = now.plusDays(timeOffset);
+                // Thời gian ở từ 1 đến 7 đêm
+                int stayDuration = random.nextInt(7) + 1;
+                checkOutDate = checkInDate.plusDays(stayDuration);
+                
+                // Tính ngày tạo booking (luôn là trước ngày check-in)
+                int bookingBeforeCheckIn = random.nextInt(30) + 1; // Đặt trước 1-30 ngày
+                LocalDateTime createdAt = checkInDate.atStartOfDay().minusDays(bookingBeforeCheckIn);
+                
+                // Xác định trạng thái dựa vào ngày checkIn/checkOut
                 String status;
-                LocalDate today = LocalDate.now();
-                if (checkInDate.isAfter(today)) {
+                if (checkInDate.isAfter(now)) {
                     // Chưa đến ngày checkin
-                    status = random.nextBoolean() ? "PENDING" : "CONFIRMED";
-                } else if (checkOutDate.isBefore(today)) {
+                    status = random.nextInt(10) < 7 ? "CONFIRMED" : "PENDING"; // 70% confirmed, 30% pending
+                } else if (checkOutDate.isBefore(now)) {
                     // Đã qua ngày checkout
-                    status = "CHECKED_OUT";
+                    status = random.nextInt(10) < 9 ? "CHECKED_OUT" : "CANCELLED"; // 90% checked out, 10% cancelled
                 } else {
                     // Đang ở
                     status = "CHECKED_IN";
                 }
                 
-                // Random một số booking bị hủy
-                if (random.nextInt(10) < 1) { // 10% bị hủy
-                    status = "CANCELLED";
+                // Ép buộc một phân bố cụ thể cho các trạng thái
+                if (i < 5) {
+                    status = "PENDING"; // Đảm bảo có 5 booking PENDING
+                } else if (i < 10) {
+                    status = "CONFIRMED"; // Đảm bảo có 5 booking CONFIRMED
+                } else if (i < 15) {
+                    status = "CHECKED_IN"; // Đảm bảo có 5 booking CHECKED_IN
+                } else if (i < 25) {
+                    status = "CHECKED_OUT"; // Đảm bảo có 10 booking CHECKED_OUT
+                } else {
+                    status = "CANCELLED"; // Đảm bảo có 5 booking CANCELLED
                 }
                 
                 // Tạo booking detail (1-3 phòng mỗi booking)
                 int roomCount = random.nextInt(3) + 1;
+                // Đảm bảo doanh thu dương và hợp lý
+                double basePrice = 500000.0; // Giá cơ bản là 500,000 VND / đêm
                 double totalPrice = 0.0;
                 
                 List<Room> selectedRooms = new ArrayList<>();
                 for (int j = 0; j < roomCount && j < rooms.size(); j++) {
                     Room room = rooms.get(random.nextInt(rooms.size()));
-                    selectedRooms.add(room);
-                    
-                    // Tính tổng giá
-                    long nights = checkInDate.datesUntil(checkOutDate).count();
-                    if (nights == 0) nights = 1; // Đảm bảo có ít nhất 1 đêm
-                    totalPrice += room.getRoomType().getBasePrice() * nights;
+                    // Tránh chọn trùng phòng
+                    if (!selectedRooms.contains(room)) {
+                        selectedRooms.add(room);
+                        
+                        // Tính tổng giá
+                        double roomPrice = room.getRoomType() != null && room.getRoomType().getBasePrice() > 0 
+                            ? room.getRoomType().getBasePrice() 
+                            : basePrice * (1 + random.nextDouble()); // Từ 500k đến 1M
+                        
+                        totalPrice += roomPrice * stayDuration;
+                    }
                 }
+                
+                // Đảm bảo có ít nhất 1 phòng và giá dương
+                if (selectedRooms.isEmpty()) {
+                    Room room = rooms.get(random.nextInt(rooms.size()));
+                    selectedRooms.add(room);
+                    totalPrice = basePrice * stayDuration;
+                }
+                
+                // Làm tròn giá tiền
+                totalPrice = Math.round(totalPrice / 10000.0) * 10000.0;
                 
                 // Tạo booking mới
                 Booking booking = new Booking();
@@ -381,7 +425,7 @@ public class DataInitializer implements CommandLineRunner {
                 booking.setDiscount(discount);
                 booking.setCreatedAt(createdAt);
                 booking.setStatus(status);
-                booking.setTotalPrice(totalPrice > 0 ? totalPrice : 1000000.0); // Đảm bảo totalPrice không null
+                booking.setTotalPrice(totalPrice);
                 
                 // Lưu booking để có ID cho booking detail
                 bookingRepository.save(booking);
@@ -391,7 +435,11 @@ public class DataInitializer implements CommandLineRunner {
                     BookingDetail bookingDetail = new BookingDetail();
                     bookingDetail.setBooking(booking);
                     bookingDetail.setRoom(room);
-                    bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                    double pricePerNight = room.getRoomType() != null && room.getRoomType().getBasePrice() > 0 
+                        ? room.getRoomType().getBasePrice() 
+                        : basePrice * (1 + random.nextDouble());
+                    
+                    bookingDetail.setPricePerNight(pricePerNight);
                     bookingDetailRepository.save(bookingDetail);
                 }
                 
@@ -400,14 +448,19 @@ public class DataInitializer implements CommandLineRunner {
                 payment.setBooking(booking);
                 payment.setAmount((long) totalPrice);
                 
+                // Phân bố trạng thái payment phù hợp với booking
                 if ("CANCELLED".equals(status)) {
+                    // Nếu đã hủy
                     payment.setStatus("REFUNDED");
                 } else if ("PENDING".equals(status)) {
+                    // Nếu đang chờ xử lý
                     payment.setStatus("PENDING");
                 } else {
+                    // Các trường hợp khác (CONFIRMED, CHECKED_IN, CHECKED_OUT)
                     payment.setStatus("PAID");
                 }
                 
+                // Thêm thông tin chi tiết cho payment đã xử lý
                 if ("PAID".equals(payment.getStatus()) || "REFUNDED".equals(payment.getStatus())) {
                     payment.setPayDate(createdAt.plusHours(1).format(formatter));
                     payment.setTransactionNo("TRX" + System.currentTimeMillis() + random.nextInt(1000));
@@ -419,7 +472,7 @@ public class DataInitializer implements CommandLineRunner {
                 paymentRepository.save(payment);
             }
             
-            log.info("Sample bookings created successfully");
+            log.info("Sample bookings (30 entries) created successfully");
         }
     }
     
