@@ -2,20 +2,32 @@ package com.spring3.hotel.management.config;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import com.spring3.hotel.management.models.Booking;
+import com.spring3.hotel.management.models.BookingDetail;
 import com.spring3.hotel.management.models.Department;
+import com.spring3.hotel.management.models.Discount;
 import com.spring3.hotel.management.models.Employee;
+import com.spring3.hotel.management.models.Payment;
 import com.spring3.hotel.management.models.Position;
 import com.spring3.hotel.management.models.Role;
+import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.User;
+import com.spring3.hotel.management.repositories.BookingDetailRepository;
+import com.spring3.hotel.management.repositories.BookingRepository;
+import com.spring3.hotel.management.repositories.DiscountRepository;
 import com.spring3.hotel.management.repositories.EmployeeRepository;
+import com.spring3.hotel.management.repositories.PaymentRepository;
 import com.spring3.hotel.management.repositories.RoleRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
@@ -68,6 +80,18 @@ public class DataInitializer implements CommandLineRunner {
     
     @Autowired
     private ReviewService reviewService;
+    
+    @Autowired
+    private BookingRepository bookingRepository;
+    
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
+    
+    @Autowired
+    private PaymentRepository paymentRepository;
+    
+    @Autowired
+    private DiscountRepository discountRepository;
     
     @Override
     public void run(String... args) throws Exception {
@@ -188,6 +212,206 @@ public class DataInitializer implements CommandLineRunner {
             } catch (Exception e) {
                 log.error("Failed to initialize reviews from JSON: {}", e.getMessage());
             }
+        }
+        
+        // Khởi tạo dữ liệu discount nếu chưa có
+        if (discountRepository.count() == 0) {
+            log.info("Creating sample discounts...");
+            
+            List<Discount> discounts = new ArrayList<>();
+            
+            Discount summer = new Discount();
+            summer.setCode("SUMMER2023");
+            summer.setDiscountType("PERCENT");
+            summer.setDiscountValue(0.1); // 10%
+            summer.setValidFrom(LocalDate.of(2023, 6, 1));
+            summer.setValidTo(LocalDate.of(2023, 8, 31));
+            summer.setMaxUses(100);
+            summer.setUsedCount(15);
+            discounts.add(summer);
+            
+            Discount weekend = new Discount();
+            weekend.setCode("WEEKEND");
+            weekend.setDiscountType("PERCENT");
+            weekend.setDiscountValue(0.15); // 15%
+            weekend.setValidFrom(LocalDate.of(2023, 1, 1));
+            weekend.setValidTo(LocalDate.of(2023, 12, 31));
+            weekend.setMaxUses(200);
+            weekend.setUsedCount(45);
+            discounts.add(weekend);
+            
+            Discount welcome = new Discount();
+            welcome.setCode("WELCOME");
+            welcome.setDiscountType("FIXED");
+            welcome.setDiscountValue(200000.0); // 200,000 VND
+            welcome.setValidFrom(LocalDate.of(2023, 1, 1));
+            welcome.setValidTo(LocalDate.of(2023, 12, 31));
+            welcome.setMaxUses(500);
+            welcome.setUsedCount(120);
+            discounts.add(welcome);
+            
+            discountRepository.saveAll(discounts);
+            
+            log.info("Sample discounts created successfully");
+        }
+        
+        // Khởi tạo dữ liệu booking nếu chưa có
+        if (bookingRepository.count() == 0 && userRepository.count() > 0 && roomRepository.count() > 0) {
+            log.info("Creating sample bookings...");
+            
+            // Tạo một số user khách hàng nếu chưa có
+            Role userRole = roleRepository.findByName("ROLE_USER");
+            List<User> customers = new ArrayList<>();
+            
+            if (userRepository.findByUsername("customer1") == null) {
+                User customer1 = new User();
+                customer1.setUsername("customer1");
+                customer1.setPassword(passwordEncoder.encode("Customer1!"));
+                customer1.setEmail("customer1@example.com");
+                customer1.setFullName("Nguyễn Văn A");
+                customer1.setPhoneNumber("0912345678");
+                customer1.setRole(userRole);
+                customer1.setNationalId("031234567890");
+                customer1.setCreatedAt(LocalDateTime.now());
+                customers.add(customer1);
+            }
+            
+            if (userRepository.findByUsername("customer2") == null) {
+                User customer2 = new User();
+                customer2.setUsername("customer2");
+                customer2.setPassword(passwordEncoder.encode("Customer2!"));
+                customer2.setEmail("customer2@example.com");
+                customer2.setFullName("Trần Thị B");
+                customer2.setPhoneNumber("0923456789");
+                customer2.setRole(userRole);
+                customer2.setNationalId("032345678901");
+                customer2.setCreatedAt(LocalDateTime.now());
+                customers.add(customer2);
+            }
+            
+            if (userRepository.findByUsername("customer3") == null) {
+                User customer3 = new User();
+                customer3.setUsername("customer3");
+                customer3.setPassword(passwordEncoder.encode("Customer3!"));
+                customer3.setEmail("customer3@example.com");
+                customer3.setFullName("Lê Văn C");
+                customer3.setPhoneNumber("0934567890");
+                customer3.setRole(userRole);
+                customer3.setNationalId("033456789012");
+                customer3.setCreatedAt(LocalDateTime.now());
+                customers.add(customer3);
+            }
+            
+            userRepository.saveAll(customers);
+            
+            // Lấy danh sách user và room để tạo booking
+            List<User> users = userRepository.findAll();
+            List<Room> rooms = roomRepository.findAll();
+            List<Discount> discounts = discountRepository.findAll();
+            
+            // Tạo dữ liệu booking mẫu
+            List<Booking> bookings = new ArrayList<>();
+            List<BookingDetail> bookingDetails = new ArrayList<>();
+            List<Payment> payments = new ArrayList<>();
+            
+            Random random = new Random();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            
+            String[] statuses = {"PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED"};
+            String[] paymentStatuses = {"PENDING", "PAID", "REFUNDED"};
+            
+            for (int i = 0; i < 10; i++) {
+                User user = users.get(random.nextInt(users.size()));
+                Discount discount = discounts.get(random.nextInt(discounts.size()));
+                
+                // Tạo ngày check-in và check-out
+                LocalDate checkInDate = LocalDate.now().plusDays(random.nextInt(60) - 30); // +/- 30 ngày
+                LocalDate checkOutDate = checkInDate.plusDays(random.nextInt(5) + 1); // Từ 1 đến 5 đêm
+                
+                // Tạo booking mới
+                Booking booking = new Booking();
+                booking.setUser(user);
+                booking.setCheckInDate(checkInDate);
+                booking.setCheckOutDate(checkOutDate);
+                booking.setDiscount(discount);
+                
+                // Tính ngày tạo booking
+                LocalDateTime createdAt = LocalDateTime.now().minusDays(random.nextInt(10) + 1);
+                booking.setCreatedAt(createdAt);
+                
+                // Xác định trạng thái dựa vào ngày checkin/checkout
+                String status;
+                LocalDate today = LocalDate.now();
+                if (checkInDate.isAfter(today)) {
+                    // Chưa đến ngày checkin
+                    status = random.nextBoolean() ? "PENDING" : "CONFIRMED";
+                } else if (checkOutDate.isBefore(today)) {
+                    // Đã qua ngày checkout
+                    status = "CHECKED_OUT";
+                } else {
+                    // Đang ở
+                    status = "CHECKED_IN";
+                }
+                
+                // Random một số booking bị hủy
+                if (random.nextInt(10) < 1) { // 10% bị hủy
+                    status = "CANCELLED";
+                }
+                
+                booking.setStatus(status);
+                
+                // Lưu booking để có ID cho booking detail
+                bookingRepository.save(booking);
+                
+                // Tạo booking detail (1-3 phòng mỗi booking)
+                int roomCount = random.nextInt(3) + 1;
+                double totalPrice = 0;
+                
+                for (int j = 0; j < roomCount; j++) {
+                    Room room = rooms.get(random.nextInt(rooms.size()));
+                    
+                    BookingDetail bookingDetail = new BookingDetail();
+                    bookingDetail.setBooking(booking);
+                    bookingDetail.setRoom(room);
+                    bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                    
+                    bookingDetails.add(bookingDetail);
+                    bookingDetailRepository.save(bookingDetail);
+                    
+                    // Tính tổng giá
+                    long nights = checkInDate.datesUntil(checkOutDate).count();
+                    totalPrice += room.getRoomType().getBasePrice() * nights;
+                }
+                
+                booking.setTotalPrice(totalPrice);
+                bookingRepository.save(booking);
+                
+                // Tạo payment
+                Payment payment = new Payment();
+                payment.setBooking(booking);
+                payment.setAmount((long) totalPrice);
+                
+                if ("CANCELLED".equals(status)) {
+                    payment.setStatus("REFUNDED");
+                } else if ("PENDING".equals(status)) {
+                    payment.setStatus("PENDING");
+                } else {
+                    payment.setStatus("PAID");
+                }
+                
+                if ("PAID".equals(payment.getStatus()) || "REFUNDED".equals(payment.getStatus())) {
+                    payment.setPayDate(createdAt.plusHours(1).format(formatter));
+                    payment.setTransactionNo("TRX" + System.currentTimeMillis() + random.nextInt(1000));
+                    payment.setOrderInfo("Thanh toán đặt phòng #" + booking.getId());
+                    payment.setBankCode("NCB");
+                    payment.setResponseCode("00");
+                }
+                
+                payments.add(payment);
+                paymentRepository.save(payment);
+            }
+            
+            log.info("Sample bookings created successfully");
         }
     }
     
