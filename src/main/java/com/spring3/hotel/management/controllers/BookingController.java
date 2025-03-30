@@ -3,12 +3,15 @@ package com.spring3.hotel.management.controllers;
 import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
 import com.spring3.hotel.management.dtos.response.NewBookingResponse;
+import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
 import com.spring3.hotel.management.services.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -53,6 +56,24 @@ public class BookingController {
         return ResponseEntity.ok(bookings);
     }
 
+    // API mới: Lấy danh sách booking trong khoảng thời gian
+    @GetMapping("/date-range")
+    public ResponseEntity<List<BookingResponseDTO>> getBookingsByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        List<BookingResponseDTO> bookings = bookingService.getBookingsByDateRange(startDate, endDate);
+        return ResponseEntity.ok(bookings);
+    }
+    
+    // API mới: Lấy danh sách phòng đã đặt trong khoảng thời gian
+    @GetMapping("/booked-rooms")
+    public ResponseEntity<List<RoomListResponseDTO>> getBookedRoomsByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        List<RoomListResponseDTO> rooms = bookingService.getBookedRoomsByDateRange(startDate, endDate);
+        return ResponseEntity.ok(rooms);
+    }
+
     // Tạo mới booking
     @PostMapping("/create")
     public ResponseEntity<BookingResponseDTO> createBooking(@RequestBody UpsertBookingRequest request) {
@@ -66,6 +87,20 @@ public class BookingController {
             @PathVariable Integer id,
             @RequestBody UpsertBookingRequest request) {
         BookingResponseDTO bookingResponseDTO = bookingService.updateBooking(request, id);
+        return ResponseEntity.ok(bookingResponseDTO);
+    }
+    
+    // API mới: Hủy booking
+    @PostMapping("/cancel/{id}")
+    public ResponseEntity<BookingResponseDTO> cancelBooking(@PathVariable Integer id) {
+        BookingResponseDTO bookingResponseDTO = bookingService.cancelBooking(id);
+        return ResponseEntity.ok(bookingResponseDTO);
+    }
+    
+    // API mới: Xác nhận booking sau khi thanh toán
+    @PostMapping("/confirm/{id}")
+    public ResponseEntity<BookingResponseDTO> confirmBooking(@PathVariable Integer id) {
+        BookingResponseDTO bookingResponseDTO = bookingService.confirmBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
 }
