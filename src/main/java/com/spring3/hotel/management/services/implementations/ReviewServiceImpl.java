@@ -260,12 +260,25 @@ public class ReviewServiceImpl implements ReviewService {
     
     @Override
     public ReviewResponseDTO deleteReview(Integer id) {
-        Review review = reviewRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Đánh giá không tìm thấy với ID: " + id));
+        log.info("Bắt đầu xóa đánh giá có ID: {}", id);
         
-        ReviewResponseDTO response = ReviewResponseDTO.fromEntity(review);
-        reviewRepository.delete(review);
-        return response;
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Không tìm thấy đánh giá với ID: {}", id);
+                    return new ResourceNotFoundException("Đánh giá không tìm thấy với ID: " + id);
+                });
+        
+        log.info("Đã tìm thấy đánh giá cần xóa: {}", review);
+        
+        try {
+            ReviewResponseDTO response = ReviewResponseDTO.fromEntity(review);
+            reviewRepository.delete(review);
+            log.info("Đã xóa thành công đánh giá có ID: {}", id);
+            return response;
+        } catch (Exception e) {
+            log.error("Lỗi khi xóa đánh giá có ID {}: {}", id, e.getMessage());
+            throw new RuntimeException("Lỗi khi xóa đánh giá: " + e.getMessage(), e);
+        }
     }
     
     @Override

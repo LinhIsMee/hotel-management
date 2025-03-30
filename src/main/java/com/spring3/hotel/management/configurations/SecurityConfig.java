@@ -77,7 +77,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/reviews/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/update/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/reviews/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/reviews/**").authenticated()
                         .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
                         .requestMatchers(
                             "/api/v1/users", 

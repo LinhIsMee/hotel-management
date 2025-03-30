@@ -52,9 +52,21 @@ public class ReviewController {
 
     // Xóa một review
     @DeleteMapping("/{id}")
-    public ResponseEntity<ReviewResponseDTO> deleteReview(@PathVariable Integer id) {
-        ReviewResponseDTO deletedReview = reviewService.deleteReview(id);
-        return ResponseEntity.ok(deletedReview);
+    public ResponseEntity<?> deleteReview(@PathVariable Integer id) {
+        try {
+            ReviewResponseDTO deletedReview = reviewService.deleteReview(id);
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Xóa đánh giá thành công",
+                "reviewId", id
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "status", "error",
+                    "message", "Không thể xóa đánh giá: " + e.getMessage()
+                ));
+        }
     }
 
     // Lấy tất cả reviews của một phòng (room) bằng roomId
