@@ -17,6 +17,6 @@ public interface DiscountRepository extends JpaRepository<Discount, Integer> {
     
     Optional<Discount> findByCode(String code);
     
-    @Query("SELECT d FROM Discount d WHERE d.validFrom <= :today AND d.validTo >= :today AND d.usedCount < d.maxUses")
+    @Query("SELECT d FROM Discount d WHERE d.validFrom <= :today AND d.validTo >= :today AND d.usedCount < d.maxUses AND d.active = true")
     List<Discount> findActiveDiscounts(LocalDate today);
 }

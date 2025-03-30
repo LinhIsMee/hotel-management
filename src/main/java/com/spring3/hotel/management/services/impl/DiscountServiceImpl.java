@@ -30,6 +30,7 @@ public class DiscountServiceImpl implements DiscountService {
     @Override
     public List<DiscountDTO> getAllDiscounts() {
         return discountRepository.findAll().stream()
+                .filter(Discount::isActive)
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -37,15 +38,19 @@ public class DiscountServiceImpl implements DiscountService {
     @Override
     public DiscountDTO getDiscountById(Integer id) {
         Optional<Discount> discount = discountRepository.findById(id);
-        return discount.map(this::convertToDTO)
-                .orElseThrow(() -> new DiscountNotFoundException(id));
+        if (discount.isEmpty() || !discount.get().isActive()) {
+            throw new DiscountNotFoundException(id);
+        }
+        return convertToDTO(discount.get());
     }
 
     @Override
     public DiscountDTO getDiscountByCode(String code) {
         Optional<Discount> discount = discountRepository.findByCode(code);
-        return discount.map(this::convertToDTO)
-                .orElseThrow(() -> new DiscountNotFoundException(code, "code"));
+        if (discount.isEmpty() || !discount.get().isActive()) {
+            throw new DiscountNotFoundException(code, "code");
+        }
+        return convertToDTO(discount.get());
     }
 
     @Override
@@ -90,17 +95,20 @@ public class DiscountServiceImpl implements DiscountService {
 
     @Override
     public void deleteDiscount(Integer id) {
-        if (!discountRepository.existsById(id)) {
+        Optional<Discount> discountOpt = discountRepository.findById(id);
+        if (discountOpt.isEmpty()) {
             throw new DiscountNotFoundException(id);
         }
-        discountRepository.deleteById(id);
+        Discount discount = discountOpt.get();
+        discount.setActive(false);
+        discountRepository.save(discount);
     }
 
     @Override
     public boolean isDiscountValid(String discountCode) {
         Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
         
-        if (discountOpt.isEmpty()) {
+        if (discountOpt.isEmpty() || !discountOpt.get().isActive()) {
             return false;
         }
         
@@ -124,7 +132,7 @@ public class DiscountServiceImpl implements DiscountService {
     public double applyDiscount(String discountCode, double amount) {
         Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
         
-        if (discountOpt.isEmpty()) {
+        if (discountOpt.isEmpty() || !discountOpt.get().isActive()) {
             throw new DiscountNotFoundException(discountCode, "code");
         }
         
@@ -168,6 +176,7 @@ public class DiscountServiceImpl implements DiscountService {
     public List<DiscountDTO> getActiveDiscounts() {
         LocalDate today = LocalDate.now();
         return discountRepository.findActiveDiscounts(today).stream()
+                .filter(Discount::isActive)
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }

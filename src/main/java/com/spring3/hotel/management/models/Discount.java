@@ -39,4 +39,7 @@ public class Discount {
 
     @Column(name = "used_count")
     private int usedCount;
+    
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
 }
