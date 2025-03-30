@@ -76,8 +76,13 @@ public class BookingServiceImpl implements BookingService {
         booking.setCheckInDate(request.getCheckInDate());
         booking.setCheckOutDate(request.getCheckOutDate());
         booking.setTotalPrice(request.getTotalPrice());
-        Discount discount = discountRepository.findDiscountById(request.getDiscountId());
-        booking.setDiscount(discount);
+        
+        // Xử lý trường hợp discountId là null
+        if (request.getDiscountId() != null) {
+            Discount discount = discountRepository.findDiscountById(request.getDiscountId());
+            booking.setDiscount(discount);
+        }
+        
         booking.setStatus("PENDING"); // Mặc định trạng thái là 'PENDING' sau khi thanh toán sẽ chuyển sang 'CONFIRMED'
         
         // Lưu booking để có ID cho booking details
@@ -117,8 +122,15 @@ public class BookingServiceImpl implements BookingService {
         booking.setCheckInDate(request.getCheckInDate());
         booking.setCheckOutDate(request.getCheckOutDate());
         booking.setTotalPrice(request.getTotalPrice());
-        Discount discount = discountRepository.findDiscountById(request.getDiscountId());
-        booking.setDiscount(discount);
+        
+        // Xử lý trường hợp discountId là null
+        if (request.getDiscountId() != null) {
+            Discount discount = discountRepository.findDiscountById(request.getDiscountId());
+            booking.setDiscount(discount);
+        } else {
+            booking.setDiscount(null); // Đặt giá trị discount là null nếu request không có discountId
+        }
+        
         booking.setStatus(request.getStatus());
         
         // Lưu booking để có ID cho booking details
