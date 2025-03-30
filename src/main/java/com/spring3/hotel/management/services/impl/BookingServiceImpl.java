@@ -274,6 +274,7 @@ public class BookingServiceImpl implements BookingService {
             roomListResponseDTO.setRoomNumber(room.getRoomNumber());
             roomListResponseDTO.setRoomType(room.getRoomType().getName());
             roomListResponseDTO.setPrice(room.getRoomType().getBasePrice());
+            roomListResponseDTO.setImagePath(room.getRoomType().getImageUrl());
             return roomListResponseDTO;
         }).toList();
         bookingResponseDTO.setId(booking.getId());
@@ -292,8 +293,14 @@ public class BookingServiceImpl implements BookingService {
             bookingResponseDTO.setDiscountCode(null);
             bookingResponseDTO.setDiscountValue(0.0);
             bookingResponseDTO.setDiscountType(null);
-        }else {
-            bookingResponseDTO.setFinalPrice(booking.getTotalPrice() - booking.getTotalPrice() * discount.getDiscountValue());
+        } else {
+            if ("PERCENT".equals(discount.getDiscountType())) {
+                bookingResponseDTO.setFinalPrice(booking.getTotalPrice() - booking.getTotalPrice() * discount.getDiscountValue());
+            } else if ("FIXED".equals(discount.getDiscountType())) {
+                bookingResponseDTO.setFinalPrice(booking.getTotalPrice() - discount.getDiscountValue());
+            } else {
+                bookingResponseDTO.setFinalPrice(booking.getTotalPrice());
+            }
             bookingResponseDTO.setDiscountCode(discount.getCode());
             bookingResponseDTO.setDiscountValue(discount.getDiscountValue());
             bookingResponseDTO.setDiscountType(discount.getDiscountType());
