@@ -1,4 +1,5 @@
-# Hotel Management API - Quản lý Đánh giá (Reviews)
+
+# Quản lý Đánh giá (Reviews) - Tài liệu API
 
 API này cung cấp các endpoint để quản lý đánh giá của khách hàng về trải nghiệm tại khách sạn.
 
@@ -12,7 +13,6 @@ API này cung cấp các endpoint để quản lý đánh giá của khách hàn
   "bookingId": "BK-2023090501",
   "guestName": "Nguyễn Văn An",
   "displayName": "Nguyễn V.",
-  "roomId": 101,
   "roomNumber": "101",
   "roomType": "Deluxe",
   "rating": 5,
@@ -48,7 +48,6 @@ Trả về danh sách tất cả các đánh giá.
 #### Response
 
 **Thành công (200)**
-
 ```json
 [
   {
@@ -56,7 +55,6 @@ Trả về danh sách tất cả các đánh giá.
     "bookingId": "BK-2023090501",
     "guestName": "Nguyễn Văn An",
     "displayName": "Nguyễn V.",
-    "roomId": 101,
     "roomNumber": "101",
     "roomType": "Deluxe",
     "rating": 5,
@@ -81,66 +79,7 @@ Trả về danh sách tất cả các đánh giá.
 ]
 ```
 
-### 2. Lấy danh sách đánh giá có phân trang
-
-```
-GET /api/v1/reviews?page=0&size=10
-```
-
-Trả về danh sách các đánh giá có phân trang.
-
-#### Tham số Query
-
-| Tham số | Kiểu   | Mô tả                                                       |
-|---------|--------|-------------------------------------------------------------|
-| page    | int    | Số trang (mặc định: 0)                                      |
-| size    | int    | Số lượng phần tử mỗi trang (mặc định: 10)                   |
-| sortBy  | string | Trường để sắp xếp (mặc định: "id")                          |
-| sortDir | string | Hướng sắp xếp: "asc" hoặc "desc" (mặc định: "desc")         |
-
-#### Response
-
-**Thành công (200)**
-
-```json
-{
-  "content": [
-    {
-      "id": 1,
-      "bookingId": "BK-2023090501",
-      // ... thông tin đánh giá
-    }
-    // ... các đánh giá khác
-  ],
-  "pageable": {
-    "pageNumber": 0,
-    "pageSize": 10,
-    "sort": {
-      "sorted": true,
-      "unsorted": false,
-      "empty": false
-    },
-    "offset": 0,
-    "paged": true,
-    "unpaged": false
-  },
-  "totalPages": 5,
-  "totalElements": 50,
-  "last": false,
-  "size": 10,
-  "number": 0,
-  "sort": {
-    "sorted": true,
-    "unsorted": false,
-    "empty": false
-  },
-  "numberOfElements": 10,
-  "first": true,
-  "empty": false
-}
-```
-
-### 3. Lấy thông tin đánh giá theo ID
+### 2. Lấy thông tin đánh giá theo ID
 
 ```
 GET /api/v1/reviews/{id}
@@ -157,14 +96,12 @@ Trả về thông tin chi tiết của một đánh giá theo ID.
 #### Response
 
 **Thành công (200)**
-
 ```json
 {
   "id": 1,
   "bookingId": "BK-2023090501",
   "guestName": "Nguyễn Văn An",
   "displayName": "Nguyễn V.",
-  "roomId": 101,
   "roomNumber": "101",
   "roomType": "Deluxe",
   "rating": 5,
@@ -187,17 +124,7 @@ Trả về thông tin chi tiết của một đánh giá theo ID.
 }
 ```
 
-**Không tìm thấy (404)**
-
-```json
-{
-  "statusCode": 404,
-  "message": "Đánh giá không tìm thấy với ID: 1",
-  "data": null
-}
-```
-
-### 4. Lấy danh sách đánh giá theo số phòng (Room ID)
+### 3. Lấy danh sách đánh giá theo số phòng
 
 ```
 GET /api/v1/reviews/room/{roomId}
@@ -214,7 +141,6 @@ Trả về danh sách các đánh giá theo ID phòng.
 #### Response
 
 **Thành công (200)**
-
 ```json
 [
   {
@@ -226,7 +152,7 @@ Trả về danh sách các đánh giá theo ID phòng.
 ]
 ```
 
-### 5. Tạo đánh giá mới
+### 4. Tạo đánh giá mới
 
 ```
 POST /api/v1/reviews/
@@ -258,7 +184,6 @@ Tạo một đánh giá mới.
 #### Response
 
 **Thành công (201)**
-
 ```json
 {
   "id": 1,
@@ -267,17 +192,7 @@ Tạo một đánh giá mới.
 }
 ```
 
-**Lỗi (400)**
-
-```json
-{
-  "statusCode": 400,
-  "message": "Đã tồn tại đánh giá cho booking ID: BK-2023090501",
-  "data": null
-}
-```
-
-### 6. Phản hồi đánh giá
+### 5. Phản hồi đánh giá
 
 ```
 POST /api/v1/reviews/{id}/reply
@@ -295,7 +210,7 @@ Phản hồi một đánh giá.
 
 ```json
 {
-  "replyComment": "Cảm ơn quý khách đã đánh giá cao dịch vụ của chúng tôi. Rất mong được đón tiếp quý khách trong tương lai!",
+  "replyComment": "Cảm ơn quý khách đã đánh giá cao dịch vụ của chúng tôi.",
   "replyBy": "Nguyễn Quản Lý"
 }
 ```
@@ -303,7 +218,6 @@ Phản hồi một đánh giá.
 #### Response
 
 **Thành công (200)**
-
 ```json
 {
   "id": 1,
@@ -312,23 +226,13 @@ Phản hồi một đánh giá.
 }
 ```
 
-**Không tìm thấy (404)**
-
-```json
-{
-  "statusCode": 404,
-  "message": "Đánh giá không tìm thấy với ID: 1",
-  "data": null
-}
-```
-
-### 7. Cập nhật đánh giá
+### 6. Cập nhật đánh giá
 
 ```
 PUT /api/v1/reviews/update/{id}
 ```
 
-Cập nhật thông tin của một đánh giá.
+Cập nhật thông tin của một đánh giá. **Lưu ý quan trọng**: Bạn phải gửi toàn bộ thông tin của đánh giá, không chỉ các trường cần cập nhật.
 
 #### Tham số Path
 
@@ -338,37 +242,50 @@ Cập nhật thông tin của một đánh giá.
 
 #### Request Body
 
+Gửi đầy đủ thông tin đánh giá cùng với các trường cần cập nhật:
+
 ```json
 {
-  "isFeatured": true,
-  "isAnonymous": false,
-  "status": "HIDDEN"
+  "id": 13,
+  "bookingId": "uer",
+  "guestName": "Nguyễn Văn A423", 
+  "displayName": "Nguyễn A.22222222",
+  "cleanliness": 5,
+  "comfort": 5,
+  "comment": "fdsfsdf",
+  "createdAt": "30/03/2025 11:34",
+  "facilities": 5,
+  "images": [],
+  "isAnonymous": true,
+  "isFeatured": false,
+  "location": 4,
+  "rating": 3,
+  "replyBy": "Admin",
+  "replyComment": "dsdasd",
+  "replyDate": "30/03/2025 11:39",
+  "roomNumber": "34",
+  "roomType": "Standard",
+  "service": 5,
+  "status": "REPLIED",
+  "updatedAt": "30/03/2025 11:39",
+  "valueForMoney": 4
 }
 ```
 
 #### Response
 
 **Thành công (200)**
-
 ```json
 {
-  "id": 1,
-  "bookingId": "BK-2023090501",
+  "id": 13,
+  "bookingId": "uer",
+  "guestName": "Nguyễn Văn A423",
+  "displayName": "Nguyễn A.22222222",
   // ... thông tin đánh giá đã được cập nhật
 }
 ```
 
-**Không tìm thấy (404)**
-
-```json
-{
-  "statusCode": 404,
-  "message": "Đánh giá không tìm thấy với ID: 1",
-  "data": null
-}
-```
-
-### 8. Xóa đánh giá
+### 7. Xóa đánh giá
 
 ```
 DELETE /api/v1/reviews/{id}
@@ -385,26 +302,15 @@ Xóa một đánh giá.
 #### Response
 
 **Thành công (200)**
-
 ```json
 {
-  "id": 1,
-  "bookingId": "BK-2023090501",
-  // ... thông tin đánh giá đã bị xóa
+  "status": "success",
+  "message": "Xóa đánh giá thành công",
+  "reviewId": 13
 }
 ```
 
-**Không tìm thấy (404)**
-
-```json
-{
-  "statusCode": 404,
-  "message": "Đánh giá không tìm thấy với ID: 1",
-  "data": null
-}
-```
-
-### 9. Lấy thống kê đánh giá
+### 8. Lấy thống kê đánh giá
 
 ```
 GET /api/v1/reviews/statistics
@@ -415,7 +321,6 @@ Lấy thông tin thống kê đánh giá.
 #### Response
 
 **Thành công (200)**
-
 ```json
 {
   "totalReviews": 50,
@@ -443,6 +348,13 @@ Lấy thông tin thống kê đánh giá.
 | PENDING    | Đánh giá mới, chưa được xử lý                   |
 | REPLIED    | Đánh giá đã được phản hồi                       |
 | HIDDEN     | Đánh giá bị ẩn (không hiển thị công khai)       |
+
+## Lưu ý quan trọng khi cập nhật đánh giá
+
+1. **Gửi đầy đủ thông tin**: Khi cập nhật (PUT), phải gửi toàn bộ thông tin của đánh giá, bao gồm cả các trường không thay đổi.
+2. **Giữ nguyên ID**: Luôn gửi đúng ID của đánh giá cần cập nhật trong cả URL path và trong body request.
+3. **Định dạng ngày**: Định dạng ngày phải đúng chuẩn "dd/MM/yyyy HH:mm".
+4. **Trạng thái hợp lệ**: Các giá trị hợp lệ cho trường status: "PENDING", "REPLIED", "HIDDEN".
 
 ## Mã lỗi
 
