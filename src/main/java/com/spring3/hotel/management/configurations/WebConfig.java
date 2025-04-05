@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${ALLOW_ORIGIN:http://localhost:5173}")
+    @Value("${app.allow-origin:http://localhost:5173}")
     private String allowOrigin;
 
     @Override

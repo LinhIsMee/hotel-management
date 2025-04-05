@@ -37,7 +37,7 @@ public class SecurityConfig {
     @Autowired
     JwtAuthFilter jwtAuthFilter;
 
-    @Value("#{'${ALLOW_ORIGIN}'.split(',')}")
+    @Value("#{'${app.allow-origin}'.split(',')}")
     private List<String> allowedOrigins;
 
     @Bean
