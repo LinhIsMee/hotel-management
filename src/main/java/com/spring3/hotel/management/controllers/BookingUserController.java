@@ -201,12 +201,14 @@ public class BookingUserController {
         try {
             UpsertBookingRequest request = new UpsertBookingRequest();
             request.setUserId(40); // Sử dụng ID của người dùng thực tế
-            request.setRoomIds(List.of(1)); // Sử dụng ID phòng đã có
-            request.setCheckInDate(LocalDate.now().plusDays(1));
-            request.setCheckOutDate(LocalDate.now().plusDays(3));
-            request.setAdults(2);
-            request.setChildren(1);
+            request.setRoomIds(List.of(62)); // Sử dụng ID phòng 62 - Phòng đơn tiêu chuẩn số 103
+            request.setCheckInDate(LocalDate.now().plusDays(10)); // Đặt xa hơn để tránh xung đột
+            request.setCheckOutDate(LocalDate.now().plusDays(12));
+            request.setAdults(1);
+            request.setChildren(0);
             request.setStatus("PENDING");
+            request.setTotalPrice(1000000.0); // Giá 500,000 x 2 đêm = 1,000,000
+            request.setFinalPrice(1000000.0); // Giá 500,000 x 2 đêm = 1,000,000
             request.setSpecialRequests("Booking test để thử nghiệm thanh toán");
             request.setFullName("Phạm Thùy Linh");
             request.setEmail("linh8686@gmail.com");

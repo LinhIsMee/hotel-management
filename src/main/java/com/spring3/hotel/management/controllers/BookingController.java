@@ -4,6 +4,10 @@ import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
 import com.spring3.hotel.management.dtos.response.NewBookingResponse;
 import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
+import com.spring3.hotel.management.models.Booking;
+import com.spring3.hotel.management.models.Payment;
+import com.spring3.hotel.management.repositories.BookingRepository;
+import com.spring3.hotel.management.repositories.PaymentRepository;
 import com.spring3.hotel.management.services.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -13,7 +17,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -21,6 +28,12 @@ public class BookingController {
 
     @Autowired
     private BookingService bookingService;
+    
+    @Autowired
+    private BookingRepository bookingRepository;
+    
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     // Lấy thông tin booking theo ID (cho cả user và admin)
     @GetMapping("/{id}")
@@ -107,5 +120,39 @@ public class BookingController {
     public ResponseEntity<BookingResponseDTO> confirmBooking(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.confirmBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
+    }
+    
+    // API test callback VNPay thành công - để test luồng thanh toán
+    @GetMapping("/test-vnpay-callback/{transactionNo}")
+    public ResponseEntity<?> testVnpayCallback(@PathVariable String transactionNo) {
+        try {
+            // Tìm payment theo transactionNo
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            if (paymentOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Không tìm thấy payment với mã giao dịch: " + transactionNo));
+            }
+            
+            Payment payment = paymentOpt.get();
+            
+            // Cập nhật payment thành công
+            payment.setStatus("00"); // 00: Thành công
+            payment.setResponseCode("00");
+            payment.setPayDate(LocalDateTime.now().toString());
+            payment.setBankCode("NCB");
+            paymentRepository.save(payment);
+            
+            // Xác nhận booking
+            Booking booking = payment.getBooking();
+            booking.setStatus("CONFIRMED");
+            bookingRepository.save(booking);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Đã cập nhật thanh toán thành công cho mã giao dịch: " + transactionNo,
+                "bookingId", booking.getId(),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Lỗi khi mô phỏng callback: " + e.getMessage()));
+        }
     }
 }

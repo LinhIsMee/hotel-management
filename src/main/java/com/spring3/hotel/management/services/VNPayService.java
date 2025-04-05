@@ -42,6 +42,13 @@ public class VNPayService {
     @Autowired
     private BookingRepository bookingRepository;
 
+    /**
+     * Tạo URL thanh toán VNPay
+     * @param bookingId ID của booking cần thanh toán
+     * @param amount Số tiền cần thanh toán
+     * @param orderInfo Thông tin đơn hàng
+     * @return URL thanh toán VNPay
+     */
     public String createPayment(Integer bookingId, Long amount, String orderInfo) {
         // Validate booking
         Booking booking = bookingRepository.findById(bookingId)
@@ -107,6 +114,7 @@ public class VNPayService {
         payment.setBankCode("");  // No bank code at creation
         payment.setPayDate("");  // No payment date yet
         payment.setStatus("04");  // Payment status: "04" (Processing)
+        payment.setResponseCode("04");
 
         // Save payment record in the database with status "04"
         paymentRepository.save(payment);
@@ -115,6 +123,11 @@ public class VNPayService {
         return payUrl + "?" + queryUrl;
     }
 
+    /**
+     * Xử lý callback từ VNPay
+     * @param queryParams Tham số từ VNPay
+     * @return Kết quả xử lý
+     */
     @Transactional
     public PaymentResponse processPaymentResponse(Map<String, String> queryParams) {
         PaymentResponse response = new PaymentResponse();
@@ -125,24 +138,50 @@ public class VNPayService {
             String responseCode = queryParams.get("vnp_ResponseCode");
             String transactionNo = queryParams.get("vnp_TxnRef");
             String orderInfo = queryParams.get("vnp_OrderInfo");
-            long amount = Long.parseLong(queryParams.get("vnp_Amount")) / 100;  // VNPay sends amount in cents
+            
+            // Đảm bảo amount không lỗi
+            String amountStr = queryParams.get("vnp_Amount");
+            long amount = 0;
+            if (amountStr != null && !amountStr.isEmpty()) {
+                amount = Long.parseLong(amountStr) / 100;  // VNPay sends amount in cents
+            }
 
             // 2. Tìm payment record trong database
-            Payment payment = paymentRepository.findByTransactionNo(transactionNo)
-                .orElseThrow(() -> new RuntimeException("Payment not found with transactionNo: " + transactionNo));
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            if (paymentOpt.isEmpty()) {
+                log.error("Payment not found with transactionNo: {}", transactionNo);
+                response.setSuccess(false);
+                response.setMessage("Payment not found with transactionNo: " + transactionNo);
+                response.setTransactionNo(transactionNo);
+                response.setAmount(amount);
+                return response;
+            }
+            
+            Payment payment = paymentOpt.get();
 
             // 3. Cập nhật thông tin payment từ VNPay
             payment.setResponseCode(responseCode);
             payment.setPayDate(LocalDateTime.now().toString());
-            payment.setBankCode(queryParams.get("vnp_BankCode"));
-            payment.setStatus(responseCode.equals("00") ? "00" : "99");  // "00" là thành công, "99" là thất bại
+            payment.setBankCode(queryParams.getOrDefault("vnp_BankCode", ""));
+            
+            // Xác định trạng thái thanh toán
+            boolean isSuccess = "00".equals(responseCode); 
+            payment.setStatus(responseCode); // Lưu mã trạng thái thực tế
+            
+            // 4. Nếu thanh toán thành công, cập nhật booking
+            if (isSuccess && payment.getBooking() != null) {
+                Booking booking = payment.getBooking();
+                booking.setStatus("CONFIRMED");
+                bookingRepository.save(booking);
+            }
 
-            // 4. Lưu thông tin payment vào database
+            // 5. Lưu thông tin payment vào database
             paymentRepository.save(payment);
 
-            // 5. Trả về thông tin phản hồi
-            response.setSuccess(responseCode.equals("00"));
-            response.setMessage(responseCode.equals("00") ? "Payment successful" : "Payment failed");
+            // 6. Trả về thông tin phản hồi
+            response.setSuccess(isSuccess);
+            String message = getPaymentStatusMessage(responseCode);
+            response.setMessage(message);
             response.setTransactionNo(transactionNo);
             response.setAmount(amount);
 
@@ -153,6 +192,36 @@ public class VNPayService {
         }
 
         return response;
+    }
+
+    /**
+     * Lấy thông báo dựa trên mã trạng thái VNPay
+     * @param responseCode Mã trạng thái từ VNPay
+     * @return Thông báo cho người dùng
+     */
+    private String getPaymentStatusMessage(String responseCode) {
+        return switch (responseCode) {
+            case "00" -> "Payment successful";
+            case "01" -> "Giao dịch đã tồn tại";
+            case "02" -> "Merchant không hợp lệ";
+            case "03" -> "Dữ liệu gửi sang không đúng định dạng";
+            case "04" -> "Khởi tạo giao dịch thành công";
+            case "05" -> "Giao dịch không thành công";
+            case "06" -> "Giao dịch đã gửi sang Ngân hàng";
+            case "07" -> "Trừ tiền thành công, giao dịch bị nghi ngờ gian lận";
+            case "09" -> "Giao dịch đã quá thời gian chờ thanh toán. Quý khách vui lòng thực hiện lại giao dịch";
+            case "10" -> "Giao dịch đang xử lý";
+            case "11" -> "Giao dịch bị hủy";
+            case "12" -> "Giao dịch bị từ chối";
+            case "13" -> "Giao dịch bị từ chối do OTP";
+            case "24" -> "Giao dịch không thành công do khách hàng hủy giao dịch";
+            case "51" -> "Tài khoản không đủ số dư";
+            case "65" -> "Tài khoản quá giới hạn thanh toán";
+            case "75" -> "Ngân hàng thanh toán đang bảo trì";
+            case "79" -> "Khách hàng đã hủy giao dịch trên cổng thanh toán VNPay";
+            case "99" -> "Sai chữ ký";
+            default -> "Payment failed with code: " + responseCode;
+        };
     }
 
     private String getRandomNumber(int len) {
@@ -189,10 +258,16 @@ public class VNPayService {
         return hexString.toString();
     }
 
+    /**
+     * Lấy lịch sử thanh toán của booking
+     * @param bookingId ID của booking
+     * @return Danh sách lịch sử thanh toán
+     */
     public List<PaymentHistoryResponse> getPaymentHistoryByBooking(Integer bookingId) {
         List<Payment> payments = paymentRepository.findAllByBookingId(bookingId);
         if (payments.isEmpty()) {
-            throw new RuntimeException("No payment history found for booking ID: " + bookingId);
+            // Trả về danh sách rỗng thay vì ném ngoại lệ
+            return new ArrayList<>();
         }
         return payments.stream()
             .map(this::convertToHistoryResponse)
@@ -205,17 +280,33 @@ public class VNPayService {
         response.setAmount(payment.getAmount());
         response.setOrderInfo(payment.getOrderInfo());
         response.setPayDate(payment.getPayDate());
-        response.setResponseStatus(payment.getStatus().equals("00") ? "Payment successful" : "Payment failed");
+        
+        // Lấy thông báo dựa vào mã trạng thái
+        response.setResponseStatus(getPaymentStatusMessage(payment.getStatus()));
         return response;
     }
 
+    /**
+     * Tìm thông tin thanh toán theo mã giao dịch
+     * @param transactionNo Mã giao dịch
+     * @return Thông tin thanh toán
+     */
     public PaymentResponse findPaymentByTransactionNo(String transactionNo) {
-        Payment payment = paymentRepository.findByTransactionNo(transactionNo)
-            .orElseThrow(() -> new RuntimeException("Payment not found with transactionNo: " + transactionNo));
-
+        Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+        
+        if (paymentOpt.isEmpty()) {
+            PaymentResponse response = new PaymentResponse();
+            response.setSuccess(false);
+            response.setMessage("Payment not found with transactionNo: " + transactionNo);
+            response.setTransactionNo(transactionNo);
+            response.setAmount(0L);
+            return response;
+        }
+        
+        Payment payment = paymentOpt.get();
         PaymentResponse response = new PaymentResponse();
-        response.setSuccess(payment.getStatus().equals("00"));
-        response.setMessage(payment.getStatus().equals("00") ? "Payment successful" : "Payment failed");
+        response.setSuccess("00".equals(payment.getStatus()));
+        response.setMessage(getPaymentStatusMessage(payment.getStatus()));
         response.setTransactionNo(payment.getTransactionNo());
         response.setAmount(payment.getAmount());
         return response;
