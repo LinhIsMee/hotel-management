@@ -5,9 +5,7 @@ COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
 COPY src ./src
-COPY .mvn ./.mvn
-COPY mvnw .
-COPY mvnw.cmd .
+
 # Biên dịch và đóng gói ứng dụng
 RUN mvn clean package -DskipTests
 
