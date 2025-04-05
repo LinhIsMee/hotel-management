@@ -31,30 +31,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-
         // Log request path
         String requestPath = request.getRequestURI();
         logger.info("Processing request for path: {}", requestPath);
 
-        String authHeader = request.getHeader("Authorization");
-        String token = null;
-        String username = null;
-        if(authHeader != null && authHeader.startsWith("Bearer ")){
-            token = authHeader.substring(7);
-            username = jwtService.extractUsername(token);
-        }
-
-        if(username != null && SecurityContextHolder.getContext().getAuthentication() == null){
-            UserDetails userDetails = userDetailsServiceImpl.loadUserByUsername(username);
-            if(jwtService.validateToken(token, userDetails)){
-                logger.info("Authorities for user {}: {}", username, userDetails.getAuthorities());
-                
-                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            }
-        }
-
+        // Bỏ qua xác thực JWT, cho phép tất cả requests đi qua
         filterChain.doFilter(request, response);
     }
 }

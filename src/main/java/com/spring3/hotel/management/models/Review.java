@@ -1,5 +1,7 @@
 package com.spring3.hotel.management.models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.spring3.hotel.management.enums.ReviewStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

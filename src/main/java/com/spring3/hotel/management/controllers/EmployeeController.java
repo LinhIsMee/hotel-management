@@ -71,13 +71,8 @@ public class EmployeeController {
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            String errorMessage = e.getMessage();
-            if (errorMessage != null && errorMessage.contains("Access Denied")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Bạn không có quyền truy cập danh sách nhân viên"));
-            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new MessageResponse("Lỗi khi lấy danh sách nhân viên: " + errorMessage));
+                .body(new MessageResponse("Lỗi khi lấy danh sách nhân viên: " + e.getMessage()));
         }
     }
     
@@ -91,10 +86,6 @@ public class EmployeeController {
             if (errorMessage != null && errorMessage.contains("not found")) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new MessageResponse("Không tìm thấy nhân viên với ID: " + employeeId));
-            }
-            if (errorMessage != null && errorMessage.contains("Access Denied")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Bạn không có quyền truy cập thông tin nhân viên"));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi lấy thông tin nhân viên: " + errorMessage));
@@ -115,10 +106,6 @@ public class EmployeeController {
             if (errorMessage != null && errorMessage.contains("Invalid")) {
                 return ResponseEntity.badRequest()
                     .body(new MessageResponse(errorMessage));
-            }
-            if (errorMessage != null && errorMessage.contains("Access Denied")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Bạn không có quyền tạo nhân viên mới"));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi tạo nhân viên mới: " + errorMessage));
@@ -146,10 +133,6 @@ public class EmployeeController {
                 return ResponseEntity.badRequest()
                     .body(new MessageResponse(errorMessage));
             }
-            if (errorMessage != null && errorMessage.contains("Access Denied")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Bạn không có quyền cập nhật thông tin nhân viên"));
-            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi cập nhật thông tin nhân viên: " + errorMessage));
         }
@@ -165,10 +148,6 @@ public class EmployeeController {
             if (errorMessage != null && errorMessage.contains("not found")) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new MessageResponse("Không tìm thấy nhân viên với ID: " + employeeId));
-            }
-            if (errorMessage != null && errorMessage.contains("Access Denied")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new MessageResponse("Bạn không có quyền xóa nhân viên"));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi xóa nhân viên: " + errorMessage));

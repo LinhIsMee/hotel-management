@@ -21,28 +21,29 @@ public class Room {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(nullable = false, unique = true)
+    @Column(name = "room_number", nullable = false, unique = true)
     private String roomNumber;
     
     @ManyToOne
     @JoinColumn(name = "room_type_id", nullable = false)
     private RoomType roomType;
     
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     private String status; // VACANT, OCCUPIED, MAINTENANCE, CLEANING
     
     @Column
     private String floor;
     
-    @Column
-    private Boolean isActive;
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
     
     @Column
     private String notes;
     
+    @Builder.Default
     @ElementCollection
     @CollectionTable(name = "room_images", joinColumns = @JoinColumn(name = "room_id"))
-    @Column(name = "image_url", columnDefinition = "TEXT")
+    @Column(name = "image_url")
     private List<String> images = new ArrayList<>();
     
     @ManyToMany
@@ -62,9 +63,6 @@ public class Room {
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDate.now();
-        if(this.isActive == null) {
-            this.isActive = true;
-        }
         if(this.status == null) {
             this.status = "VACANT";
         }

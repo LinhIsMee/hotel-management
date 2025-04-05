@@ -216,20 +216,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserProfileResponse getUserProfile(Integer userId) {
-        // Kiểm tra quyền truy cập nếu không phải là thông tin cá nhân
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String currentUsername = authentication.getName();
-        User currentUser = userRepository.findByUsername(currentUsername);
-        
-        if (currentUser == null) {
-            throw new NotFoundException("User not found");
-        }
-        
-        if (!currentUser.getId().equals(userId) && 
-            !currentUser.getRole().getName().equals("ROLE_ADMIN")) {
-            throw new AccessDeniedException("Access Denied: Không có quyền xem thông tin người dùng khác");
-        }
-        
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
         
@@ -480,6 +466,10 @@ public class UserServiceImpl implements UserService {
     }
 
     private void checkAdminRole() {
+        // Vô hiệu hóa kiểm tra quyền, cho phép tất cả truy cập
+        return;
+        
+        /*
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Chưa đăng nhập");
@@ -491,6 +481,7 @@ public class UserServiceImpl implements UserService {
         if (!isAdmin) {
             throw new AccessDeniedException("Access Denied: Chỉ admin mới có quyền thực hiện thao tác này");
         }
+        */
     }
 
 }

@@ -232,3 +232,33 @@
         }
     ]
 }
+
+            "type": "OTHER",
+            "description": "Dịch vụ trông giữ trẻ em",
+            "price": 300000,
+            "unit": "Giờ",
+            "isAvailable": true,
+            "createdAt": "2023-02-01"
+        },
+        {
+            "name": "Thuê máy tính",
+            "code": "COMPUTER_RENTAL",
+            "type": "BUSINESS",
+            "description": "Cho thuê máy tính xách tay trong thời gian lưu trú",
+            "price": 250000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-02-01"
+        },
+        {
+            "name": "Phòng tập gym",
+            "code": "GYM",
+            "type": "FITNESS",
+            "description": "Sử dụng phòng tập gym của khách sạn",
+            "price": 100000,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-02-05"
+        }
+    ]
+}

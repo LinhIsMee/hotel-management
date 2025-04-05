@@ -1,9 +1,12 @@
 package com.spring3.hotel.management.controllers;
 
 import com.spring3.hotel.management.dtos.request.UpsertRoomTypeRequest;
+import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
 import com.spring3.hotel.management.dtos.response.RoomTypeResponseDTO;
+import com.spring3.hotel.management.services.interfaces.RoomService;
 import com.spring3.hotel.management.services.interfaces.RoomTypeService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,15 +16,26 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/room-types")
+@Slf4j
+@CrossOrigin(origins = "*", maxAge = 3600)
 public class RoomTypeController {
 
     @Autowired
     private RoomTypeService roomTypeService;
+    
+    @Autowired
+    private RoomService roomService;
 
     @GetMapping("/{id}")
     public ResponseEntity<RoomTypeResponseDTO> getRoomTypeById(@PathVariable Integer id) {
         RoomTypeResponseDTO roomType = roomTypeService.getRoomTypeById(id);
         return ResponseEntity.ok(roomType);
+    }
+    
+    @GetMapping("/{id}/rooms")
+    public ResponseEntity<List<RoomResponseDTO>> getRoomsByRoomType(@PathVariable Integer id) {
+        List<RoomResponseDTO> rooms = roomService.getRoomsByRoomType(id);
+        return ResponseEntity.ok(rooms);
     }
 
     @PostMapping

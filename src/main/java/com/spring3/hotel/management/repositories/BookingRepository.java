@@ -7,11 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Integer> {
@@ -69,4 +71,41 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "(b.checkOutDate >= :startDate AND b.checkOutDate <= :endDate) OR " +
            "(b.checkInDate <= :startDate AND b.checkOutDate >= :endDate))")
     List<Booking> findActiveBookingsBetweenDates(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    
+    // Thống kê số lượng đặt phòng theo ngày trong tháng hiện tại
+    @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, COUNT(*) as booking_count " +
+           "FROM bookings " +
+           "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m') " +
+           "GROUP BY booking_date " +
+           "ORDER BY created_at", nativeQuery = true)
+    List<Object[]> countBookingsByDayInCurrentMonth();
+    
+    // Thống kê doanh thu theo ngày trong tháng hiện tại
+    @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, SUM(total_price) as daily_revenue " +
+           "FROM bookings " +
+           "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m') " +
+           "GROUP BY booking_date " +
+           "ORDER BY created_at", nativeQuery = true)
+    List<Object[]> sumRevenueByDayInCurrentMonth();
+    
+    // Thống kê doanh thu tháng hiện tại
+    @Query(value = "SELECT SUM(total_price) FROM bookings " +
+           "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m')", nativeQuery = true)
+    Double calculateCurrentMonthRevenue();
+    
+    // Thống kê doanh thu tháng trước
+    @Query(value = "SELECT SUM(total_price) FROM bookings " +
+           "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')", nativeQuery = true)
+    Double calculatePreviousMonthRevenue();
+    
+    // Đếm số booking theo trạng thái
+    @Query("SELECT b.status, COUNT(b) FROM Booking b GROUP BY b.status")
+    List<Object[]> countBookingsByStatus();
+    
+    // Thống kê các phòng được đặt nhiều nhất
+    @Query(value = "SELECT bd.room_number, COUNT(*), SUM(bd.price) " +
+           "FROM booking_details bd " +
+           "GROUP BY bd.room_number " +
+           "ORDER BY COUNT(*) DESC", nativeQuery = true)
+    List<Object[]> findMostBookedRooms(Pageable pageable);
 }

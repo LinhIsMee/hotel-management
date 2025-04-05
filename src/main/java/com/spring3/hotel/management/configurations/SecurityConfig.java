@@ -11,7 +11,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+// import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -20,7 +20,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -31,7 +30,7 @@ import com.spring3.hotel.management.helpers.UserDetailsServiceImpl;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+// @EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -48,10 +47,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://127.0.0.1:5173"));
+        configuration.addAllowedOrigin("*"); // Cho phép tất cả nguồn gốc
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(false); // Phải đặt false khi sử dụng "*"
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -64,38 +63,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((authorize) -> authorize
-                        .requestMatchers(
-                            "/api/v1/login",
-                            "/api/v1/register",
-                            "/api/v1/validate-token",
-                            "/api/v1/refresh-token",
-                            "/api/v1/forgot-password",
-                            "/api/v1/reset-password",
-                            "/api/v1/logout",
-                            "/api/v1/payments/callback",
-                            "/api/v1/payments/check-status/**"
-                        ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/reviews", "/api/v1/reviews/", "/api/v1/reviews/{id}", "/api/v1/reviews/room/{roomId}", "/api/v1/reviews/statistics").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/reviews/**").permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/**").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/reviews/**").permitAll()
-                        .requestMatchers("/api/v1/user", "/api/v1/user/profile/**", "/api/v1/user/change-password").authenticated()
-                        .requestMatchers(
-                            "/api/v1/users", 
-                            "/api/v1/users/**", 
-                            "/api/v1/user/create", 
-                            "/api/v1/user/update/**"
-                        ).hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/v1/employees/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/v1/user/bookings/**").hasAuthority("ROLE_USER")
-                        .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
-                        .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()  // Cho phép truy cập tất cả API mà không cần xác thực
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // Bỏ JWT Filter để không cần xác thực
                 .build();
     }
 

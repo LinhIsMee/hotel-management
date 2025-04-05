@@ -66,6 +66,38 @@ Authorization: Bearer <your_admin_jwt_token>
         "description": "Giặt ủi trong ngày",
         "price": 150000.0
       }
+    ],
+    "maxOccupancy": 2,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+    "specialFeatures": "Phòng hướng biển",
+    "averageRating": 4.5,
+    "totalReviews": 10,
+    "recentReviews": [
+      {
+        "id": 1,
+        "bookingId": "BK2023001",
+        "guestName": "Nguyễn Văn A",
+        "displayName": "Nguyễn Văn A",
+        "roomNumber": "101",
+        "roomType": "Phòng Đơn Tiêu Chuẩn",
+        "rating": 5,
+        "cleanliness": 5,
+        "service": 4,
+        "comfort": 5,
+        "location": 4,
+        "facilities": 5,
+        "valueForMoney": 4,
+        "comment": "Phòng rất thoải mái và sạch sẽ",
+        "images": [],
+        "replyComment": "Cảm ơn quý khách đã đánh giá",
+        "replyBy": "Quản lý",
+        "replyDate": "30/03/2023",
+        "isFeatured": true,
+        "isAnonymous": false,
+        "status": "REPLIED",
+        "createdAt": "29/03/2023",
+        "updatedAt": "30/03/2023"
+      }
     ]
   },
   {
@@ -89,6 +121,33 @@ Authorization: Bearer <your_admin_jwt_token>
         "name": "Wifi",
         "description": "Wifi tốc độ cao",
         "price": 0.0
+      }
+    ],
+    "maxOccupancy": 4,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Két sắt"],
+    "specialFeatures": "Phòng hướng hồ bơi",
+    "averageRating": 4.2,
+    "totalReviews": 6,
+    "recentReviews": [
+      {
+        "id": 3,
+        "bookingId": "BK2023005",
+        "guestName": "Trần Thị B",
+        "displayName": "Trần Thị B",
+        "roomNumber": "102",
+        "roomType": "Phòng Đôi Tiêu Chuẩn",
+        "rating": 4,
+        "cleanliness": 4,
+        "service": 5,
+        "comfort": 4,
+        "location": 3,
+        "facilities": 5,
+        "valueForMoney": 4,
+        "comment": "Phòng khá đẹp, nhân viên phục vụ tốt",
+        "images": [],
+        "status": "PENDING",
+        "createdAt": "15/03/2023",
+        "updatedAt": null
       }
     ]
   }
@@ -148,6 +207,38 @@ Authorization: Bearer <your_admin_jwt_token>
       "description": "Giặt ủi trong ngày",
       "price": 150000.0
     }
+  ],
+  "maxOccupancy": 2,
+  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+  "specialFeatures": "Phòng hướng biển",
+  "averageRating": 4.5,
+  "totalReviews": 10,
+  "recentReviews": [
+    {
+      "id": 1,
+      "bookingId": "BK2023001",
+      "guestName": "Nguyễn Văn A",
+      "displayName": "Nguyễn Văn A",
+      "roomNumber": "101",
+      "roomType": "Phòng Đơn Tiêu Chuẩn",
+      "rating": 5,
+      "cleanliness": 5,
+      "service": 4,
+      "comfort": 5,
+      "location": 4,
+      "facilities": 5,
+      "valueForMoney": 4,
+      "comment": "Phòng rất thoải mái và sạch sẽ",
+      "images": [],
+      "replyComment": "Cảm ơn quý khách đã đánh giá",
+      "replyBy": "Quản lý",
+      "replyDate": "30/03/2023",
+      "isFeatured": true,
+      "isAnonymous": false,
+      "status": "REPLIED",
+      "createdAt": "29/03/2023",
+      "updatedAt": "30/03/2023"
+    }
   ]
 }
 ```
@@ -201,7 +292,10 @@ Authorization: Bearer <your_admin_jwt_token>
       "description": "Giặt ủi trong ngày",
       "price": 150000.0
     }
-  ]
+  ],
+  "maxOccupancy": 2,
+  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+  "specialFeatures": "Phòng hướng biển"
 }
 ```
 
@@ -284,7 +378,10 @@ Content-Type: application/json
       "description": "Spa và massage",
       "price": 500000.0
     }
-  ]
+  ],
+  "maxOccupancy": 6,
+  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công", "Bồn tắm"],
+  "specialFeatures": "Phòng gia đình rộng rãi"
 }
 ```
 
@@ -374,7 +471,10 @@ Content-Type: application/json
       "description": "Xe đưa đón sân bay VIP",
       "price": 300000.0
     }
-  ]
+  ],
+  "maxOccupancy": 2,
+  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công", "Bồn tắm", "Minibar"],
+  "specialFeatures": "Phòng đang được nâng cấp thiết bị"
 }
 ```
 
@@ -456,7 +556,10 @@ Authorization: Bearer <your_admin_jwt_token>
         "description": "Giặt ủi trong ngày",
         "price": 150000.0
       }
-    ]
+    ],
+    "maxOccupancy": 2,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+    "specialFeatures": "Phòng hướng biển"
   },
   {
     "id": 4,
@@ -480,7 +583,10 @@ Authorization: Bearer <your_admin_jwt_token>
         "description": "Wifi tốc độ cao",
         "price": 0.0
       }
-    ]
+    ],
+    "maxOccupancy": 2,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+    "specialFeatures": "Phòng góc"
   }
 ]
 ```
@@ -531,7 +637,10 @@ Authorization: Bearer <your_admin_jwt_token>
         "description": "Giặt ủi trong ngày",
         "price": 150000.0
       }
-    ]
+    ],
+    "maxOccupancy": 2,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+    "specialFeatures": "Phòng hướng biển"
   },
   {
     "id": 5,
@@ -555,7 +664,83 @@ Authorization: Bearer <your_admin_jwt_token>
         "description": "Wifi tốc độ cao",
         "price": 0.0
       }
-    ]
+    ],
+    "maxOccupancy": 4,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Bồn tắm"],
+    "specialFeatures": "Phòng góc"
+  }
+]
+```
+
+## 9. Lấy danh sách phòng theo loại phòng (API công khai)
+
+**Endpoint**: `GET /api/v1/room-types/{roomTypeId}/rooms`
+
+**Mô tả**: Lấy danh sách các phòng thuộc về một loại phòng cụ thể. API này có thể được sử dụng công khai mà không cần quyền admin.
+
+**Response (Success - 200 OK)**:
+```json
+[
+  {
+    "id": 1,
+    "roomNumber": "101",
+    "roomTypeId": 1,
+    "roomTypeName": "Phòng Đơn Tiêu Chuẩn",
+    "status": "VACANT",
+    "floor": "1",
+    "isActive": true,
+    "notes": "Phòng hướng biển",
+    "createdAt": "20/03/2023",
+    "updatedAt": null,
+    "pricePerNight": 500000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
+      "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      },
+      {
+        "id": 2,
+        "name": "Dịch vụ giặt ủi",
+        "description": "Giặt ủi trong ngày",
+        "price": 150000.0
+      }
+    ],
+    "maxOccupancy": 2,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+    "specialFeatures": "Phòng hướng biển"
+  },
+  {
+    "id": 4,
+    "roomNumber": "102",
+    "roomTypeId": 1,
+    "roomTypeName": "Phòng Đơn Tiêu Chuẩn",
+    "status": "VACANT",
+    "floor": "1",
+    "isActive": true,
+    "notes": "Phòng góc",
+    "createdAt": "20/03/2023",
+    "updatedAt": "25/03/2023",
+    "pricePerNight": 500000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room102-img1.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      }
+    ],
+    "maxOccupancy": 2,
+    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
+    "specialFeatures": "Phòng góc"
   }
 ]
 ```

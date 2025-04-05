@@ -52,8 +52,9 @@ public class RoomType {
     @Column(name = "image_url")
     private String imageUrl;
     
-    @Column(name = "is_active")
-    private Boolean isActive;
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean isActive = true;
     
     @Column(name = "amenities", columnDefinition = "TEXT")
     private String amenities;

@@ -27,4 +27,24 @@ public class BookingDetail {
 
     @Column(name = "price_per_night")
     private Double pricePerNight;
+    
+    @Column(name = "room_number")
+    private String roomNumber;
+    
+    @Column(name = "room_type")
+    private Integer roomType;
+    
+    @Column(name = "price")
+    private Double price;
+    
+    @Transient
+    public String getRoomNumber() {
+        return room != null ? room.getRoomNumber() : roomNumber;
+    }
+    
+    @Transient
+    public String getRoomType() {
+        return room != null && room.getRoomType() != null ? 
+               room.getRoomType().getName() : (roomType != null ? roomType.toString() : "Unknown");
+    }
 }
