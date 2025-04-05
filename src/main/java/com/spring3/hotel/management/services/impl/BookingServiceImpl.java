@@ -69,6 +69,19 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponseDTO createBooking(UpsertBookingRequest request) {
+        // Kiểm tra tính hợp lệ của ngày
+        if (request.getCheckInDate() == null || request.getCheckOutDate() == null) {
+            throw new IllegalArgumentException("Ngày nhận phòng và trả phòng không được để trống");
+        }
+        
+        if (request.getCheckInDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Ngày nhận phòng không thể là ngày trong quá khứ");
+        }
+        
+        if (request.getCheckOutDate().isBefore(request.getCheckInDate())) {
+            throw new IllegalArgumentException("Ngày trả phòng phải sau ngày nhận phòng");
+        }
+        
         Booking booking = new Booking();
         
         // Kiểm tra userId và lấy thông tin user
@@ -92,6 +105,49 @@ public class BookingServiceImpl implements BookingService {
         
         booking.setStatus(request.getStatus() != null ? request.getStatus() : "PENDING");
         
+        // Kiểm tra xem các phòng có khả dụng không
+        if (request.getRoomIds() == null || request.getRoomIds().isEmpty()) {
+            throw new RuntimeException("Danh sách phòng không được để trống");
+        }
+        
+        // Lấy danh sách phòng đã đặt trong khoảng thời gian
+        List<Room> bookedRooms = roomRepository.findBookedRoomsBetweenDates(
+                request.getCheckInDate(), request.getCheckOutDate());
+        
+        // Lấy danh sách ID của các phòng đã đặt
+        List<Integer> bookedRoomIds = bookedRooms.stream()
+                .map(Room::getId)
+                .collect(Collectors.toList());
+        
+        // Kiểm tra xem có phòng nào trong request đã được đặt hay không
+        List<Integer> unavailableRoomIds = request.getRoomIds().stream()
+                .filter(bookedRoomIds::contains)
+                .collect(Collectors.toList());
+        
+        if (!unavailableRoomIds.isEmpty()) {
+            // Lấy thông tin các phòng không khả dụng để hiển thị thông báo chi tiết
+            List<Room> unavailableRooms = roomRepository.findAllById(unavailableRoomIds);
+            String roomNumbers = unavailableRooms.stream()
+                    .map(Room::getRoomNumber)
+                    .collect(Collectors.joining(", "));
+            
+            throw new RuntimeException("Các phòng sau không khả dụng trong khoảng thời gian đã chọn: " + roomNumbers);
+        }
+        
+        // Kiểm tra trạng thái phòng
+        List<Room> requestedRooms = roomRepository.findAllById(request.getRoomIds());
+        List<Room> invalidStatusRooms = requestedRooms.stream()
+                .filter(room -> !"VACANT".equals(room.getStatus()) && !"BOOKED".equals(room.getStatus()))
+                .collect(Collectors.toList());
+        
+        if (!invalidStatusRooms.isEmpty()) {
+            String roomNumbers = invalidStatusRooms.stream()
+                    .map(room -> room.getRoomNumber() + " (" + room.getStatus() + ")")
+                    .collect(Collectors.joining(", "));
+            
+            throw new RuntimeException("Các phòng sau có trạng thái không hợp lệ để đặt: " + roomNumbers);
+        }
+        
         // Lưu booking để có ID cho booking details
         booking = bookingRepository.save(booking);
         
@@ -107,28 +163,71 @@ public class BookingServiceImpl implements BookingService {
         paymentRepository.save(payment);
         
         // Tạo booking details cho các phòng được chọn
-        if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
-            for (Integer roomId : request.getRoomIds()) {
-                Room room = roomRepository.findById(roomId)
-                    .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
-                
-                BookingDetail bookingDetail = new BookingDetail();
-                bookingDetail.setBooking(booking);
-                bookingDetail.setRoom(room);
-                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
-                bookingDetailRepository.save(bookingDetail);
-            }
-        } else {
-            throw new RuntimeException("Danh sách phòng không được để trống");
+        double totalPriceCalculated = 0;
+        long stayDuration = java.time.temporal.ChronoUnit.DAYS.between(
+                request.getCheckInDate(), request.getCheckOutDate());
+        
+        for (Integer roomId : request.getRoomIds()) {
+            Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+            
+            // Cập nhật trạng thái phòng thành BOOKED
+            room.setStatus("BOOKED");
+            roomRepository.save(room);
+            
+            // Tính giá phòng theo số ngày ở
+            double roomPrice = room.getRoomType().getBasePrice() * stayDuration;
+            totalPriceCalculated += roomPrice;
+            
+            BookingDetail bookingDetail = new BookingDetail();
+            bookingDetail.setBooking(booking);
+            bookingDetail.setRoom(room);
+            bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+            bookingDetail.setPrice(roomPrice);
+            bookingDetailRepository.save(bookingDetail);
         }
         
-        return convertToBookingResponseDTO(booking);
+        // Kiểm tra và cập nhật tổng giá nếu cần
+        if (Math.abs(totalPriceCalculated - booking.getTotalPrice()) > 0.01) {
+            booking.setTotalPrice(totalPriceCalculated);
+            Booking savedBooking = bookingRepository.save(booking);
+            
+            // Cập nhật lại payment nếu có
+            final Integer bookingId = savedBooking.getId();
+            paymentRepository.findByBookingId(bookingId).ifPresent(paymentRecord -> {
+                paymentRecord.setAmount(savedBooking.getTotalPrice().longValue());
+                paymentRepository.save(paymentRecord);
+            });
+            
+            return convertToBookingResponseDTO(savedBooking);
+        }
+        
+        return convertToBookingResponseDTO(bookingRepository.save(booking));
     }
 
     @Override
     public BookingResponseDTO updateBooking(UpsertBookingRequest request, Integer id) {
+        // Kiểm tra tính hợp lệ của ngày
+        if (request.getCheckInDate() == null || request.getCheckOutDate() == null) {
+            throw new IllegalArgumentException("Ngày nhận phòng và trả phòng không được để trống");
+        }
+        
+        if (request.getCheckInDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Ngày nhận phòng không thể là ngày trong quá khứ");
+        }
+        
+        if (request.getCheckOutDate().isBefore(request.getCheckInDate())) {
+            throw new IllegalArgumentException("Ngày trả phòng phải sau ngày nhận phòng");
+        }
+        
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
+        
+        // Không cho phép cập nhật booking đã CHECKED_IN hoặc CHECKED_OUT
+        if ("CHECKED_IN".equals(booking.getStatus()) || "CHECKED_OUT".equals(booking.getStatus())) {
+            throw new IllegalStateException("Không thể cập nhật booking có trạng thái: " + booking.getStatus());
+        }
+        
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         booking.setUser(user);
@@ -146,28 +245,147 @@ public class BookingServiceImpl implements BookingService {
         
         booking.setStatus(request.getStatus());
         
-        // Lưu booking để có ID cho booking details
-        booking = bookingRepository.save(booking);
-        
         // Cập nhật booking details nếu có danh sách phòng mới
         if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
+            // Kiểm tra xem các phòng có khả dụng không
+            // Lấy danh sách phòng đã đặt trong khoảng thời gian, ngoại trừ booking hiện tại
+            List<Room> bookedRooms = roomRepository.findAll().stream()
+                    .filter(room -> {
+                        // Lấy các booking của phòng này
+                        List<BookingDetail> bookingDetails = bookingDetailRepository.findAll().stream()
+                                .filter(bd -> bd.getRoom() != null && bd.getRoom().getId().equals(room.getId()))
+                                .collect(Collectors.toList());
+                                
+                        // Kiểm tra xem có booking nào khác (không phải booking hiện tại) mà có overlap thời gian
+                        return bookingDetails.stream()
+                                .anyMatch(bd -> {
+                                    // Bỏ qua nếu là booking hiện tại
+                                    if (bd.getBooking().getId().equals(id)) {
+                                        return false;
+                                    }
+                                    
+                                    // Bỏ qua booking đã bị hủy
+                                    if ("CANCELLED".equals(bd.getBooking().getStatus())) {
+                                        return false;
+                                    }
+                                    
+                                    // Kiểm tra overlap thời gian
+                                    return (bd.getBooking().getCheckInDate().isEqual(request.getCheckInDate()) 
+                                            || bd.getBooking().getCheckInDate().isAfter(request.getCheckInDate()))
+                                            && (bd.getBooking().getCheckInDate().isEqual(request.getCheckOutDate()) 
+                                            || bd.getBooking().getCheckInDate().isBefore(request.getCheckOutDate()))
+                                            || (bd.getBooking().getCheckOutDate().isEqual(request.getCheckInDate()) 
+                                            || bd.getBooking().getCheckOutDate().isAfter(request.getCheckInDate()))
+                                            && (bd.getBooking().getCheckOutDate().isEqual(request.getCheckOutDate()) 
+                                            || bd.getBooking().getCheckOutDate().isBefore(request.getCheckOutDate()))
+                                            || (bd.getBooking().getCheckInDate().isBefore(request.getCheckInDate()) 
+                                            && bd.getBooking().getCheckOutDate().isAfter(request.getCheckOutDate()));
+                                });
+                    })
+                    .collect(Collectors.toList());
+                    
+            // Lấy danh sách ID của các phòng đã đặt
+            List<Integer> bookedRoomIds = bookedRooms.stream()
+                    .map(Room::getId)
+                    .collect(Collectors.toList());
+            
+            // Kiểm tra xem có phòng nào trong request đã được đặt hay không
+            List<Integer> unavailableRoomIds = request.getRoomIds().stream()
+                    .filter(bookedRoomIds::contains)
+                    .collect(Collectors.toList());
+            
+            if (!unavailableRoomIds.isEmpty()) {
+                // Lấy thông tin các phòng không khả dụng để hiển thị thông báo chi tiết
+                List<Room> unavailableRooms = roomRepository.findAllById(unavailableRoomIds);
+                String roomNumbers = unavailableRooms.stream()
+                        .map(Room::getRoomNumber)
+                        .collect(Collectors.joining(", "));
+                
+                throw new RuntimeException("Các phòng sau không khả dụng trong khoảng thời gian đã chọn: " + roomNumbers);
+            }
+            
+            // Kiểm tra trạng thái phòng (trừ các phòng đã thuộc booking hiện tại)
+            List<Room> currentBookingRooms = booking.getBookingDetail().stream()
+                    .map(BookingDetail::getRoom)
+                    .collect(Collectors.toList());
+                    
+            List<Integer> currentBookingRoomIds = currentBookingRooms.stream()
+                    .map(Room::getId)
+                    .collect(Collectors.toList());
+                    
+            List<Room> newRoomsToCheck = roomRepository.findAllById(
+                    request.getRoomIds().stream()
+                            .filter(rid -> !currentBookingRoomIds.contains(rid))
+                            .collect(Collectors.toList()));
+                            
+            List<Room> invalidStatusRooms = newRoomsToCheck.stream()
+                    .filter(room -> !"VACANT".equals(room.getStatus()) && !"BOOKED".equals(room.getStatus()))
+                    .collect(Collectors.toList());
+            
+            if (!invalidStatusRooms.isEmpty()) {
+                String roomNumbers = invalidStatusRooms.stream()
+                        .map(room -> room.getRoomNumber() + " (" + room.getStatus() + ")")
+                        .collect(Collectors.joining(", "));
+                
+                throw new RuntimeException("Các phòng sau có trạng thái không hợp lệ để đặt: " + roomNumbers);
+            }
+            
             // Xóa booking details cũ
+            List<BookingDetail> oldDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
+            for (BookingDetail detail : oldDetails) {
+                // Khôi phục trạng thái phòng về VACANT nếu phòng không còn trong danh sách mới
+                if (detail.getRoom() != null && !request.getRoomIds().contains(detail.getRoom().getId())) {
+                    Room room = detail.getRoom();
+                    room.setStatus("VACANT");
+                    roomRepository.save(room);
+                }
+            }
             bookingDetailRepository.deleteAllByBookingId(booking.getId());
             
             // Tạo booking details mới
+            double totalPriceCalculated = 0;
+            long stayDuration = java.time.temporal.ChronoUnit.DAYS.between(
+                    request.getCheckInDate(), request.getCheckOutDate());
+                    
             for (Integer roomId : request.getRoomIds()) {
                 Room room = roomRepository.findById(roomId)
                     .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+                
+                // Cập nhật trạng thái phòng thành BOOKED
+                room.setStatus("BOOKED");
+                roomRepository.save(room);
+                
+                // Tính giá phòng theo số ngày ở
+                double roomPrice = room.getRoomType().getBasePrice() * stayDuration;
+                totalPriceCalculated += roomPrice;
                 
                 BookingDetail bookingDetail = new BookingDetail();
                 bookingDetail.setBooking(booking);
                 bookingDetail.setRoom(room);
                 bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                bookingDetail.setPrice(roomPrice);
                 bookingDetailRepository.save(bookingDetail);
             }
+            
+            // Kiểm tra và cập nhật tổng giá nếu cần
+            if (Math.abs(totalPriceCalculated - booking.getTotalPrice()) > 0.01) {
+                booking.setTotalPrice(totalPriceCalculated);
+                Booking savedBooking = bookingRepository.save(booking);
+                
+                // Cập nhật lại payment nếu có
+                final Integer bookingId = savedBooking.getId();
+                paymentRepository.findByBookingId(bookingId).ifPresent(paymentRecord -> {
+                    paymentRecord.setAmount(savedBooking.getTotalPrice().longValue());
+                    paymentRepository.save(paymentRecord);
+                });
+                
+                return convertToBookingResponseDTO(savedBooking);
+            }
+            
+            return convertToBookingResponseDTO(bookingRepository.save(booking));
         }
         
-        return convertToBookingResponseDTO(booking);
+        return convertToBookingResponseDTO(bookingRepository.save(booking));
     }
 
     // Phương thức mới: hủy booking

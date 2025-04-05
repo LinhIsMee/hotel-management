@@ -194,4 +194,39 @@ public class BookingUserController {
         
         return ResponseEntity.ok(response);
     }
+    
+    // API test thanh toán không cần xác thực
+    @GetMapping("/test-payment")
+    public ResponseEntity<?> testPayment() {
+        try {
+            UpsertBookingRequest request = new UpsertBookingRequest();
+            request.setUserId(40); // Sử dụng ID của người dùng thực tế
+            request.setRoomIds(List.of(1)); // Sử dụng ID phòng đã có
+            request.setCheckInDate(LocalDate.now().plusDays(1));
+            request.setCheckOutDate(LocalDate.now().plusDays(3));
+            request.setAdults(2);
+            request.setChildren(1);
+            request.setStatus("PENDING");
+            request.setSpecialRequests("Booking test để thử nghiệm thanh toán");
+            request.setFullName("Phạm Thùy Linh");
+            request.setEmail("linh8686@gmail.com");
+            request.setPhone("0773352286");
+
+            BookingResponseDTO bookingResponseDTO = bookingService.createBooking(request);
+            if (bookingResponseDTO == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Lỗi khi tạo booking test"));
+            }
+
+            String orderInfo = "Thanh toán đặt phòng " + bookingResponseDTO.getId();
+            Long amount = bookingResponseDTO.getFinalPrice().longValue();
+            String paymentUrl = vnPayService.createPayment(bookingResponseDTO.getId(), amount, orderInfo);
+
+            return ResponseEntity.ok(Map.of(
+                    "booking", bookingResponseDTO,
+                    "payment", new PaymentLinkResponse(paymentUrl, orderInfo)
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Lỗi khi tạo booking test: " + e.getMessage()));
+        }
+    }
 } 

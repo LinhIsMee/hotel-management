@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/rooms")
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, allowCredentials = "true", maxAge = 3600)
+@CrossOrigin(origins = "*", maxAge = 3600)
 public class RoomController {
 
     @Autowired
@@ -55,7 +55,15 @@ public class RoomController {
         log.info("Nhận yêu cầu lấy danh sách tất cả phòng đang hoạt động");
         try {
             List<RoomResponseDTO> rooms = roomService.getAllActiveRooms();
-            log.info("Tìm thấy {} phòng đang hoạt động", rooms.size());
+            log.info("Tìm thấy {} phòng từ DB", rooms.size());
+            
+            if (rooms.isEmpty()) {
+                log.info("Gọi API reload-data để khởi tạo dữ liệu ban đầu do danh sách phòng trống");
+                roomService.initRoomsFromJson();
+                rooms = roomService.getAllActiveRooms();
+                log.info("Sau khi khởi tạo lại: {} phòng", rooms.size());
+            }
+            
             enrichWithReviewData(rooms);
             log.info("Trả về {} phòng sau khi làm phong phú dữ liệu", rooms.size());
             return ResponseEntity.ok(rooms);

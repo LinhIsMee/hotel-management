@@ -72,20 +72,20 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "(b.checkInDate <= :startDate AND b.checkOutDate >= :endDate))")
     List<Booking> findActiveBookingsBetweenDates(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
     
-    // Thống kê số lượng đặt phòng theo ngày trong tháng hiện tại
+    // Thống kê số lượng đặt phòng theo ngày trong tháng hiện tại và tháng trước
     @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, COUNT(*) as booking_count " +
            "FROM bookings " +
-           "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m') " +
+           "WHERE DATE_FORMAT(created_at, '%Y%m') IN (DATE_FORMAT(CURDATE(), '%Y%m'), DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')) " +
            "GROUP BY booking_date " +
-           "ORDER BY created_at", nativeQuery = true)
+           "ORDER BY MIN(created_at)", nativeQuery = true)
     List<Object[]> countBookingsByDayInCurrentMonth();
     
-    // Thống kê doanh thu theo ngày trong tháng hiện tại
+    // Thống kê doanh thu theo ngày trong tháng hiện tại và tháng trước
     @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, SUM(total_price) as daily_revenue " +
            "FROM bookings " +
-           "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m') " +
+           "WHERE DATE_FORMAT(created_at, '%Y%m') IN (DATE_FORMAT(CURDATE(), '%Y%m'), DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')) " +
            "GROUP BY booking_date " +
-           "ORDER BY created_at", nativeQuery = true)
+           "ORDER BY MIN(created_at)", nativeQuery = true)
     List<Object[]> sumRevenueByDayInCurrentMonth();
     
     // Thống kê doanh thu tháng hiện tại
@@ -103,9 +103,9 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Object[]> countBookingsByStatus();
     
     // Thống kê các phòng được đặt nhiều nhất
-    @Query(value = "SELECT bd.room_number, COUNT(*), SUM(bd.price) " +
+    @Query(value = "SELECT bd.room_number, COUNT(*) as count, SUM(bd.price) as total " +
            "FROM booking_details bd " +
            "GROUP BY bd.room_number " +
-           "ORDER BY COUNT(*) DESC", nativeQuery = true)
+           "ORDER BY count DESC", nativeQuery = true)
     List<Object[]> findMostBookedRooms(Pageable pageable);
 }

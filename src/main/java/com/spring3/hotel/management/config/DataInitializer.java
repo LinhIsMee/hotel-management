@@ -11,6 +11,8 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -183,14 +185,12 @@ public class DataInitializer implements CommandLineRunner {
         }
         
         // Khởi tạo dữ liệu phòng nếu chưa có
-        if (roomRepository.count() == 0 && roomTypeRepository.count() > 0) {
-            log.info("Initializing rooms from JSON...");
-            try {
-                roomService.initRoomsFromJson();
-                log.info("Rooms initialized successfully");
-            } catch (Exception e) {
-                log.error("Failed to initialize rooms from JSON: {}", e.getMessage());
-            }
+        if (roomRepository.count() < 10) {
+            log.info("Khởi tạo lại dữ liệu phòng với ảnh mới...");
+            roomService.initRoomsFromJson();
+            log.info("Đã hoàn thành khởi tạo dữ liệu phòng.");
+        } else {
+            log.info("Đã có {} phòng trong cơ sở dữ liệu, bỏ qua khởi tạo.", roomRepository.count());
         }
         
         // Khởi tạo dữ liệu dịch vụ nếu chưa có
@@ -336,54 +336,58 @@ public class DataInitializer implements CommandLineRunner {
                 LocalDate now = LocalDate.now();
                 LocalDate checkInDate;
                 LocalDate checkOutDate;
+                LocalDateTime createdAt;
                 
                 // Phân bố các booking trong quá khứ, hiện tại và tương lai
-                int timeOffset;
-                if (i < 10) {
-                    // Booking trong quá khứ
-                    timeOffset = -random.nextInt(90) - 10; // -100 đến -10 ngày
-                } else if (i < 20) {
-                    // Booking hiện tại và sắp tới
-                    timeOffset = random.nextInt(20) - 10; // -10 đến 10 ngày
-                } else {
-                    // Booking trong tương lai
-                    timeOffset = random.nextInt(90) + 10; // 10 đến 100 ngày
-                }
-                
-                checkInDate = now.plusDays(timeOffset);
-                // Thời gian ở từ 1 đến 7 đêm
-                int stayDuration = random.nextInt(7) + 1;
-                checkOutDate = checkInDate.plusDays(stayDuration);
-                
-                // Tính ngày tạo booking (luôn là trước ngày check-in)
-                int bookingBeforeCheckIn = random.nextInt(30) + 1; // Đặt trước 1-30 ngày
-                LocalDateTime createdAt = checkInDate.atStartOfDay().minusDays(bookingBeforeCheckIn);
-                
-                // Xác định trạng thái dựa vào ngày checkIn/checkOut
                 String status;
-                if (checkInDate.isAfter(now)) {
-                    // Chưa đến ngày checkin
-                    status = random.nextInt(10) < 7 ? "CONFIRMED" : "PENDING"; // 70% confirmed, 30% pending
-                } else if (checkOutDate.isBefore(now)) {
-                    // Đã qua ngày checkout
-                    status = random.nextInt(10) < 9 ? "CHECKED_OUT" : "CANCELLED"; // 90% checked out, 10% cancelled
+                if (i < 10) {
+                    // 10 booking cho tháng 3/2025 (tháng trước)
+                    // Tạo booking vào nhiều ngày khác nhau trong tháng 3
+                    int day = random.nextInt(31) + 1;
+                    checkInDate = LocalDate.of(2025, 3, day);
+                    checkOutDate = checkInDate.plusDays(random.nextInt(5) + 1);
+                    
+                    // Ngày tạo booking luôn trước ngày check-in
+                    int bookingBeforeCheckIn = random.nextInt(10) + 1;
+                    createdAt = LocalDate.of(2025, 3, Math.max(1, day - bookingBeforeCheckIn)).atStartOfDay().plusHours(random.nextInt(24));
+                    
+                    status = "CHECKED_OUT"; // Đã hoàn thành
+                } else if (i < 20) {
+                    // 10 booking cho tháng 4/2025 (tháng hiện tại)
+                    // Phân bố đều trong tháng 4
+                    int day = random.nextInt(30) + 1;
+                    checkInDate = LocalDate.of(2025, 4, day);
+                    checkOutDate = checkInDate.plusDays(random.nextInt(5) + 1);
+                    
+                    // Ngày tạo booking nằm trong tháng 4, trước ngày check-in
+                    int bookingDay = Math.max(1, day - random.nextInt(7) - 1);
+                    createdAt = LocalDate.of(2025, 4, bookingDay).atStartOfDay().plusHours(random.nextInt(24));
+                    
+                    if (day < 5) {
+                        // Trước ngày hiện tại (05/04/2025)
+                        status = "CHECKED_OUT";
+                    } else if (day == 5) {
+                        // Đúng ngày hiện tại
+                        status = "CHECKED_IN";
+                    } else {
+                        // Sau ngày hiện tại
+                        status = "CONFIRMED";
+                    }
                 } else {
-                    // Đang ở
-                    status = "CHECKED_IN";
+                    // 10 booking cho tương lai
+                    checkInDate = LocalDate.of(2025, random.nextInt(8) + 5, random.nextInt(28) + 1); // Từ tháng 5-12/2025
+                    checkOutDate = checkInDate.plusDays(random.nextInt(7) + 1);
+                    
+                    // Ngày tạo booking trong tháng 4/2025
+                    int bookingDay = random.nextInt(5) + 1; // 1-5 tháng 4
+                    createdAt = LocalDate.of(2025, 4, bookingDay).atStartOfDay().plusHours(random.nextInt(24));
+                    
+                    status = random.nextBoolean() ? "CONFIRMED" : "PENDING";
                 }
                 
-                // Ép buộc một phân bố cụ thể cho các trạng thái
-                if (i < 5) {
-                    status = "PENDING"; // Đảm bảo có 5 booking PENDING
-                } else if (i < 10) {
-                    status = "CONFIRMED"; // Đảm bảo có 5 booking CONFIRMED
-                } else if (i < 15) {
-                    status = "CHECKED_IN"; // Đảm bảo có 5 booking CHECKED_IN
-                } else if (i < 25) {
-                    status = "CHECKED_OUT"; // Đảm bảo có 10 booking CHECKED_OUT
-                } else {
-                    status = "CANCELLED"; // Đảm bảo có 5 booking CANCELLED
-                }
+                // Tính số ngày lưu trú
+                int stayDuration = (int) (checkOutDate.toEpochDay() - checkInDate.toEpochDay());
+                if (stayDuration < 1) stayDuration = 1;
                 
                 // Tạo booking detail (1-3 phòng mỗi booking)
                 int roomCount = random.nextInt(3) + 1;

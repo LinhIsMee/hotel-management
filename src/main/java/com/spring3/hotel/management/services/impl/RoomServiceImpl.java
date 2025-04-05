@@ -14,6 +14,7 @@ import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -154,163 +156,75 @@ public class RoomServiceImpl implements RoomService {
     
     @Override
     public void initRoomsFromJson() {
+        log.info("Cập nhật lại ảnh cho các phòng hiện có...");
+        
         try {
-            log.info("Bắt đầu khởi tạo dữ liệu phòng từ file JSON...");
-            
-            // Tạo phòng mẫu trực tiếp nếu không có file JSON
-            log.info("Khởi tạo dữ liệu phòng mẫu trực tiếp...");
-            List<Room> rooms = new ArrayList<>();
-            
-            // Phải đảm bảo có đủ loại phòng trong DB
-            List<RoomType> roomTypes = roomTypeRepository.findAll();
-            if (roomTypes.isEmpty()) {
-                log.error("Không có loại phòng nào trong DB, không thể khởi tạo phòng mẫu.");
+            // Lấy danh sách phòng hiện có
+            List<Room> existingRooms = roomRepository.findAll();
+            if (existingRooms.isEmpty()) {
+                log.warn("Không có phòng nào trong cơ sở dữ liệu để cập nhật.");
                 return;
             }
             
-            // Ảnh từ upcloud cho các loại phòng khác nhau
-            List<String> singleRoomImages = List.of(
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/single-room-1-ayK5.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/single-room-2-CDJS.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/single-room-3-mLTZ.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/single-room-4-MvZ4.jpg"
+            // Danh sách hình ảnh chất lượng cao từ Unsplash với các tham số tối ưu
+            List<String> optimizedImages = List.of(
+                "https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1566665797739-1674de7a421a?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1587985064135-0366536eab42?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1595576508898-0ad5c879a061?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1566195992011-5f6b21e539aa?q=80&w=1200&auto=format&fit=crop",
+                "https://images.unsplash.com/photo-1591088398332-8a7791972843?q=80&w=1200&auto=format&fit=crop"
             );
             
-            List<String> doubleRoomImages = List.of(
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/double-room-1-JkXD.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/double-room-2-7Zwd.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/double-room-3-TK2N.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/double-room-4-fE6R.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/double-room-5-cQrB.jpg"
-            );
-            
-            List<String> familyRoomImages = List.of(
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/family-room-1-3mVC.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/family-room-2-JH4y.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/family-room-3-qnPb.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/family-room-4-gCjQ.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/family-room-5-P8az.jpg"
-            );
-            
-            List<String> deluxeRoomImages = List.of(
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/deluxe-room-1-2DhB.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/deluxe-room-2-fkG3.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/deluxe-room-3-JQHL.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/deluxe-room-4-Lbx4.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/deluxe-room-5-xCkS.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/deluxe-room-6-ZsFn.jpg"
-            );
-            
-            List<String> presidentRoomImages = List.of(
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-1-VGb7.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-2-kQtH.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-3-Mv6X.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-4-wFrK.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-5-tBn3.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-6-27Wz.jpg",
-                "https://upcdn.io/12a1X6T/raw/uploads/2024/06/27/presidential-suite-7-pQcR.jpg"
-            );
-            
-            // Tạo các phòng mẫu
-            // Phòng Đơn Tiêu Chuẩn (ID: 1)
-            RoomType singleRoom = roomTypes.stream().filter(rt -> rt.getId() == 1).findFirst().orElse(roomTypes.get(0));
-            rooms.add(createSampleRoom("101", singleRoom, "VACANT", "1", true, 
-                "Phòng đơn tiêu chuẩn với view thành phố đẹp, phù hợp cho doanh nhân", 
-                singleRoomImages.subList(0, 3)));
-            
-            rooms.add(createSampleRoom("102", singleRoom, "VACANT", "1", true, 
-                "Phòng đơn tiêu chuẩn với ban công nhìn ra vườn hoa", 
-                singleRoomImages.subList(1, 4)));
-            
-            // Phòng Đôi Tiêu Chuẩn (ID: 2)
-            RoomType doubleRoom = roomTypes.stream().filter(rt -> rt.getId() == 2).findFirst().orElse(roomTypes.get(0));
-            rooms.add(createSampleRoom("201", doubleRoom, "VACANT", "2", true, 
-                "Phòng đôi tiêu chuẩn với 1 giường đôi lớn, phù hợp cho cặp đôi", 
-                doubleRoomImages.subList(0, 4)));
-            
-            rooms.add(createSampleRoom("202", doubleRoom, "VACANT", "2", true, 
-                "Phòng đôi tiêu chuẩn hướng biển, view tuyệt đẹp", 
-                doubleRoomImages.subList(1, 5)));
-            
-            // Phòng Gia Đình (ID: 3)
-            RoomType familyRoom = roomTypes.stream().filter(rt -> rt.getId() == 3).findFirst().orElse(roomTypes.get(0));
-            rooms.add(createSampleRoom("301", familyRoom, "VACANT", "3", true, 
-                "Phòng gia đình rộng rãi với 1 giường đôi và 2 giường đơn, phù hợp cho 4 người", 
-                familyRoomImages.subList(0, 4)));
-            
-            rooms.add(createSampleRoom("302", familyRoom, "VACANT", "3", true, 
-                "Phòng gia đình sang trọng với phòng khách riêng và view thành phố", 
-                familyRoomImages.subList(2, 5)));
-            
-            // Phòng Hạng Sang (ID: 4)
-            RoomType deluxeRoom = roomTypes.stream().filter(rt -> rt.getId() == 4).findFirst().orElse(roomTypes.get(0));
-            rooms.add(createSampleRoom("401", deluxeRoom, "VACANT", "4", true, 
-                "Phòng hạng sang với giường king size, view biển và các tiện nghi cao cấp", 
-                deluxeRoomImages.subList(0, 5)));
-            
-            rooms.add(createSampleRoom("402", deluxeRoom, "MAINTENANCE", "4", true, 
-                "Phòng hạng sang với bồn tắm spa và ban công riêng", 
-                deluxeRoomImages.subList(1, 6)));
-            
-            // Suite Tổng Thống (ID: 5)
-            RoomType presidentRoom = roomTypes.stream().filter(rt -> rt.getId() == 5).findFirst().orElse(roomTypes.get(0));
-            rooms.add(createSampleRoom("501", presidentRoom, "VACANT", "5", true, 
-                "Suite tổng thống với phòng khách riêng biệt, 2 phòng ngủ, ban công và tiện nghi đẳng cấp", 
-                presidentRoomImages.subList(0, 6)));
-            
-            rooms.add(createSampleRoom("502", presidentRoom, "CLEANING", "5", true, 
-                "Suite tổng thống với hồ bơi riêng và view 360 độ", 
-                presidentRoomImages.subList(1, 7)));
-            
-            // Thêm phòng extra cho mỗi loại
-            rooms.add(createSampleRoom("103", singleRoom, "VACANT", "1", true, 
-                "Phòng đơn yên tĩnh với không gian làm việc thoải mái", 
-                singleRoomImages));
+            // Cập nhật URL hình ảnh cho từng phòng
+            int count = 0;
+            for (Room room : existingRooms) {
+                // Lấy 3 hình ảnh ngẫu nhiên cho mỗi phòng
+                List<String> newImages = getRandomImages(optimizedImages, 3, count);
+                room.setImages(newImages);
+                count += 3;
                 
-            rooms.add(createSampleRoom("203", doubleRoom, "VACANT", "2", true, 
-                "Phòng đôi rộng rãi với view công viên", 
-                doubleRoomImages));
-                
-            rooms.add(createSampleRoom("303", familyRoom, "OCCUPIED", "3", true, 
-                "Phòng gia đình kết nối với phòng chơi trẻ em", 
-                familyRoomImages));
-                
-            rooms.add(createSampleRoom("403", deluxeRoom, "VACANT", "4", true, 
-                "Phòng hạng sang với sân hiên và khu vực thư giãn riêng", 
-                deluxeRoomImages));
-                
-            rooms.add(createSampleRoom("503", presidentRoom, "VACANT", "5", true, 
-                "Suite tổng thống siêu sang với dịch vụ quản gia riêng", 
-                presidentRoomImages));
+                // Cập nhật trạng thái phòng nếu cần
+                if ("AVAILABLE".equals(room.getStatus())) {
+                    room.setStatus("VACANT");
+                }
+            }
             
-            // Lưu tất cả các phòng vào DB
-            List<Room> savedRooms = roomRepository.saveAll(rooms);
-            log.info("Đã khởi tạo thành công {} phòng mẫu.", savedRooms.size());
-            
-            // Thêm các dịch vụ mặc định cho các phòng
-            addDefaultServicesToRooms(savedRooms);
-            
+            // Lưu các phòng đã được cập nhật
+            roomRepository.saveAll(existingRooms);
+            log.info("Đã cập nhật thành công URL hình ảnh cho {} phòng hiện có", existingRooms.size());
         } catch (Exception e) {
-            log.error("Lỗi khi khởi tạo dữ liệu phòng mẫu: {}", e.getMessage(), e);
+            log.error("Lỗi khi cập nhật hình ảnh phòng: {}", e.getMessage());
+            throw new RuntimeException("Không thể cập nhật hình ảnh cho phòng", e);
         }
     }
     
-    private Room createSampleRoom(String roomNumber, RoomType roomType, String status, String floor, 
-                                 boolean isActive, String notes, List<String> images) {
-        Room room = Room.builder()
-            .roomNumber(roomNumber)
-            .roomType(roomType)
-            .status(status)
-            .floor(floor)
-            .isActive(isActive)
-            .notes(notes)
-            .images(images)
-            .build();
-        
-        // Cập nhật thời gian tạo
-        room.setCreatedAt(LocalDate.now());
-        
+    // Hàm hỗ trợ tạo phòng
+    private Room createRoom(String roomNumber, RoomType roomType, String status, String floor, 
+                           Boolean isActive, String notes, List<String> images) {
+        Room room = new Room();
+        room.setRoomNumber(roomNumber);
+        room.setRoomType(roomType);
+        room.setStatus(status);
+        room.setFloor(floor);
+        room.setIsActive(isActive);
+        room.setNotes(notes);
+        room.setImages(images);
         return room;
+    }
+    
+    // Hàm lấy ngẫu nhiên các hình ảnh
+    private List<String> getRandomImages(List<String> allImages, int count, int offset) {
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            int index = (offset + i) % allImages.size();
+            result.add(allImages.get(index));
+        }
+        return result;
     }
     
     private void addDefaultServicesToRooms(List<Room> rooms) {
@@ -399,21 +313,21 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public List<RoomResponseDTO> getAllActiveRooms() {
-        // Đảm bảo lấy tất cả phòng đang hoạt động, không lọc theo bất kỳ điều kiện nào khác
-        List<Room> allActiveRooms = roomRepository.findByIsActiveTrue();
-        log.info("Đã tìm thấy {} phòng đang hoạt động", allActiveRooms.size());
+        // Lấy tất cả phòng không phân biệt trạng thái active
+        List<Room> allRooms = roomRepository.findAll();
+        log.info("Đã tìm thấy {} phòng trong DB", allRooms.size());
         
         // Kiểm tra nếu không có phòng nào hoặc ít hơn 5 phòng (dữ liệu không đủ)
-        if (allActiveRooms.isEmpty() || allActiveRooms.size() < 5) {
+        if (allRooms.isEmpty() || allRooms.size() < 5) {
             // Tạo phòng mẫu nếu DB trống hoặc ít dữ liệu
             log.warn("Không tìm thấy đủ phòng trong cơ sở dữ liệu, khởi tạo dữ liệu mẫu");
             initRoomsFromJson();
-            allActiveRooms = roomRepository.findByIsActiveTrue();
-            log.info("Sau khi khởi tạo dữ liệu mẫu: {} phòng đang hoạt động", allActiveRooms.size());
+            allRooms = roomRepository.findAll();
+            log.info("Sau khi khởi tạo dữ liệu mẫu: {} phòng", allRooms.size());
         }
         
         // Chuyển đổi sang DTO và trả về
-        List<RoomResponseDTO> result = allActiveRooms.stream()
+        List<RoomResponseDTO> result = allRooms.stream()
                 .map(RoomResponseDTO::fromEntity)
                 .collect(Collectors.toList());
         

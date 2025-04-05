@@ -16,24 +16,10 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        List<String> allowedOrigins = Arrays.stream(allowOrigin.split(","))
-            .map(String::trim)
-            .collect(Collectors.toList());
-        
-        // Thêm protocol http:// cho domain nếu nó không chứa http:// hoặc https://
-        allowedOrigins = allowedOrigins.stream()
-            .map(origin -> {
-                if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
-                    return "http://" + origin;
-                }
-                return origin;
-            })
-            .collect(Collectors.toList());
-        
         registry.addMapping("/**")
-            .allowedOrigins(allowedOrigins.toArray(new String[0]))
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            .allowedHeaders("*")
-            .allowCredentials(true);
+                .allowedOrigins("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(false);
     }
 }

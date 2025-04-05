@@ -21,6 +21,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/payments")
+@CrossOrigin(origins = "*", maxAge = 3600)
 public class PaymentController {
 
     @Autowired
@@ -31,6 +32,15 @@ public class PaymentController {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @GetMapping("/")
+    public ResponseEntity<Map<String, Object>> getPaymentInfo() {
+        Map<String, Object> info = new HashMap<>();
+        info.put("status", "active");
+        info.put("paymentMethod", "VNPay");
+        info.put("version", "1.0.0");
+        return ResponseEntity.ok(info);
+    }
 
     @PreAuthorize("hasRole('ROLE_USER') or hasRole('ROLE_ADMIN')")
     @PostMapping("/create/{bookingId}")
