@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Data
@@ -37,6 +39,19 @@ public class Room {
     
     @Column
     private String notes;
+    
+    @ElementCollection
+    @CollectionTable(name = "room_images", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private List<String> images = new ArrayList<>();
+    
+    @ManyToMany
+    @JoinTable(
+        name = "room_services",
+        joinColumns = @JoinColumn(name = "room_id"),
+        inverseJoinColumns = @JoinColumn(name = "service_id")
+    )
+    private List<Service> services = new ArrayList<>();
     
     @Column
     private LocalDate createdAt;

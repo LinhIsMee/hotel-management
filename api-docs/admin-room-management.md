@@ -48,7 +48,25 @@ Authorization: Bearer <your_admin_jwt_token>
     "notes": "Phòng hướng biển",
     "createdAt": "20/03/2023",
     "updatedAt": null,
-    "pricePerNight": 500000
+    "pricePerNight": 500000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
+      "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      },
+      {
+        "id": 2,
+        "name": "Dịch vụ giặt ủi",
+        "description": "Giặt ủi trong ngày",
+        "price": 150000.0
+      }
+    ]
   },
   {
     "id": 2,
@@ -61,7 +79,18 @@ Authorization: Bearer <your_admin_jwt_token>
     "notes": "Phòng hướng hồ bơi",
     "createdAt": "20/03/2023",
     "updatedAt": "25/03/2023",
-    "pricePerNight": 800000
+    "pricePerNight": 800000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room102-img1.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      }
+    ]
   }
 ]
 ```
@@ -101,7 +130,25 @@ Authorization: Bearer <your_admin_jwt_token>
   "notes": "Phòng hướng biển",
   "createdAt": "20/03/2023",
   "updatedAt": null,
-  "pricePerNight": 500000
+  "pricePerNight": 500000,
+  "images": [
+    "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
+    "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
+  ],
+  "services": [
+    {
+      "id": 1,
+      "name": "Wifi",
+      "description": "Wifi tốc độ cao",
+      "price": 0.0
+    },
+    {
+      "id": 2,
+      "name": "Dịch vụ giặt ủi",
+      "description": "Giặt ủi trong ngày",
+      "price": 150000.0
+    }
+  ]
 }
 ```
 
@@ -136,7 +183,25 @@ Authorization: Bearer <your_admin_jwt_token>
   "notes": "Phòng hướng biển",
   "createdAt": "20/03/2023",
   "updatedAt": null,
-  "pricePerNight": 500000
+  "pricePerNight": 500000,
+  "images": [
+    "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
+    "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
+  ],
+  "services": [
+    {
+      "id": 1,
+      "name": "Wifi",
+      "description": "Wifi tốc độ cao",
+      "price": 0.0
+    },
+    {
+      "id": 2,
+      "name": "Dịch vụ giặt ủi",
+      "description": "Giặt ủi trong ngày",
+      "price": 150000.0
+    }
+  ]
 }
 ```
 
@@ -167,13 +232,20 @@ Content-Type: application/json
   "status": "VACANT",
   "floor": "2",
   "isActive": true,
-  "notes": "Phòng gia đình rộng rãi"
+  "notes": "Phòng gia đình rộng rãi",
+  "images": [
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEA...", 
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQDT..."
+  ],
+  "serviceIds": [1, 3, 5]
 }
 ```
 
 **Lưu ý**:
 - `roomNumber` và `roomTypeId` là bắt buộc
 - `roomNumber` phải là duy nhất trong hệ thống
+- `images` là danh sách chuỗi Base64 của hình ảnh
+- `serviceIds` là danh sách ID của các dịch vụ liên quan đến phòng
 
 **Response (Success - 201 Created)**:
 ```json
@@ -188,7 +260,31 @@ Content-Type: application/json
   "notes": "Phòng gia đình rộng rãi",
   "createdAt": "29/03/2023",
   "updatedAt": null,
-  "pricePerNight": 1200000
+  "pricePerNight": 1200000,
+  "images": [
+    "https://hotel-images.s3.amazonaws.com/room201-img1.jpg",
+    "https://hotel-images.s3.amazonaws.com/room201-img2.jpg"
+  ],
+  "services": [
+    {
+      "id": 1,
+      "name": "Wifi",
+      "description": "Wifi tốc độ cao",
+      "price": 0.0
+    },
+    {
+      "id": 3,
+      "name": "Buổi ăn sáng",
+      "description": "Bữa ăn sáng buffet",
+      "price": 120000.0
+    },
+    {
+      "id": 5,
+      "name": "Dịch vụ spa",
+      "description": "Spa và massage",
+      "price": 500000.0
+    }
+  ]
 }
 ```
 
@@ -226,7 +322,12 @@ Content-Type: application/json
   "status": "MAINTENANCE",
   "floor": "2",
   "isActive": true,
-  "notes": "Phòng đang được nâng cấp thiết bị"
+  "notes": "Phòng đang được nâng cấp thiết bị",
+  "images": [
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEA...", 
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQDT..."
+  ],
+  "serviceIds": [1, 2, 4, 6]
 }
 ```
 
@@ -243,7 +344,37 @@ Content-Type: application/json
   "notes": "Phòng đang được nâng cấp thiết bị",
   "createdAt": "29/03/2023",
   "updatedAt": "29/03/2023",
-  "pricePerNight": 1800000
+  "pricePerNight": 1800000,
+  "images": [
+    "https://hotel-images.s3.amazonaws.com/room201-img1-updated.jpg",
+    "https://hotel-images.s3.amazonaws.com/room201-img2-updated.jpg"
+  ],
+  "services": [
+    {
+      "id": 1,
+      "name": "Wifi",
+      "description": "Wifi tốc độ cao",
+      "price": 0.0
+    },
+    {
+      "id": 2,
+      "name": "Dịch vụ giặt ủi",
+      "description": "Giặt ủi trong ngày",
+      "price": 150000.0
+    },
+    {
+      "id": 4,
+      "name": "Minibar",
+      "description": "Minibar đầy đủ đồ uống",
+      "price": 200000.0
+    },
+    {
+      "id": 6,
+      "name": "Xe đưa đón sân bay",
+      "description": "Xe đưa đón sân bay VIP",
+      "price": 300000.0
+    }
+  ]
 }
 ```
 
@@ -307,7 +438,25 @@ Authorization: Bearer <your_admin_jwt_token>
     "notes": "Phòng hướng biển",
     "createdAt": "20/03/2023",
     "updatedAt": null,
-    "pricePerNight": 500000
+    "pricePerNight": 500000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
+      "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      },
+      {
+        "id": 2,
+        "name": "Dịch vụ giặt ủi",
+        "description": "Giặt ủi trong ngày",
+        "price": 150000.0
+      }
+    ]
   },
   {
     "id": 4,
@@ -320,7 +469,18 @@ Authorization: Bearer <your_admin_jwt_token>
     "notes": "Phòng góc",
     "createdAt": "20/03/2023",
     "updatedAt": "25/03/2023",
-    "pricePerNight": 500000
+    "pricePerNight": 500000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room102-img1.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      }
+    ]
   }
 ]
 ```
@@ -353,7 +513,25 @@ Authorization: Bearer <your_admin_jwt_token>
     "notes": "Phòng hướng biển",
     "createdAt": "20/03/2023",
     "updatedAt": null,
-    "pricePerNight": 500000
+    "pricePerNight": 500000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
+      "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      },
+      {
+        "id": 2,
+        "name": "Dịch vụ giặt ủi",
+        "description": "Giặt ủi trong ngày",
+        "price": 150000.0
+      }
+    ]
   },
   {
     "id": 5,
@@ -366,7 +544,18 @@ Authorization: Bearer <your_admin_jwt_token>
     "notes": "Phòng góc",
     "createdAt": "20/03/2023",
     "updatedAt": null,
-    "pricePerNight": 800000
+    "pricePerNight": 800000,
+    "images": [
+      "https://hotel-images.s3.amazonaws.com/room103-img1.jpg"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "name": "Wifi",
+        "description": "Wifi tốc độ cao",
+        "price": 0.0
+      }
+    ]
   }
 ]
 ```

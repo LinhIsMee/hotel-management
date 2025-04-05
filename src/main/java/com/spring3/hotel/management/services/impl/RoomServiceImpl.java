@@ -7,12 +7,13 @@ import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;
+import com.spring3.hotel.management.models.Service;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
+import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -22,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
+@org.springframework.stereotype.Service
 public class RoomServiceImpl implements RoomService {
 
     @Autowired
@@ -31,6 +32,9 @@ public class RoomServiceImpl implements RoomService {
     
     @Autowired
     private RoomTypeRepository roomTypeRepository;
+    
+    @Autowired
+    private ServiceRepository serviceRepository;
     
     @Autowired
     private ObjectMapper objectMapper;
@@ -204,14 +208,95 @@ public class RoomServiceImpl implements RoomService {
                         .createdAt(createdAt)
                         .build();
                 
+                // Thêm các hình ảnh mẫu cho phòng
+                List<String> images = new ArrayList<>();
+                // Thêm hình ảnh dựa theo loại phòng
+                switch (roomTypeId) {
+                    case 1: // Phòng Đơn Tiêu Chuẩn
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Delta%20Suite/b1zy0kd45oky2b4k.webp");
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Delta%20Suite/3plrr8wmfnkaqepi.webp");
+                        break;
+                    case 2: // Phòng Đôi Tiêu Chuẩn
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Delta%20Suite/e1ozdho5a3a8iuom.webp");
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Delta%20Suite/yfs5zhdq2y7j7wbv.webp");
+                        break;
+                    case 3: // Phòng Gia Đình
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Ocean%20Suite/ceb6gpnbn7ujv921.webp");
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Ocean%20Suite/uf5a7u4kbmlc2gfu.webp");
+                        break;
+                    case 4: // Phòng Hạng Sang
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Regal%20Suite/zkzkyobaulxx5m2j.webp");
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Regal%20Suite/k9mlf70kbkqcwcvl.webp");
+                        break;
+                    case 5: // Suite Tổng Thống
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-essencegrand/Ph%C3%B2ng%20Ocean%20Suite/fxf3v6pr8w2en5q2.webp");
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-essencegrand/Ph%C3%B2ng%20Ocean%20Suite/9wvlvomyukfxibf1.webp");
+                        break;
+                    default:
+                        images.add("https://minio.fares.vn/mixivivu-dev/tour/du-thuyen-heritage-binh-chuan-cat-ba/Ph%C3%B2ng%20Delta%20Suite/b1zy0kd45oky2b4k.webp");
+                }
+                room.setImages(images);
+                
                 rooms.add(room);
             }
             
-            roomRepository.saveAll(rooms);
+            List<Room> savedRooms = roomRepository.saveAll(rooms);
             log.info("Đã khởi tạo thành công {} phòng từ file JSON.", rooms.size());
             
+            // Thêm các dịch vụ mặc định cho các phòng
+            addDefaultServicesToRooms(savedRooms);
+            
         } catch (Exception e) {
-            log.error("Lỗi khi khởi tạo dữ liệu phòng từ file JSON: {}", e.getMessage(), e);
+            log.error("Lỗi khi khởi tạo dữ liệu phòng từ JSON: {}", e.getMessage(), e);
+        }
+    }
+    
+    private void addDefaultServicesToRooms(List<Room> rooms) {
+        try {
+            // Lấy danh sách các dịch vụ cơ bản từ DB
+            List<Service> basicServices = serviceRepository.findByIsAvailable(true);
+            if (basicServices.isEmpty()) {
+                log.warn("Không có dịch vụ nào trong hệ thống để thêm vào phòng.");
+                return;
+            }
+            
+            for (Room room : rooms) {
+                // Dịch vụ miễn phí cơ bản cho tất cả các phòng
+                List<Service> roomServices = new ArrayList<>();
+                
+                // Dịch vụ Wifi và TV miễn phí cho tất cả các phòng
+                basicServices.stream()
+                    .filter(service -> service.getName().contains("Wifi") || service.getName().contains("Truyền hình"))
+                    .forEach(roomServices::add);
+                
+                // Thêm dịch vụ dựa trên loại phòng
+                int roomTypeId = room.getRoomType().getId();
+                if (roomTypeId >= 2) { // Từ phòng đôi trở lên
+                    basicServices.stream()
+                        .filter(service -> service.getName().contains("Dọn phòng") || service.getName().contains("Giặt ủi"))
+                        .forEach(roomServices::add);
+                }
+                
+                if (roomTypeId >= 3) { // Từ phòng gia đình trở lên
+                    basicServices.stream()
+                        .filter(service -> service.getName().contains("Bữa sáng"))
+                        .forEach(roomServices::add);
+                }
+                
+                if (roomTypeId >= 4) { // Phòng hạng sang
+                    basicServices.stream()
+                        .filter(service -> service.getName().contains("Spa") || service.getName().contains("Đưa đón"))
+                        .forEach(roomServices::add);
+                }
+                
+                // Thiết lập dịch vụ cho phòng
+                room.setServices(roomServices);
+                roomRepository.save(room);
+            }
+            
+            log.info("Đã thêm các dịch vụ mặc định cho {} phòng.", rooms.size());
+        } catch (Exception e) {
+            log.error("Lỗi khi thêm dịch vụ mặc định cho phòng: {}", e.getMessage(), e);
         }
     }
 }

@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -26,4 +28,8 @@ public class UpsertRoomRequest {
     private Boolean isActive;
     
     private String notes;
+    
+    private List<String> images; // Danh sách các ảnh của phòng (Base64 encoded)
+    
+    private List<Integer> serviceIds; // Danh sách ID của các dịch vụ liên quan
 }

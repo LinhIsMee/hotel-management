@@ -71,7 +71,9 @@ public class SecurityConfig {
                             "/api/v1/refresh-token",
                             "/api/v1/forgot-password",
                             "/api/v1/reset-password",
-                            "/api/v1/logout"
+                            "/api/v1/logout",
+                            "/api/v1/payments/callback",
+                            "/api/v1/payments/check-status/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/reviews", "/api/v1/reviews/", "/api/v1/reviews/{id}", "/api/v1/reviews/room/{roomId}", "/api/v1/reviews/statistics").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/reviews/**").permitAll()
@@ -86,6 +88,7 @@ public class SecurityConfig {
                         ).hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/employees/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/statistics/**", "/api/v1/bookings/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/user/bookings/**").hasAuthority("ROLE_USER")
                         .requestMatchers("/api/v1/bookings/create").hasAuthority("ROLE_USER")
                         .requestMatchers("/api/v1/bookings/recent").hasAuthority("ROLE_EMPLOYEE")
                         .anyRequest().authenticated()

@@ -1,6 +1,36 @@
 {
     "data": [
         {
+            "name": "WiFi miễn phí",
+            "code": "FREE_WIFI",
+            "type": "BASIC",
+            "description": "Kết nối internet WiFi tốc độ cao miễn phí",
+            "price": 0,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-01-01"
+        },
+        {
+            "name": "Truyền hình cáp",
+            "code": "CABLE_TV",
+            "type": "BASIC",
+            "description": "Truyền hình cáp với các kênh quốc tế",
+            "price": 0,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-01-01"
+        },
+        {
+            "name": "Dọn phòng hàng ngày",
+            "code": "DAILY_CLEANING",
+            "type": "BASIC",
+            "description": "Dịch vụ dọn phòng hàng ngày",
+            "price": 0,
+            "unit": "Ngày",
+            "isAvailable": true,
+            "createdAt": "2023-01-01"
+        },
+        {
             "name": "Dịch vụ giặt ủi",
             "code": "LAUNDRY",
             "type": "HOUSEKEEPING",

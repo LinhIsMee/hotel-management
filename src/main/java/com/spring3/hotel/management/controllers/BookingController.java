@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -21,42 +22,42 @@ public class BookingController {
     @Autowired
     private BookingService bookingService;
 
-    // Lấy thông tin booking theo ID
+    // Lấy thông tin booking theo ID (cho cả user và admin)
     @GetMapping("/{id}")
     public ResponseEntity<BookingResponseDTO> getBookingById(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.getBookingById(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
 
-    // Lấy danh sách booking theo userId
+    // Lấy danh sách booking theo userId (cho user đã đăng nhập)
+    @PreAuthorize("hasRole('ROLE_USER')")
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<BookingResponseDTO>> getBookingsByUserId(@PathVariable Integer userId) {
         List<BookingResponseDTO> bookings = bookingService.getBookingsByUserId(userId);
         return ResponseEntity.ok(bookings);
     }
 
-    // Lấy tất cả booking
+    // API chỉ dành cho admin - được chuyển sang AdminBookingController
+    // Ẩn toàn bộ danh sách booking
+    /*
     @GetMapping("/")
     public ResponseEntity<List<BookingResponseDTO>> getAllBookings() {
         List<BookingResponseDTO> bookings = bookingService.getAllBookings();
         return ResponseEntity.ok(bookings);
     }
 
-    //lấy danh sách booking mới nhất trong 7 ngày
     @GetMapping("/recent")
     public ResponseEntity<List<NewBookingResponse>> getRecentBookings() {
         List<NewBookingResponse> bookings = bookingService.getRecentBookings();
         return ResponseEntity.ok(bookings);
     }
 
-    // Lấy danh sách booking theo trạng thái
     @GetMapping("/status/{status}")
     public ResponseEntity<List<BookingResponseDTO>> getBookingsByStatus(@PathVariable String status) {
         List<BookingResponseDTO> bookings = bookingService.getBookingsByStatus(status);
         return ResponseEntity.ok(bookings);
     }
 
-    // API mới: Lấy danh sách booking trong khoảng thời gian
     @GetMapping("/date-range")
     public ResponseEntity<List<BookingResponseDTO>> getBookingsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -64,8 +65,9 @@ public class BookingController {
         List<BookingResponseDTO> bookings = bookingService.getBookingsByDateRange(startDate, endDate);
         return ResponseEntity.ok(bookings);
     }
+    */
     
-    // API mới: Lấy danh sách phòng đã đặt trong khoảng thời gian
+    // Lấy danh sách phòng đã đặt trong khoảng thời gian (cho cả user và admin)
     @GetMapping("/booked-rooms")
     public ResponseEntity<List<RoomListResponseDTO>> getBookedRoomsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -74,14 +76,16 @@ public class BookingController {
         return ResponseEntity.ok(rooms);
     }
 
-    // Tạo mới booking
+    // Tạo mới booking (cho user thông thường - sẽ có quy trình thanh toán VNPay)
+    @PreAuthorize("hasRole('ROLE_USER')")
     @PostMapping("/create")
     public ResponseEntity<BookingResponseDTO> createBooking(@RequestBody UpsertBookingRequest request) {
         BookingResponseDTO bookingResponseDTO = bookingService.createBooking(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(bookingResponseDTO);
     }
 
-    // Cập nhật thông tin booking
+    // Cập nhật thông tin booking (cho user thông thường - chỉ cho phép trong trạng thái PENDING)
+    @PreAuthorize("hasRole('ROLE_USER')")
     @PutMapping("/update/{id}")
     public ResponseEntity<BookingResponseDTO> updateBooking(
             @PathVariable Integer id,
@@ -90,14 +94,15 @@ public class BookingController {
         return ResponseEntity.ok(bookingResponseDTO);
     }
     
-    // API mới: Hủy booking
+    // Hủy booking (cho user thông thường - chỉ cho phép trong trạng thái PENDING hoặc CONFIRMED)
+    @PreAuthorize("hasRole('ROLE_USER')")
     @PostMapping("/cancel/{id}")
     public ResponseEntity<BookingResponseDTO> cancelBooking(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.cancelBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
     
-    // API mới: Xác nhận booking sau khi thanh toán
+    // Xác nhận booking sau khi thanh toán (gọi từ callback của VNPay)
     @PostMapping("/confirm/{id}")
     public ResponseEntity<BookingResponseDTO> confirmBooking(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.confirmBooking(id);
