@@ -15,7 +15,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -549,59 +552,189 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BookingResponseDTO convertToBookingResponseDTO(Booking booking) {
-        User user = userRepository.findById(booking.getUser().getId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        BookingResponseDTO bookingResponseDTO = new BookingResponseDTO();
-        Payment payment = paymentRepository.findByBookingId(booking.getId())
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
-        List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
-        List<Room> rooms = bookingDetails.stream().map(BookingDetail::getRoom).toList();
-        List<RoomListResponseDTO> bookingRoomList = rooms.stream().map(room -> {
-            RoomListResponseDTO roomListResponseDTO = new RoomListResponseDTO();
-            roomListResponseDTO.setRoomId(room.getId());
-            roomListResponseDTO.setRoomNumber(room.getRoomNumber());
-            roomListResponseDTO.setRoomType(room.getRoomType().getName());
-            roomListResponseDTO.setPrice(room.getRoomType().getBasePrice());
-            return roomListResponseDTO;
-        }).toList();
-        bookingResponseDTO.setId(booking.getId());
-        bookingResponseDTO.setUserId(user.getId());
-        bookingResponseDTO.setFullName(user.getFullName());
-        bookingResponseDTO.setNationalId(user.getNationalId());
-        bookingResponseDTO.setEmail(user.getEmail());
-        bookingResponseDTO.setRooms(bookingRoomList);
-        bookingResponseDTO.setPhone(user.getPhoneNumber());
-        bookingResponseDTO.setCheckInDate(booking.getCheckInDate());
-        bookingResponseDTO.setCheckOutDate(booking.getCheckOutDate());
-        bookingResponseDTO.setTotalPrice(booking.getTotalPrice());
+        BookingResponseDTO dto = new BookingResponseDTO();
+        dto.setId(booking.getId());
+        dto.setUserId(booking.getUser().getId());
+        dto.setFullName(booking.getUser().getFullName());
+        dto.setNationalId(booking.getUser().getNationalId());
+        dto.setEmail(booking.getUser().getEmail());
+        dto.setPhone(booking.getUser().getPhoneNumber());
         
-        // Xử lý trường hợp discount là null
-        if (booking.getDiscount() == null) {
-            bookingResponseDTO.setFinalPrice(booking.getTotalPrice());
-            bookingResponseDTO.setDiscountCode(null);
-            bookingResponseDTO.setDiscountValue(0.0);
-            bookingResponseDTO.setDiscountType(null);
-        } else {
-            Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
-            if (discount == null) {
-                bookingResponseDTO.setFinalPrice(booking.getTotalPrice());
-                bookingResponseDTO.setDiscountCode(null);
-                bookingResponseDTO.setDiscountValue(0.0);
-                bookingResponseDTO.setDiscountType(null);
-            } else {
-                bookingResponseDTO.setFinalPrice(booking.getTotalPrice() - booking.getTotalPrice() * discount.getDiscountValue());
-                bookingResponseDTO.setDiscountCode(discount.getCode());
-                bookingResponseDTO.setDiscountValue(discount.getDiscountValue());
-                bookingResponseDTO.setDiscountType(discount.getDiscountType());
-            }
+        // Lấy danh sách phòng từ booking_details
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
+        List<RoomListResponseDTO> roomList = new ArrayList<>();
+        
+        for (BookingDetail detail : bookingDetails) {
+            Room room = detail.getRoom();
+            RoomListResponseDTO roomDto = new RoomListResponseDTO();
+            roomDto.setRoomId(room.getId());
+            roomDto.setRoomNumber(room.getRoomNumber() != null ? room.getRoomNumber() : "");
+            roomDto.setRoomType(room.getRoomType() != null ? room.getRoomType().getName() : "");
+            roomDto.setPrice(detail.getPrice());
+            
+            // Thêm danh sách hình ảnh
+            roomDto.setImages(room.getImages());
+            
+            roomList.add(roomDto);
         }
         
-        bookingResponseDTO.setStatus(booking.getStatus());
-        bookingResponseDTO.setPaymentMethod(payment.getMethod());
-        bookingResponseDTO.setPaymentStatus(payment.getStatus());
-        bookingResponseDTO.setPaymentDate(payment.getPayDate());
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-        bookingResponseDTO.setCreatedAt(booking.getCreatedAt().format(formatter));
-        return bookingResponseDTO;
+        dto.setRooms(roomList);
+        dto.setCheckInDate(booking.getCheckInDate());
+        dto.setCheckOutDate(booking.getCheckOutDate());
+        dto.setTotalPrice(booking.getTotalPrice());
+        
+        // Tính finalPrice
+        double finalPrice = booking.getTotalPrice();
+        if (booking.getDiscount() != null) {
+            Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
+            if (discount != null) {
+                dto.setDiscountCode(discount.getCode());
+                dto.setDiscountValue(discount.getDiscountValue());
+                dto.setDiscountType(discount.getDiscountType());
+                
+                // Tính giá sau khi giảm giá
+                if ("PERCENT".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+                } else if ("FIXED".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice - discount.getDiscountValue();
+                    if (finalPrice < 0) finalPrice = 0;
+                }
+            }
+        }
+        dto.setFinalPrice(finalPrice);
+        
+        // Kiểm tra và đồng bộ trạng thái payment
+        Optional<Payment> paymentOpt = paymentRepository.findByBookingId(booking.getId());
+        if (paymentOpt.isPresent()) {
+            Payment payment = paymentOpt.get();
+            
+            // Nếu payment thành công (status=00) nhưng booking chưa được xác nhận
+            if ("00".equals(payment.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
+                booking.setStatus("CONFIRMED");
+                booking = bookingRepository.save(booking);
+                System.out.println("Đã tự động cập nhật trạng thái booking #" + booking.getId() + " thành CONFIRMED do payment thành công");
+            }
+            
+            dto.setPaymentMethod(payment.getMethod());
+            dto.setPaymentStatus(payment.getStatus());
+            dto.setPaymentDate(payment.getPayDate());
+        }
+        
+        // Đặt trạng thái booking sau khi đã đồng bộ
+        dto.setStatus(booking.getStatus());
+        
+        if (booking.getCreatedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            dto.setCreatedAt(booking.getCreatedAt().format(formatter));
+        }
+        
+        return dto;
+    }
+
+    private void checkRoomAvailability(List<Integer> roomIds, LocalDate checkInDate, LocalDate checkOutDate) {
+        for (Integer roomId : roomIds) {
+            // Kiểm tra xem phòng có tồn tại không
+            Room room = roomRepository.findById(roomId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
+
+            // Kiểm tra xem phòng có đang trống không
+            if (!"VACANT".equals(room.getStatus())) {
+                throw new RuntimeException("Phòng " + roomId + " không còn trống");
+            }
+
+            // Kiểm tra xem phòng có bị đặt trong khoảng thời gian này không
+            List<BookingDetail> existingBookings = bookingDetailRepository.findByRoomIdAndDateRange(
+                    roomId, checkInDate, checkOutDate);
+            
+            for (BookingDetail detail : existingBookings) {
+                // Bỏ qua các booking đã hủy
+                if (!"CANCELLED".equals(detail.getBooking().getStatus())) {
+                    throw new RuntimeException("Phòng " + roomId + " đã được đặt trong khoảng thời gian này");
+                }
+            }
+        }
+    }
+
+    @Override
+    public Map<String, Object> getBookingPaymentInfo(Integer bookingId) {
+        // Lấy thông tin booking
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
+        
+        // Lấy thông tin payment
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElse(null);
+        
+        Map<String, Object> result = new HashMap<>();
+        
+        // Thông tin cơ bản
+        result.put("bookingId", booking.getId());
+        result.put("totalPrice", booking.getTotalPrice());
+        result.put("status", booking.getStatus());
+        
+        // Thông tin thanh toán
+        if (payment != null) {
+            result.put("paymentId", payment.getId());
+            result.put("paymentStatus", payment.getStatus() != null ? payment.getStatus() : "UNPAID");
+            result.put("paymentMethod", payment.getMethod() != null ? payment.getMethod() : "VNPAY");
+            result.put("paymentDate", payment.getPayDate() != null ? payment.getPayDate() : "");
+            result.put("transactionNo", payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
+            result.put("amount", payment.getAmount() != null ? payment.getAmount() : 0);
+            result.put("bankCode", payment.getBankCode() != null ? payment.getBankCode() : "");
+            
+            // Các trường thông tin bổ sung
+            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
+            boolean success = "00".equals(transactionStatus);
+            boolean pending = "01".equals(transactionStatus) || "04".equals(transactionStatus) || 
+                    "05".equals(transactionStatus) || "06".equals(transactionStatus);
+            
+            result.put("success", success);
+            result.put("pending", pending);
+            
+            // Định dạng số tiền
+            if (payment.getAmount() != null) {
+                result.put("formattedAmount", String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
+            } else {
+                result.put("formattedAmount", "0 ₫");
+            }
+            
+            // Định dạng ngày giờ thanh toán
+            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
+                String payDate = payment.getPayDate();
+                String year = payDate.substring(0, 4);
+                String month = payDate.substring(4, 6);
+                String day = payDate.substring(6, 8);
+                String hour = payDate.substring(8, 10);
+                String minute = payDate.substring(10, 12);
+                String second = payDate.substring(12, 14);
+                
+                result.put("formattedPaymentTime", day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
+            } else {
+                result.put("formattedPaymentTime", "");
+            }
+        } else {
+            // Cung cấp giá trị mặc định cho tất cả các trường
+            result.put("paymentId", 0);
+            result.put("paymentStatus", "UNPAID");
+            result.put("paymentMethod", "VNPAY");
+            result.put("paymentDate", "");
+            result.put("transactionNo", "");
+            result.put("amount", booking.getTotalPrice().longValue());
+            result.put("bankCode", "");
+            result.put("success", false);
+            result.put("pending", false);
+            result.put("formattedAmount", String.format("%,d", booking.getTotalPrice().longValue()).replace(",", ".") + " ₫");
+            result.put("formattedPaymentTime", "");
+        }
+        
+        return result;
+    }
+    
+    @Override
+    public List<BookingResponseDTO> getConfirmedBookingsByDateRange(LocalDate startDate, LocalDate endDate) {
+        List<Booking> bookings = bookingRepository.findByStatusAndCheckInDateBetween("CONFIRMED", startDate, endDate);
+        return bookings.stream()
+                .map(this::convertToBookingResponseDTO)
+                .collect(Collectors.toList());
     }
 }

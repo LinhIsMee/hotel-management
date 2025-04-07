@@ -108,4 +108,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "GROUP BY bd.room_number " +
            "ORDER BY count DESC", nativeQuery = true)
     List<Object[]> findMostBookedRooms(Pageable pageable);
+
+    // Tìm các booking đã được xác nhận (CONFIRMED) trong khoảng thời gian
+    List<Booking> findByStatusAndCheckInDateBetween(String status, LocalDate startDate, LocalDate endDate);
 }

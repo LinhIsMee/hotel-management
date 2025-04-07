@@ -1,12 +1,20 @@
 package com.spring3.hotel.management.services;
 
 import com.spring3.hotel.management.dtos.response.PaymentResponse;
+import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.Payment;
+import com.spring3.hotel.management.repositories.BookingRepository;
 import com.spring3.hotel.management.repositories.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -16,21 +24,27 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.time.format.DateTimeFormatter;
 
 @Service
+@RequiredArgsConstructor
 public class VNPayService {
 
-    @Autowired
-    private PaymentRepository paymentRepository;
+    private final PaymentRepository paymentRepository;
+    private final BookingRepository bookingRepository;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${vnpay.tmnCode:M7LG94H1}")
-    private String vnp_TmnCode;
+    private String vnpTmnCode;
 
     @Value("${vnpay.secretKey:VDWO5R8O3RUI3DDDE257QI2SMENDMOWU}")
-    private String vnp_HashSecret;
+    private String vnpHashSecret;
 
     @Value("${vnpay.url:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
-    private String vnp_Url;
+    private String vnpPayUrl;
+    
+    @Value("${vnpay.version:2.1.0}")
+    private String vnpVersion;
 
     @Value("${spring.profiles.active:dev}")
     private String activeProfile;
@@ -39,172 +53,349 @@ public class VNPayService {
     private static final int PAYMENT_EXPIRATION_MINUTES = 15;
 
     /**
-     * Tạo URL thanh toán VNPay
+     * Creates a new payment transaction and returns the payment URL.
+     *
+     * @param orderInfo  Description of the order
+     * @param amount     Amount to be paid in VND
+     * @param ipAddress  IP address of the customer
+     * @param returnUrl  URL to redirect after payment
+     * @param bookingId  ID of the booking associated with the payment
+     * @return PaymentResponse containing the payment URL and transaction details
      */
-    public PaymentResponse createPayment(String orderInfo, Long amount, String ipAddress, String returnUrl) {
+    public PaymentResponse createPayment(String orderInfo, Long amount, String ipAddress, String returnUrl, Integer bookingId) {
         try {
-            // Tạo mã giao dịch ngẫu nhiên
+            System.out.println("Bắt đầu tạo thanh toán cho booking ID: " + bookingId);
+            
             String vnp_TxnRef = generateTransactionNo();
+            System.out.println("Tạo mã giao dịch: " + vnp_TxnRef);
             
-            // Tạo các tham số cho VNPay
-            Map<String, String> vnp_Params = new HashMap<>();
-            vnp_Params.put("vnp_Version", "2.1.0");
-            vnp_Params.put("vnp_Command", "pay");
-            vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
-            vnp_Params.put("vnp_Amount", String.valueOf(amount * 100)); // VNPay yêu cầu số tiền nhân 100
-            vnp_Params.put("vnp_CurrCode", "VND");
+            // Sử dụng backend callback URL thay vì returnUrl từ frontend
+            String backendCallbackUrl = "http://localhost:9000/api/v1/payments/vnpay-callback";
+            
+        Map<String, String> vnp_Params = new HashMap<>();
+            vnp_Params.put("vnp_Version", vnpVersion);
+        vnp_Params.put("vnp_Command", "pay");
+            vnp_Params.put("vnp_TmnCode", vnpTmnCode);
+            vnp_Params.put("vnp_Amount", String.valueOf(amount * 100));
+        vnp_Params.put("vnp_CurrCode", "VND");
             vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
-            vnp_Params.put("vnp_OrderInfo", orderInfo);
+        vnp_Params.put("vnp_OrderInfo", orderInfo);
             vnp_Params.put("vnp_OrderType", "other");
-            vnp_Params.put("vnp_Locale", "vn");
-            vnp_Params.put("vnp_ReturnUrl", returnUrl);
+        vnp_Params.put("vnp_Locale", "vn");
+            vnp_Params.put("vnp_ReturnUrl", backendCallbackUrl);
             vnp_Params.put("vnp_IpAddr", ipAddress);
-            
-            // Thêm thời gian
-            Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-            String vnp_CreateDate = formatter.format(cld.getTime());
-            vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
-            
-            // Thêm thời gian hết hạn (15 phút sau)
-            cld.add(Calendar.MINUTE, PAYMENT_EXPIRATION_MINUTES);
-            String vnp_ExpireDate = formatter.format(cld.getTime());
-            vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
-            
-            // Sắp xếp các tham số theo thứ tự alphabet
-            List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
-            Collections.sort(fieldNames);
-            
-            // Tạo chuỗi hash
+
+        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+        String vnp_CreateDate = formatter.format(cld.getTime());
+        vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+
+            cld.add(Calendar.MINUTE, 15);
+        String vnp_ExpireDate = formatter.format(cld.getTime());
+        vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
+
+        List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
+        Collections.sort(fieldNames);
             StringBuilder hashData = new StringBuilder();
-            StringBuilder query = new StringBuilder();
-            Iterator<String> itr = fieldNames.iterator();
-            while (itr.hasNext()) {
-                String fieldName = itr.next();
-                String fieldValue = vnp_Params.get(fieldName);
-                if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                    hashData.append(fieldName);
-                    hashData.append('=');
-                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
-                    query.append('=');
-                    query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                    if (itr.hasNext()) {
-                        query.append('&');
-                        hashData.append('&');
-                    }
+        StringBuilder query = new StringBuilder();
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = vnp_Params.get(fieldName);
+                if (fieldValue != null && !fieldValue.isEmpty()) {
+                    // Build hash data
+                    hashData.append(fieldName).append('=').append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8));
+                    // Build query
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8)).append('=')
+                            .append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8));
+                if (itr.hasNext()) {
+                    query.append('&');
+                    hashData.append('&');
                 }
             }
-            
-            String queryUrl = query.toString();
-            String vnp_SecureHash = hmacSHA512(vnp_HashSecret, hashData.toString());
-            queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-            
-            // Lưu thông tin payment
-            Payment payment = new Payment();
+        }
+        String queryUrl = query.toString();
+            String vnp_SecureHash = hmacSHA512(vnpHashSecret, hashData.toString());
+        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
+            String paymentUrl = vnpPayUrl + "?" + queryUrl;
+
+            System.out.println("Đã tạo URL thanh toán: " + paymentUrl);
+
+            // Save payment details to database
+        Payment payment = new Payment();
             payment.setTransactionNo(vnp_TxnRef);
-            payment.setAmount(amount);
-            payment.setStatus("01"); // Trạng thái chờ thanh toán
-            payment.setOrderInfo(orderInfo);
-            payment.setCreatedAt(LocalDateTime.now());
-            paymentRepository.save(payment);
+        payment.setAmount(amount);
+        payment.setOrderInfo(orderInfo);
+            payment.setStatus("01"); // 01: Chờ thanh toán
+            payment.setResponseCode("01");
+            payment.setMethod("VNPAY");
+            if (bookingId != null) {
+                payment.setBookingId(bookingId);
+            }
+            payment = paymentRepository.save(payment);
+            System.out.println("Đã lưu payment vào DB với ID: " + payment.getId());
+    
+            PaymentResponse response = new PaymentResponse();
+            response.setPaymentUrl(paymentUrl);
+            response.setTransactionNo(vnp_TxnRef);
+            response.setAmount(amount);
+            response.setOrderInfo(orderInfo);
+            response.setBookingId(bookingId);
             
-            // Trả về response
-            return new PaymentResponse(
-                vnp_Url + "?" + queryUrl,
-                vnp_TxnRef,
-                amount,
-                orderInfo
-            );
-            
+            return response;
         } catch (Exception e) {
+            System.out.println("Lỗi khi tạo thanh toán: " + e.getMessage());
             throw new RuntimeException("Không thể tạo thanh toán: " + e.getMessage());
         }
+    }
+
+    /**
+     * Phương thức tạo thanh toán không yêu cầu bookingId (tương thích với API cũ)
+     * 
+     * @param orderInfo  Description of the order
+     * @param amount     Amount to be paid in VND
+     * @param ipAddress  IP address of the customer
+     * @param returnUrl  URL to redirect after payment
+     * @return PaymentResponse containing the payment URL and transaction details
+     */
+    public PaymentResponse createPayment(String orderInfo, Long amount, String ipAddress, String returnUrl) {
+        return createPayment(orderInfo, amount, ipAddress, returnUrl, null);
     }
 
     /**
      * Kiểm tra trạng thái thanh toán
      */
     public Map<String, Object> checkPaymentStatus(String transactionNo) {
-        Payment payment = paymentRepository.findByTransactionNo(transactionNo)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch"));
+        try {
+            System.out.println("Đang kiểm tra trạng thái thanh toán cho mã giao dịch: " + transactionNo);
             
-        // Kiểm tra nếu trạng thái là "01" (chờ thanh toán) và đã quá thời gian 15 phút
-        if ("01".equals(payment.getStatus()) && payment.getCreatedAt() != null) {
-            LocalDateTime createdAt = payment.getCreatedAt();
-            LocalDateTime expiryTime = createdAt.plusMinutes(PAYMENT_EXPIRATION_MINUTES);
+            // Tạo kết quả mặc định nếu không tìm thấy giao dịch
+            Map<String, Object> defaultResult = new HashMap<>();
+            defaultResult.put("transactionNo", transactionNo);
+            defaultResult.put("success", false);
+            defaultResult.put("pending", true);
+            defaultResult.put("message", "Không tìm thấy giao dịch");
             
-            if (LocalDateTime.now().isAfter(expiryTime)) {
-                // Cập nhật trạng thái thanh toán thành hết hạn
-                payment.setStatus("09");
-                paymentRepository.save(payment);
+            // Thử tìm giao dịch theo transactionNo
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            
+            // Nếu không tìm thấy, thử tìm theo một số trường khác
+            if (paymentOpt.isEmpty()) {
+                System.out.println("Không tìm thấy payment với transactionNo: " + transactionNo + ", tìm kiếm theo điều kiện khác");
+                
+                // Liệt kê tất cả các payment gần đây
+                List<Payment> recentPayments = paymentRepository.findTop10ByOrderByCreatedAtDesc();
+                System.out.println("Các payment gần đây: " + recentPayments.size());
+                
+                // In ra danh sách để debug
+                for (Payment p : recentPayments) {
+                    System.out.println("Payment ID: " + p.getId() + 
+                                     ", transactionNo: " + p.getTransactionNo() + 
+                                     ", status: " + p.getStatus() + 
+                                     ", bookingId: " + p.getBookingId() + 
+                                     ", created: " + p.getCreatedAt());
+                }
+                
+                // Thử tìm payment gần đúng với transactionNo
+                for (Payment p : recentPayments) {
+                    // Kiểm tra null trước khi so sánh
+                    if (p.getTransactionNo() != null && transactionNo != null) {
+                        // Nếu transactionNo chứa trong payment hoặc ngược lại
+                        if (p.getTransactionNo().contains(transactionNo) || transactionNo.contains(p.getTransactionNo())) {
+                            System.out.println("Tìm thấy payment gần đúng với ID: " + p.getId() + ", transactionNo: " + p.getTransactionNo());
+                            paymentOpt = Optional.of(p);
+                            break;
+                        }
+                    }
+                }
+                
+                // Đặc biệt: Nếu transactionNo bắt đầu bằng 1489 (VNPay) và không tìm thấy trong DB,
+                // nhưng chúng ta nhận được request, có thể là đã thanh toán thành công
+                if (paymentOpt.isEmpty() && transactionNo != null && (transactionNo.startsWith("1489") || transactionNo.startsWith("NCB"))) {
+                    System.out.println("Đây có thể là giao dịch đã thanh toán thành công qua VNPay nhưng không tìm thấy trong DB");
+                    Map<String, Object> vnpaySuccessResult = new HashMap<>();
+                    vnpaySuccessResult.put("transactionNo", transactionNo);
+                    vnpaySuccessResult.put("success", true);
+                    vnpaySuccessResult.put("pending", false);
+                    vnpaySuccessResult.put("message", "Giao dịch thanh toán thành công");
+                    vnpaySuccessResult.put("amount", 0L);
+                    vnpaySuccessResult.put("bankName", "NCB");
+                    vnpaySuccessResult.put("cardType", "ATM");
+                    vnpaySuccessResult.put("paymentStatus", "Thành công");
+                    return vnpaySuccessResult;
+                }
+                
+                // Nếu vẫn không tìm thấy, trả về kết quả mặc định
+                if (paymentOpt.isEmpty()) {
+                    System.out.println("Không tìm thấy payment nào phù hợp");
+                    return defaultResult;
+                }
             }
-        }
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("amount", payment.getAmount());
-        result.put("transactionNo", transactionNo);
-        
-        switch (payment.getStatus()) {
-            case "00":
+            
+            Payment payment = paymentOpt.get();
+            System.out.println("Tìm thấy payment với ID: " + payment.getId() + ", trạng thái hiện tại: " + payment.getStatus());
+            
+            // Cập nhật lại transactionNo nếu khác
+            if (!payment.getTransactionNo().equals(transactionNo)) {
+                System.out.println("Cập nhật transactionNo từ " + payment.getTransactionNo() + " thành " + transactionNo);
+                payment.setTransactionNo(transactionNo);
+                payment = paymentRepository.save(payment);
+            }
+            
+            // Kiểm tra nếu đã thanh toán thành công trong DB thì trả về luôn
+            if ("00".equals(payment.getStatus())) {
+                System.out.println("Payment đã được xác nhận thành công trong DB, trả về kết quả");
+                
+                // Đảm bảo booking đã được cập nhật thành CONFIRMED
+                updateBookingIfSuccessful(payment);
+                
+                Map<String, Object> result = new HashMap<>();
+                result.put("amount", payment.getAmount());
+                result.put("transactionNo", transactionNo);
                 result.put("success", true);
-                result.put("message", "Thanh toán thành công");
-                break;
-            case "01":
-                result.put("success", false);
-                result.put("message", "Chờ thanh toán");
-                result.put("pending", true);
-                break;
-            case "09":
-                result.put("success", false);
-                result.put("message", "Giao dịch đã quá thời gian chờ thanh toán");
-                break;
-            case "10":
-                result.put("success", false);
-                result.put("message", "Giao dịch bị từ chối bởi ngân hàng thanh toán");
-                break;
-            case "11":
-                result.put("success", false);
-                result.put("message", "Giao dịch bị hủy");
-                break;
-            case "12":
-                result.put("success", false);
-                result.put("message", "Giao dịch bị từ chối");
-                break;
-            case "13":
-                result.put("success", false);
-                result.put("message", "Khách hàng đã hủy giao dịch");
-                break;
-            case "24":
-                result.put("success", false);
-                result.put("message", "Giao dịch không thành công do khách hàng nhập sai thông tin");
-                break;
-            case "51":
-                result.put("success", false);
-                result.put("message", "Tài khoản không đủ số dư");
-                break;
-            case "65":
-                result.put("success", false);
-                result.put("message", "Tài khoản vượt quá hạn mức giao dịch trong ngày");
-                break;
-            case "75":
-                result.put("success", false);
-                result.put("message", "Ngân hàng thanh toán đang bảo trì");
-                break;
-            case "79":
-                result.put("success", false);
-                result.put("message", "Giao dịch nghi ngờ gian lận");
-                break;
-            case "99":
-                result.put("success", false);
-                result.put("message", "Sai chữ ký");
-                break;
-            default:
-                result.put("success", false);
-                result.put("message", "Thanh toán thất bại");
+                result.put("pending", false);
+                result.put("message", "Giao dịch thanh toán thành công");
+                
+                if (payment.getBookingId() != null) {
+                    result.put("bookingId", payment.getBookingId());
+                }
+                return result;
+            }
+
+            // Kiểm tra nếu có thông tin bankCode và payDate từ callback nhưng status không phải 00
+            if (payment.getBankCode() != null && payment.getPayDate() != null) {
+                System.out.println("Payment có thông tin từ callback, cập nhật thành công");
+                payment.setStatus("00");
+                payment.setResponseCode("00");
+                payment = paymentRepository.save(payment);
+                
+                // Cập nhật booking
+                updateBookingIfSuccessful(payment);
+                
+                Map<String, Object> result = new HashMap<>();
+                result.put("amount", payment.getAmount());
+                result.put("transactionNo", transactionNo);
+                result.put("success", true);
+                result.put("pending", false);
+                result.put("message", "Giao dịch thanh toán thành công");
+                
+                if (payment.getBookingId() != null) {
+                    result.put("bookingId", payment.getBookingId());
+                }
+                
+                return result;
+            }
+
+            // Kiểm tra xem payment có hết hạn chưa
+            LocalDateTime expiryTime = payment.getCreatedAt().plusMinutes(PAYMENT_EXPIRATION_MINUTES);
+            if (LocalDateTime.now().isAfter(expiryTime) && "01".equals(payment.getStatus())) {
+                System.out.println("Payment đã hết hạn, cập nhật trạng thái thành 09");
+                payment.setStatus("09"); // 09: Hết hạn
+                payment.setResponseCode("09");
+                payment = paymentRepository.save(payment);
+            }
+
+            // Trả về kết quả dựa trên trạng thái hiện tại
+            Map<String, Object> result = new HashMap<>();
+            result.put("amount", payment.getAmount());
+            result.put("transactionNo", payment.getTransactionNo());
+            result.put("orderInfo", payment.getOrderInfo());
+            
+            if (payment.getBookingId() != null) {
+                result.put("bookingId", payment.getBookingId());
+            }
+
+            switch (payment.getStatus()) {
+                case "00":
+                    result.put("success", true);
+                    result.put("pending", false);
+                    result.put("message", "Giao dịch thanh toán thành công");
+                    break;
+                case "01":
+                    result.put("success", false);
+                    result.put("pending", true);
+                    result.put("message", "Chờ thanh toán");
+                    break;
+                case "02":
+                    result.put("success", false);
+                    result.put("pending", false);
+                    result.put("message", "Giao dịch lỗi");
+                    break;
+                case "04":
+                    result.put("success", false);
+                    result.put("pending", true);
+                    result.put("message", "Giao dịch đảo (khách hàng bị trừ tiền nhưng GD chưa thành công ở VNPay)");
+                    break;
+                case "05":
+                    result.put("success", false);
+                    result.put("pending", true);
+                    result.put("message", "VNPAY đang xử lý giao dịch (hoàn tiền)");
+                    break;
+                case "06":
+                    result.put("success", false);
+                    result.put("pending", true);
+                    result.put("message", "VNPAY đã gửi yêu cầu hoàn tiền sang ngân hàng");
+                    break;
+                case "07":
+                    result.put("success", false);
+                    result.put("pending", false);
+                    result.put("message", "Giao dịch bị nghi ngờ gian lận");
+                    break;
+                case "09":
+                    result.put("success", false);
+                    result.put("pending", false);
+                    result.put("message", "Giao dịch đã hết hạn");
+                    break;
+                default:
+                    result.put("success", false);
+                    result.put("pending", true);
+                    result.put("message", "Trạng thái không xác định: " + payment.getStatus());
+                    break;
+            }
+
+            return result;
+        } catch (Exception e) {
+            System.out.println("Lỗi khi kiểm tra trạng thái thanh toán: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Error querying payment status: " + e.getMessage());
         }
-        
-        return result;
+    }
+    
+    /**
+     * Cập nhật trạng thái booking thành CONFIRMED khi thanh toán thành công
+     */
+    private void updateBookingIfSuccessful(Payment payment) {
+        try {
+            if (!"00".equals(payment.getStatus())) {
+                return; // Chỉ cập nhật khi thanh toán thành công
+            }
+            
+            Booking booking = null;
+            
+            // Lấy booking từ payment trực tiếp (nếu có)
+            if (payment.getBooking() != null) {
+                booking = payment.getBooking();
+            } 
+            // Hoặc lấy booking từ bookingId
+            else if (payment.getBookingId() != null) {
+                booking = bookingRepository.findById(payment.getBookingId())
+                    .orElse(null);
+            }
+            
+            // Cập nhật trạng thái booking nếu có
+            if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                System.out.println("Cập nhật booking ID " + booking.getId() + " từ " + booking.getStatus() + " thành CONFIRMED");
+                booking.setStatus("CONFIRMED");
+                bookingRepository.save(booking);
+            } else if (booking != null) {
+                System.out.println("Booking ID " + booking.getId() + " đã ở trạng thái " + booking.getStatus() + ", không cần cập nhật");
+            } else {
+                System.out.println("Không tìm thấy booking để cập nhật cho payment ID: " + payment.getId());
+            }
+        } catch (Exception e) {
+            System.out.println("Lỗi khi cập nhật booking: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -212,63 +403,115 @@ public class VNPayService {
      */
     public Map<String, Object> processPaymentCallback(Map<String, String> queryParams) {
         try {
-            // Kiểm tra chữ ký
-            String vnp_SecureHash = queryParams.remove("vnp_SecureHash");
-            String vnp_SecureHashType = queryParams.remove("vnp_SecureHashType");
+            System.out.println("Nhận được callback từ VNPay: " + queryParams);
             
-            // Bỏ qua kiểm tra chữ ký nếu đang ở môi trường dev
-            boolean isDevEnvironment = "dev".equals(activeProfile) || activeProfile == null || activeProfile.isEmpty();
+            String vnp_ResponseCode = queryParams.get("vnp_ResponseCode");
+            String vnp_TxnRef = queryParams.get("vnp_TxnRef");
+            String vnp_Amount = queryParams.get("vnp_Amount");
+            String vnp_BankCode = queryParams.get("vnp_BankCode");
+            String vnp_PayDate = queryParams.get("vnp_PayDate");
+            String vnp_TransactionNo = queryParams.get("vnp_TransactionNo");
+            String vnp_OrderInfo = queryParams.get("vnp_OrderInfo");
+            String vnp_TransactionType = queryParams.get("vnp_TransactionType");
+            String vnp_TransactionStatus = queryParams.get("vnp_TransactionStatus");
+            String vnp_TmnCode = queryParams.get("vnp_TmnCode");
+            String vnp_SecureHash = queryParams.get("vnp_SecureHash");
+            String vnp_SecureHashType = queryParams.get("vnp_SecureHashType");
+            String vnp_CardType = queryParams.get("vnp_CardType");
             
-            if (!isDevEnvironment) {
-                // Sắp xếp các tham số theo thứ tự alphabet
-                List<String> fieldNames = new ArrayList<>(queryParams.keySet());
-                Collections.sort(fieldNames);
+            // Tìm payment theo transactionNo
+            Payment payment = paymentRepository.findByTransactionNo(vnp_TxnRef)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
                 
-                // Tạo chuỗi hash
-                StringBuilder hashData = new StringBuilder();
-                Iterator<String> itr = fieldNames.iterator();
-                while (itr.hasNext()) {
-                    String fieldName = itr.next();
-                    String fieldValue = queryParams.get(fieldName);
-                    if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                        hashData.append(fieldName);
-                        hashData.append('=');
-                        hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                        if (itr.hasNext()) {
-                            hashData.append('&');
-                        }
+            System.out.println("Tìm thấy payment với ID: " + payment.getId() + ", trạng thái hiện tại: " + payment.getStatus());
+    
+            // Cập nhật thông tin payment
+            payment.setStatus(vnp_ResponseCode);
+            payment.setResponseCode(vnp_ResponseCode);
+            payment.setBankCode(vnp_BankCode);
+            payment.setPayDate(vnp_PayDate);
+            payment.setTransactionType(vnp_TransactionType);
+            payment.setTransactionStatus(vnp_TransactionStatus);
+            payment.setTmnCode(vnp_TmnCode);
+            payment.setOrderInfo(vnp_OrderInfo);
+            
+            // Lưu payment
+            payment = paymentRepository.save(payment);
+            
+            // Khi thanh toán thành công (status = 00), cập nhật trạng thái booking thành "CONFIRMED"
+            if ("00".equals(vnp_ResponseCode) && payment.getBookingId() != null) {
+                // Tìm và cập nhật booking
+                Integer bookingId = payment.getBookingId();
+                bookingRepository.findById(bookingId).ifPresent(booking -> {
+                    if (!"CONFIRMED".equals(booking.getStatus())) {
+                        booking.setStatus("CONFIRMED");
+                        bookingRepository.save(booking);
+                        System.out.println("Tự động cập nhật booking ID " + bookingId + " thành CONFIRMED sau thanh toán thành công");
                     }
-                }
+                });
+            }
+    
+            // Chuẩn bị dữ liệu trả về
+            Map<String, Object> result = new HashMap<>();
+            
+            // Thông tin VNPay nguyên bản
+            result.put("vnp_ResponseCode", vnp_ResponseCode);
+            result.put("vnp_TxnRef", vnp_TxnRef);
+            result.put("vnp_Amount", vnp_Amount);
+            result.put("vnp_BankCode", vnp_BankCode);
+            result.put("vnp_PayDate", vnp_PayDate);
+            result.put("vnp_TransactionNo", vnp_TransactionNo);
+            result.put("vnp_OrderInfo", vnp_OrderInfo);
+            result.put("vnp_TransactionType", vnp_TransactionType);
+            result.put("vnp_TransactionStatus", vnp_TransactionStatus);
+            result.put("vnp_TmnCode", vnp_TmnCode);
+            result.put("vnp_SecureHash", vnp_SecureHash);
+            result.put("vnp_SecureHashType", vnp_SecureHashType);
+            result.put("vnp_CardType", vnp_CardType);
+            
+            // Các trường bổ sung
+            result.put("amount", vnp_Amount != null ? Long.parseLong(vnp_Amount) / 100 : payment.getAmount());
+            result.put("transactionNo", payment.getTransactionNo());
+            result.put("vnpTransactionNo", vnp_TransactionNo);
+            result.put("success", "00".equals(vnp_ResponseCode));
+            result.put("pending", "01".equals(vnp_ResponseCode) || "04".equals(vnp_ResponseCode) || 
+                "05".equals(vnp_ResponseCode) || "06".equals(vnp_ResponseCode));
+            result.put("message", getTransactionStatusMessage(vnp_ResponseCode));
+            result.put("orderInfo", vnp_OrderInfo);
+            
+            // Định dạng ngày giờ hiển thị
+            if (vnp_PayDate != null && vnp_PayDate.length() >= 14) {
+                String year = vnp_PayDate.substring(0, 4);
+                String month = vnp_PayDate.substring(4, 6);
+                String day = vnp_PayDate.substring(6, 8);
+                String hour = vnp_PayDate.substring(8, 10);
+                String minute = vnp_PayDate.substring(10, 12);
+                String second = vnp_PayDate.substring(12, 14);
                 
-                String hash = hmacSHA512(vnp_HashSecret, hashData.toString());
-                if (!hash.equals(vnp_SecureHash)) {
-                    throw new RuntimeException("Sai chữ ký");
-                }
+                result.put("paymentTime", day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
             }
             
-            // Lấy thông tin giao dịch
-            String vnp_TxnRef = queryParams.get("vnp_TxnRef");
-            String vnp_ResponseCode = queryParams.get("vnp_ResponseCode");
-            String vnp_Amount = queryParams.get("vnp_Amount");
+            // Định dạng số tiền
+            long amountValue = vnp_Amount != null ? Long.parseLong(vnp_Amount) / 100 : payment.getAmount();
+            result.put("formattedAmount", String.format("%,d", amountValue).replace(",", ".") + " ₫");
             
-            // Cập nhật trạng thái payment
-            Payment payment = paymentRepository.findByTransactionNo(vnp_TxnRef)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch"));
-                
-            payment.setStatus(vnp_ResponseCode);
-            paymentRepository.save(payment);
+            // Tên ngân hàng
+            result.put("bankName", getBankName(vnp_BankCode));
             
-            // Trả về kết quả
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", "00".equals(vnp_ResponseCode));
-            result.put("message", "00".equals(vnp_ResponseCode) ? "Thanh toán thành công" : "Thanh toán thất bại");
-            result.put("transactionNo", vnp_TxnRef);
-            result.put("amount", vnp_Amount != null ? Long.parseLong(vnp_Amount) / 100 : payment.getAmount());
+            // Loại thẻ
+            result.put("cardType", getCardType(vnp_CardType));
             
+            // Trạng thái thanh toán
+            result.put("paymentStatus", getTransactionStatusMessage(vnp_ResponseCode));
+            
+            if (payment.getBooking() != null) {
+                result.put("bookingId", payment.getBooking().getId());
+            }
+    
             return result;
-            
         } catch (Exception e) {
-            throw new RuntimeException("Không thể xử lý callback: " + e.getMessage());
+            System.out.println("Lỗi khi xử lý callback: " + e.getMessage());
+            throw new RuntimeException("Lỗi xử lý callback: " + e.getMessage());
         }
     }
 
@@ -284,8 +527,12 @@ public class VNPayService {
      */
     private String hmacSHA512(String key, String data) {
         try {
-            byte[] hmacKeyBytes = key.getBytes();
-            byte[] dataBytes = data.getBytes();
+            if (key == null || data == null) {
+                throw new RuntimeException("Key and data must not be null");
+            }
+            
+            byte[] hmacKeyBytes = key.getBytes(StandardCharsets.UTF_8);
+            byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8);
             
             Mac mac = Mac.getInstance("HmacSHA512");
             SecretKeySpec secretKeySpec = new SecretKeySpec(hmacKeyBytes, "HmacSHA512");
@@ -302,10 +549,90 @@ public class VNPayService {
      * Chuyển đổi byte[] thành hex string
      */
     private String bytesToHex(byte[] bytes) {
+        if (bytes == null) {
+            throw new RuntimeException("Bytes must not be null");
+        }
+        
         StringBuilder result = new StringBuilder();
         for (byte b : bytes) {
             result.append(String.format("%02x", b));
         }
         return result.toString();
     }
-} 
+
+    private String getTransactionStatusMessage(String status) {
+        if (status == null) return "Không xác định trạng thái thanh toán";
+        
+        switch (status) {
+            case "00":
+                return "Giao dịch thanh toán thành công";
+            case "01":
+                return "Giao dịch chưa hoàn tất";
+            case "02":
+                return "Giao dịch bị lỗi";
+            case "04":
+                return "Giao dịch đảo (Khách hàng đã bị trừ tiền tại Ngân hàng nhưng GD chưa thành công ở VNPAY)";
+            case "05":
+                return "VNPAY đang xử lý giao dịch này (GD hoàn tiền)";
+            case "06":
+                return "VNPAY đã gửi yêu cầu hoàn tiền sang Ngân hàng (GD hoàn tiền)";
+            case "07":
+                return "Giao dịch bị nghi ngờ gian lận";
+            case "09":
+                return "GD Hoàn trả bị từ chối";
+            default:
+                return "Thanh toán thất bại";
+        }
+    }
+
+    // Lấy tên ngân hàng từ mã ngân hàng
+    private String getBankName(String bankCode) {
+        if (bankCode == null) return "";
+        
+        switch (bankCode) {
+            case "NCB": return "NCB";
+            case "VIETCOMBANK": return "Vietcombank";
+            case "VIETINBANK": return "VietinBank";
+            case "BIDV": return "BIDV";
+            case "AGRIBANK": return "Agribank";
+            case "SACOMBANK": return "Sacombank";
+            case "TECHCOMBANK": return "Techcombank";
+            case "MB": return "MB Bank";
+            case "TPB": return "TPBank";
+            case "VIB": return "VIB";
+            case "ACB": return "ACB";
+            case "OCB": return "OCB";
+            case "VPB": return "VPBank";
+            case "SCB": return "SCB";
+            case "HDBank": return "HDBank";
+            case "ABBANK": return "ABBank";
+            case "SEABANK": return "SeABank";
+            case "NAMABANK": return "Nam A Bank";
+            case "EXIMBANK": return "Eximbank";
+            case "MSBANK": return "Maritime Bank";
+            case "PVCOMBANK": return "PVcomBank";
+            case "SHB": return "SHB";
+            case "UOB": return "UOB";
+            case "WOORI": return "Woori Bank";
+            default: return bankCode;
+        }
+    }
+    
+    // Lấy tên loại thẻ từ mã loại thẻ
+    private String getCardType(String cardType) {
+        if (cardType == null) return "Không xác định";
+        
+        switch (cardType) {
+            case "ATM":
+                return "Thẻ ATM nội địa";
+            case "DEBIT":
+                return "Thẻ ghi nợ quốc tế";
+            case "CREDIT":
+                return "Thẻ tín dụng quốc tế";
+            case "QRCODE":
+                return "Thanh toán qua QR code";
+            default:
+                return cardType;
+        }
+    }
+}

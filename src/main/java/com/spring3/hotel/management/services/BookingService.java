@@ -7,6 +7,7 @@ import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface BookingService {
     List<NewBookingResponse> getRecentBookings();
@@ -20,4 +21,8 @@ public interface BookingService {
     List<BookingResponseDTO> getBookingsByDateRange(LocalDate startDate, LocalDate endDate);
     BookingResponseDTO confirmBooking(Integer id);
     List<RoomListResponseDTO> getBookedRoomsByDateRange(LocalDate startDate, LocalDate endDate);
+    
+    // Phương thức mới
+    Map<String, Object> getBookingPaymentInfo(Integer bookingId);
+    List<BookingResponseDTO> getConfirmedBookingsByDateRange(LocalDate startDate, LocalDate endDate);
 }

@@ -12,4 +12,5 @@ public class PaymentResponse {
     private String transactionNo;
     private Long amount;
     private String orderInfo;
+    private Integer bookingId;
 }

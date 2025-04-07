@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.util.List;
 
 @Getter
 @Setter
@@ -13,6 +14,6 @@ public class RoomListResponseDTO {
     private Integer roomId;
     private String roomNumber;
     private String roomType;
-    private String imagePath;
     private Double price;
+    private List<String> images;
 }

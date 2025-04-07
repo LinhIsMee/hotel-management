@@ -34,4 +34,8 @@ public class UpsertBookingRequest {
     private LocalDate paymentDate;
     private String specialRequests;
     private List<String> additionalServices;
+    
+    // Thêm trường cho thanh toán kết hợp
+    private String ipAddress;
+    private String returnUrl;
 }

@@ -187,7 +187,7 @@ public class DataInitializer implements CommandLineRunner {
         // Khởi tạo dữ liệu phòng nếu chưa có
         if (roomRepository.count() < 10) {
             log.info("Khởi tạo lại dữ liệu phòng với ảnh mới...");
-            roomService.initRoomsFromJson();
+                roomService.initRoomsFromJson();
             log.info("Đã hoàn thành khởi tạo dữ liệu phòng.");
         } else {
             log.info("Đã có {} phòng trong cơ sở dữ liệu, bỏ qua khởi tạo.", roomRepository.count());

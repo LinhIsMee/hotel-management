@@ -247,4 +247,61 @@ public class BookingUserController {
             return ResponseEntity.badRequest().body(Map.of("message", "Lỗi khi tạo booking test: " + e.getMessage()));
         }
     }
+
+    // API lấy chi tiết đơn đặt phòng kèm thông tin thanh toán, không cần xác thực để dùng cho trang thanh toán
+    @GetMapping("/detail/{id}")
+    public ResponseEntity<?> getBookingDetail(@PathVariable Integer id) {
+        try {
+            // Lấy thông tin booking
+            BookingResponseDTO booking = bookingService.getBookingById(id);
+            if (booking == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Không tìm thấy đơn đặt phòng với mã " + id));
+            }
+            
+            // Lấy thông tin thanh toán
+            Map<String, Object> paymentInfo = bookingService.getBookingPaymentInfo(id);
+            
+            // Tạo response
+            Map<String, Object> result = new HashMap<>();
+            result.put("booking", booking);
+            result.put("payment", paymentInfo);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Lỗi khi lấy thông tin chi tiết đơn đặt: " + e.getMessage()));
+        }
+    }
+    
+    // API lấy danh sách tất cả các đơn đặt phòng đã xác nhận, không cần xác thực
+    @GetMapping("/list-confirmed")
+    public ResponseEntity<?> getConfirmedBookings(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            // Nếu không có startDate, lấy ngày hiện tại
+            if (startDate == null) {
+                startDate = LocalDate.now();
+            }
+            
+            // Nếu không có endDate, lấy 30 ngày tính từ startDate
+            if (endDate == null) {
+                endDate = startDate.plusDays(30);
+            }
+            
+            // Lấy danh sách booking đã xác nhận
+            List<BookingResponseDTO> bookings = bookingService.getConfirmedBookingsByDateRange(startDate, endDate);
+            
+            return ResponseEntity.ok(Map.of(
+                "bookings", bookings,
+                "startDate", startDate,
+                "endDate", endDate,
+                "count", bookings.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Lỗi khi lấy danh sách đơn đặt phòng: " + e.getMessage()));
+        }
+    }
 } 

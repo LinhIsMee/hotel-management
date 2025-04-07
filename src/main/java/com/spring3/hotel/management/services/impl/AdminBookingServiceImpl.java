@@ -60,10 +60,14 @@ public class AdminBookingServiceImpl implements AdminBookingService {
 
     @Override
     public List<BookingResponseDTO> getAllBookings() {
-        return bookingRepository.findAll()
-                .stream()
-                .map(this::convertToBookingResponseDTO)
-                .toList();
+        try {
+            List<Booking> bookings = bookingRepository.findAll();
+            return bookings.stream()
+                    .map(this::convertToBookingResponseDTO)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
+        }
     }
 
     @Override
@@ -347,7 +351,20 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         // Lấy danh sách phòng từ booking_details
         List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
         dto.setRooms(bookingDetails.stream()
-                .map(bookingDetail -> convertToRoomListResponseDTO(bookingDetail.getRoom()))
+                .map(detail -> {
+                    RoomListResponseDTO roomDto = convertToRoomListResponseDTO(detail.getRoom());
+                    // Ghi đè giá phòng từ booking detail
+                    if (detail.getPrice() != null) {
+                        roomDto.setPrice(detail.getPrice());
+                    } else {
+                        // Tính giá dựa vào số ngày ở
+                        long days = java.time.temporal.ChronoUnit.DAYS.between(
+                                booking.getCheckInDate(), booking.getCheckOutDate());
+                        if (days < 1) days = 1;
+                        roomDto.setPrice(detail.getRoom().getRoomType().getPricePerNight() * days);
+                    }
+                    return roomDto;
+                })
                 .toList());
         
         dto.setCheckInDate(booking.getCheckInDate());
@@ -357,28 +374,77 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         // Calculate final price
         double finalPrice = booking.getTotalPrice();
         if (booking.getDiscount() != null) {
-            dto.setDiscountCode(booking.getDiscount().getCode());
-            dto.setDiscountValue(booking.getDiscount().getDiscountValue());
-            dto.setDiscountType(booking.getDiscount().getDiscountType());
-            
-            // Tính giá sau khi giảm giá
-            if ("PERCENT".equals(booking.getDiscount().getDiscountType())) {
-                finalPrice = finalPrice * (1 - booking.getDiscount().getDiscountValue() / 100);
-            } else if ("FIXED".equals(booking.getDiscount().getDiscountType())) {
-                finalPrice = finalPrice - booking.getDiscount().getDiscountValue();
-                if (finalPrice < 0) finalPrice = 0;
+            Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
+            if (discount != null) {
+                dto.setDiscountCode(discount.getCode());
+                dto.setDiscountValue(discount.getDiscountValue());
+                dto.setDiscountType(discount.getDiscountType());
+                
+                // Tính giá sau khi giảm giá
+                if ("PERCENT".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+                } else if ("FIXED".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice - discount.getDiscountValue();
+                    if (finalPrice < 0) finalPrice = 0;
+                }
             }
         }
         dto.setFinalPrice(finalPrice);
         
-        dto.setStatus(booking.getStatus());
-        
-        // Thông tin thanh toán
-        paymentRepository.findByBookingId(booking.getId()).ifPresent(payment -> {
+        // Thông tin thanh toán - lấy payment mới nhất và đầy đủ
+        List<Payment> payments = paymentRepository.findAllByBookingId(booking.getId());
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(payments.size() - 1); // Lấy payment mới nhất
+            
+            // Kiểm tra và đồng bộ trạng thái booking với payment
+            if ("00".equals(payment.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
+                // Nếu payment thành công (00) nhưng booking chưa được xác nhận
+                // Cập nhật trạng thái booking thành CONFIRMED
+                booking.setStatus("CONFIRMED");
+                bookingRepository.save(booking);
+            }
+            
+            // Set thông tin payment cơ bản
             dto.setPaymentMethod(payment.getMethod());
             dto.setPaymentStatus(payment.getStatus());
             dto.setPaymentDate(payment.getPayDate());
-        });
+            
+            // Bổ sung thêm thông tin chi tiết payment
+            dto.setTransactionNo(payment.getTransactionNo());
+            dto.setAmount(payment.getAmount());
+            dto.setBankCode(payment.getBankCode());
+            
+            // Đặt success và pending dựa vào trạng thái payment
+            String transactionStatus = payment.getStatus();
+            dto.setPaymentSuccess("00".equals(transactionStatus));
+            dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
+                "05".equals(transactionStatus) || "06".equals(transactionStatus));
+            
+            // Định dạng số tiền và thời gian
+            if (payment.getAmount() != null) {
+                dto.setFormattedAmount(String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
+            }
+            
+            // Định dạng thời gian thanh toán
+            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
+                String payDate = payment.getPayDate();
+                try {
+                    String year = payDate.substring(0, 4);
+                    String month = payDate.substring(4, 6);
+                    String day = payDate.substring(6, 8);
+                    String hour = payDate.substring(8, 10);
+                    String minute = payDate.substring(10, 12);
+                    String second = payDate.substring(12, 14);
+                    
+                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
+                } catch (Exception e) {
+                    System.out.println("Lỗi khi định dạng ngày thanh toán: " + e.getMessage());
+                }
+            }
+        }
+        
+        // Cập nhật trạng thái dựa trên giá trị đã đồng bộ
+        dto.setStatus(booking.getStatus());
         
         // Format createdAt
         if (booking.getCreatedAt() != null) {
@@ -408,12 +474,10 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setRoomId(room.getId());
         dto.setRoomNumber(room.getRoomNumber());
         dto.setRoomType(room.getRoomType().getName());
-        dto.setPrice(room.getRoomType().getBasePrice());
+        dto.setPrice(room.getRoomType().getPricePerNight()); // Giá cơ bản theo đêm
         
-        // Lấy ảnh đầu tiên của phòng nếu có
-        if (room.getImages() != null && !room.getImages().isEmpty()) {
-            dto.setImagePath(room.getImages().get(0));
-        }
+        // Lấy danh sách ảnh của phòng
+        dto.setImages(room.getImages());
         
         return dto;
     }

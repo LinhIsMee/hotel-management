@@ -23,6 +23,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
 
     Optional<Payment> findByBookingId(Integer id);
 
+    // Lấy 10 payment gần đây nhất theo thời gian tạo
+    List<Payment> findTop10ByOrderByCreatedAtDesc();
+
     @Modifying
     @Transactional
     void deleteByBookingId(Integer bookingId);

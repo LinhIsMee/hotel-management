@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDate;
 
 @Repository
 public interface BookingDetailRepository extends JpaRepository<BookingDetail, Integer> {
@@ -19,6 +20,8 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, In
     List<BookingDetailResponse> findBookingDetailsByBooking_Id(Integer bookingId);
 
     List<BookingDetail> findAllByBooking_Id(Integer bookingId);
+    
+    List<BookingDetail> findAllByRoom_Id(Integer roomId);
     
     @Modifying
     @Transactional
@@ -28,4 +31,13 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, In
     // Tính doanh thu theo loại phòng trong khoảng thời gian
     @Query("SELECT SUM(bd.pricePerNight) FROM BookingDetail bd WHERE bd.room.roomType.id = :roomTypeId AND bd.booking.createdAt BETWEEN :startDate AND :endDate")
     Double calculateRevenueByRoomTypeAndDateRange(@Param("roomTypeId") Integer roomTypeId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT bd FROM BookingDetail bd " +
+           "WHERE bd.room.id = :roomId " +
+           "AND bd.booking.checkInDate <= :checkOutDate " +
+           "AND bd.booking.checkOutDate >= :checkInDate")
+    List<BookingDetail> findByRoomIdAndDateRange(
+            @Param("roomId") Integer roomId,
+            @Param("checkInDate") LocalDate checkInDate,
+            @Param("checkOutDate") LocalDate checkOutDate);
 }

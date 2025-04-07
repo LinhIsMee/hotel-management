@@ -30,7 +30,7 @@ public class PaymentMockController {
     @GetMapping("/create")
     public ResponseEntity<?> createMockPayment() {
         String transactionNo = String.valueOf(System.currentTimeMillis() % 100000000);
-        String mockedPaymentUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=100000000&vnp_Command=pay&vnp_CreateDate=20250405175217&vnp_CurrCode=VND&vnp_ExpireDate=20250405180717&vnp_IpAddr=127.0.0.1&vnp_Locale=vn&vnp_OrderInfo=Thanh+toan+test&vnp_OrderType=other&vnp_ReturnUrl=http%3A%2F%2Flocalhost%3A9898%2Fapi%2Fv1%2Fpayment%2Fcallback-html&vnp_TmnCode=M7LG94H1&vnp_TxnRef=" + transactionNo + "&vnp_Version=2.1.0&vnp_SecureHash=6c27b679fd4d9d486c21ddfde020ba6a4404cf80f58f2bf40f16d0a9e18c11d50b0b8b3ef30af07d4e7e2c014819e76dca59843bd4524e6d8ce1f9376f620bee";
+        String mockedPaymentUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=100000000&vnp_Command=pay&vnp_CreateDate=20250405175217&vnp_CurrCode=VND&vnp_ExpireDate=20250405180717&vnp_IpAddr=127.0.0.1&vnp_Locale=vn&vnp_OrderInfo=Thanh+toan+test&vnp_OrderType=other&vnp_ReturnUrl=http%3A%2F%2Flocalhost%3A9000%2Fapi%2Fv1%2Fpayment%2Fcallback-html&vnp_TmnCode=M7LG94H1&vnp_TxnRef=" + transactionNo + "&vnp_Version=2.1.0&vnp_SecureHash=6c27b679fd4d9d486c21ddfde020ba6a4404cf80f58f2bf40f16d0a9e18c11d50b0b8b3ef30af07d4e7e2c014819e76dca59843bd4524e6d8ce1f9376f620bee";
         
         // Tạo payment record mẫu
         Payment payment = new Payment();
@@ -70,7 +70,7 @@ public class PaymentMockController {
             booking.getTotalPrice().longValue() * 100 + 
             "&vnp_Command=pay&vnp_CreateDate=20250405175217&vnp_CurrCode=VND&vnp_ExpireDate=20250405180717&vnp_IpAddr=127.0.0.1&vnp_Locale=vn&vnp_OrderInfo=Thanh+toan+dat+phong+" + 
             bookingId + 
-            "&vnp_OrderType=other&vnp_ReturnUrl=http%3A%2F%2Flocalhost%3A9898%2Fapi%2Fv1%2Fpayment%2Fcallback-html&vnp_TmnCode=M7LG94H1&vnp_TxnRef=" + 
+            "&vnp_OrderType=other&vnp_ReturnUrl=http%3A%2F%2Flocalhost%3A9000%2Fapi%2Fv1%2Fpayment%2Fcallback-html&vnp_TmnCode=M7LG94H1&vnp_TxnRef=" + 
             transactionNo + 
             "&vnp_Version=2.1.0&vnp_SecureHash=6c27b679fd4d9d486c21ddfde020ba6a4404cf80f58f2bf40f16d0a9e18c11d50b0b8b3ef30af07d4e7e2c014819e76dca59843bd4524e6d8ce1f9376f620bee";
         
