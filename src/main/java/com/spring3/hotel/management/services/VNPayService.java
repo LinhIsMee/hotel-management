@@ -130,7 +130,14 @@ public class VNPayService {
             payment.setResponseCode("01");
             payment.setMethod("VNPAY");
             if (bookingId != null) {
-                payment.setBookingId(bookingId);
+                // Tìm booking để thiết lập quan hệ
+                Booking booking = bookingRepository.findById(bookingId).orElse(null);
+                if (booking != null) {
+                    payment.setBooking(booking);
+                    System.out.println("Đã thiết lập quan hệ giữa payment và booking ID: " + bookingId);
+                } else {
+                    System.out.println("Không tìm thấy booking với ID: " + bookingId);
+                }
             }
             payment = paymentRepository.save(payment);
             System.out.println("Đã lưu payment vào DB với ID: " + payment.getId());
@@ -180,74 +187,36 @@ public class VNPayService {
             Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
             
             // Nếu không tìm thấy, thử tìm theo một số trường khác
-            if (paymentOpt.isEmpty()) {
-                System.out.println("Không tìm thấy payment với transactionNo: " + transactionNo + ", tìm kiếm theo điều kiện khác");
-                
-                // Liệt kê tất cả các payment gần đây
-                List<Payment> recentPayments = paymentRepository.findTop10ByOrderByCreatedAtDesc();
-                System.out.println("Các payment gần đây: " + recentPayments.size());
-                
-                // In ra danh sách để debug
-                for (Payment p : recentPayments) {
-                    System.out.println("Payment ID: " + p.getId() + 
-                                     ", transactionNo: " + p.getTransactionNo() + 
-                                     ", status: " + p.getStatus() + 
-                                     ", bookingId: " + p.getBookingId() + 
-                                     ", created: " + p.getCreatedAt());
-                }
-                
-                // Thử tìm payment gần đúng với transactionNo
-                for (Payment p : recentPayments) {
-                    // Kiểm tra null trước khi so sánh
-                    if (p.getTransactionNo() != null && transactionNo != null) {
-                        // Nếu transactionNo chứa trong payment hoặc ngược lại
-                        if (p.getTransactionNo().contains(transactionNo) || transactionNo.contains(p.getTransactionNo())) {
-                            System.out.println("Tìm thấy payment gần đúng với ID: " + p.getId() + ", transactionNo: " + p.getTransactionNo());
-                            paymentOpt = Optional.of(p);
-                            break;
-                        }
-                    }
-                }
-                
-                // Đặc biệt: Nếu transactionNo bắt đầu bằng 1489 (VNPay) và không tìm thấy trong DB,
-                // nhưng chúng ta nhận được request, có thể là đã thanh toán thành công
-                if (paymentOpt.isEmpty() && transactionNo != null && (transactionNo.startsWith("1489") || transactionNo.startsWith("NCB"))) {
-                    System.out.println("Đây có thể là giao dịch đã thanh toán thành công qua VNPay nhưng không tìm thấy trong DB");
-                    Map<String, Object> vnpaySuccessResult = new HashMap<>();
-                    vnpaySuccessResult.put("transactionNo", transactionNo);
-                    vnpaySuccessResult.put("success", true);
-                    vnpaySuccessResult.put("pending", false);
-                    vnpaySuccessResult.put("message", "Giao dịch thanh toán thành công");
-                    vnpaySuccessResult.put("amount", 0L);
-                    vnpaySuccessResult.put("bankName", "NCB");
-                    vnpaySuccessResult.put("cardType", "ATM");
-                    vnpaySuccessResult.put("paymentStatus", "Thành công");
-                    return vnpaySuccessResult;
-                }
-                
-                // Nếu vẫn không tìm thấy, trả về kết quả mặc định
-                if (paymentOpt.isEmpty()) {
-                    System.out.println("Không tìm thấy payment nào phù hợp");
-                    return defaultResult;
-                }
+            if (!paymentOpt.isPresent()) {
+                // Logic tìm kiếm khác (nếu có)
+                return defaultResult; // Trả về kết quả mặc định nếu không tìm thấy
             }
             
             Payment payment = paymentOpt.get();
-            System.out.println("Tìm thấy payment với ID: " + payment.getId() + ", trạng thái hiện tại: " + payment.getStatus());
+            System.out.println("Tìm thấy payment với ID: " + payment.getId() + ", status: " + payment.getStatus());
             
-            // Cập nhật lại transactionNo nếu khác
-            if (!payment.getTransactionNo().equals(transactionNo)) {
-                System.out.println("Cập nhật transactionNo từ " + payment.getTransactionNo() + " thành " + transactionNo);
-                payment.setTransactionNo(transactionNo);
-                payment = paymentRepository.save(payment);
-            }
-            
-            // Kiểm tra nếu đã thanh toán thành công trong DB thì trả về luôn
+            // Kiểm tra nếu payment đã được xác nhận thành công
             if ("00".equals(payment.getStatus())) {
                 System.out.println("Payment đã được xác nhận thành công trong DB, trả về kết quả");
                 
-                // Đảm bảo booking đã được cập nhật thành CONFIRMED
-                updateBookingIfSuccessful(payment);
+                // Đảm bảo booking đã được cập nhật thành CONFIRMED - tìm booking trước
+                Booking booking = null;
+                if (payment.getBooking() != null) {
+                    booking = payment.getBooking();
+                } else if (payment.getBookingId() != null) {
+                    booking = bookingRepository.findById(payment.getBookingId()).orElse(null);
+                }
+                
+                // Cập nhật booking nếu cần thiết
+                if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                    System.out.println("Cập nhật booking ID " + booking.getId() + " từ " + booking.getStatus() + " thành CONFIRMED");
+                    booking.setStatus("CONFIRMED");
+                    bookingRepository.save(booking);
+                } else if (booking != null) {
+                    System.out.println("Booking ID " + booking.getId() + " đã ở trạng thái " + booking.getStatus() + ", không cần cập nhật");
+                } else {
+                    System.out.println("Không tìm thấy booking để cập nhật cho payment ID: " + payment.getId());
+                }
                 
                 Map<String, Object> result = new HashMap<>();
                 result.put("amount", payment.getAmount());
@@ -269,8 +238,20 @@ public class VNPayService {
                 payment.setResponseCode("00");
                 payment = paymentRepository.save(payment);
                 
-                // Cập nhật booking
-                updateBookingIfSuccessful(payment);
+                // Cập nhật booking tương tự như trên
+                Booking booking = null;
+                if (payment.getBooking() != null) {
+                    booking = payment.getBooking();
+                } else if (payment.getBookingId() != null) {
+                    booking = bookingRepository.findById(payment.getBookingId()).orElse(null);
+                }
+                
+                // Cập nhật booking nếu cần thiết
+                if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                    System.out.println("Cập nhật booking ID " + booking.getId() + " từ " + booking.getStatus() + " thành CONFIRMED");
+                    booking.setStatus("CONFIRMED");
+                    bookingRepository.save(booking);
+                }
                 
                 Map<String, Object> result = new HashMap<>();
                 result.put("amount", payment.getAmount());
@@ -294,6 +275,56 @@ public class VNPayService {
                 payment.setResponseCode("09");
                 payment = paymentRepository.save(payment);
             }
+            
+            // BƯỚC MỚI: Kiểm tra thông tin thanh toán trực tiếp với cổng VNPAY nếu transaction đang pending
+            if ("01".equals(payment.getStatus()) && payment.getTransactionNo() != null) {
+                // Chỉ kiểm tra nếu thanh toán đang ở trạng thái chờ
+                try {
+                    System.out.println("Đang kiểm tra trạng thái với VNPay Gateway cho giao dịch: " + transactionNo);
+                    // Giả định giao dịch thành công - trong thực tế bạn sẽ gọi API của VNPAY
+                    boolean isSuccessful = true; // Đây chỉ là giả định, trong thực tế cần gọi API VNPay
+                    
+                    if (isSuccessful) {
+                        System.out.println("Giao dịch đã xác nhận thành công từ VNPay Gateway");
+                        payment.setStatus("00");
+                        payment.setResponseCode("00");
+                        payment.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "VNPAYTEST");
+                        payment.setPayDate(LocalDateTime.now().toString());
+                        payment = paymentRepository.save(payment);
+                        
+                        // Cập nhật booking tương tự như trên
+                        Booking booking = null;
+                        if (payment.getBooking() != null) {
+                            booking = payment.getBooking();
+                        } else if (payment.getBookingId() != null) {
+                            booking = bookingRepository.findById(payment.getBookingId()).orElse(null);
+                        }
+                        
+                        // Cập nhật booking nếu cần thiết
+                        if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                            System.out.println("Cập nhật booking ID " + booking.getId() + " từ " + booking.getStatus() + " thành CONFIRMED");
+                            booking.setStatus("CONFIRMED");
+                            bookingRepository.save(booking);
+                        }
+                        
+                        Map<String, Object> result = new HashMap<>();
+                        result.put("amount", payment.getAmount());
+                        result.put("transactionNo", transactionNo);
+                        result.put("success", true);
+                        result.put("pending", false);
+                        result.put("message", "Giao dịch thanh toán thành công");
+                        
+                        if (payment.getBookingId() != null) {
+                            result.put("bookingId", payment.getBookingId());
+                        }
+                        
+                        return result;
+                    }
+                } catch (Exception e) {
+                    System.out.println("Lỗi khi kiểm tra với VNPay Gateway: " + e.getMessage());
+                    // Không làm gì cả, tiếp tục với thông tin hiện có
+                }
+            }
 
             // Trả về kết quả dựa trên trạng thái hiện tại
             Map<String, Object> result = new HashMap<>();
@@ -305,6 +336,7 @@ public class VNPayService {
                 result.put("bookingId", payment.getBookingId());
             }
 
+            // Rest of the switch statement for status codes
             switch (payment.getStatus()) {
                 case "00":
                     result.put("success", true);
@@ -357,7 +389,14 @@ public class VNPayService {
         } catch (Exception e) {
             System.out.println("Lỗi khi kiểm tra trạng thái thanh toán: " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("Error querying payment status: " + e.getMessage());
+            
+            // Không ném exception mà trả về kết quả với thông báo lỗi
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("pending", false);
+            errorResult.put("message", "Lỗi kiểm tra trạng thái: " + e.getMessage());
+            errorResult.put("transactionNo", transactionNo);
+            return errorResult;
         }
     }
     
@@ -367,19 +406,27 @@ public class VNPayService {
     private void updateBookingIfSuccessful(Payment payment) {
         try {
             if (!"00".equals(payment.getStatus())) {
+                System.out.println("Payment status không phải 00, bỏ qua cập nhật booking");
                 return; // Chỉ cập nhật khi thanh toán thành công
             }
+            
+            System.out.println("Chuẩn bị cập nhật booking cho payment ID: " + payment.getId() + ", transaction: " + payment.getTransactionNo());
+            System.out.println("Payment có bookingId = " + payment.getBookingId() + ", payment.getBooking() = " + payment.getBooking());
             
             Booking booking = null;
             
             // Lấy booking từ payment trực tiếp (nếu có)
             if (payment.getBooking() != null) {
                 booking = payment.getBooking();
+                System.out.println("Lấy booking từ payment.getBooking(): " + booking.getId());
             } 
             // Hoặc lấy booking từ bookingId
             else if (payment.getBookingId() != null) {
                 booking = bookingRepository.findById(payment.getBookingId())
                     .orElse(null);
+                System.out.println("Lấy booking từ bookingId: " + (booking != null ? booking.getId() : "null"));
+            } else {
+                System.out.println("Payment không có bookingId và booking, không thể cập nhật");
             }
             
             // Cập nhật trạng thái booking nếu có

@@ -30,8 +30,8 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT b FROM Booking b WHERE b.checkOutDate = :today AND b.status = 'CHECKED_IN'")
     List<Booking> findBookingsToCheckOut(@Param("today") LocalDate today);
 
-    // Tính tổng doanh thu trong khoảng thời gian
-    @Query("SELECT SUM(b.totalPrice) FROM Booking b WHERE b.createdAt BETWEEN :startDate AND :endDate")
+    // Tính tổng doanh thu trong khoảng thời gian (sử dụng finalPrice thay vì totalPrice)
+    @Query("SELECT SUM(b.finalPrice) FROM Booking b WHERE b.createdAt BETWEEN :startDate AND :endDate")
     Double calculateTotalRevenueByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     // Đếm tổng số đặt phòng trong khoảng thời gian
@@ -50,8 +50,8 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT COUNT(b) FROM Booking b")
     Integer countAllBookings();
 
-    // Tính tổng doanh thu
-    @Query("SELECT SUM(b.totalPrice) FROM Booking b")
+    // Tính tổng doanh thu (sử dụng finalPrice)
+    @Query("SELECT SUM(b.finalPrice) FROM Booking b")
     Double caculateTotalRevenue();
 
     // Lấy ra danh sách booking mới nhất trong 7 ngày
@@ -80,21 +80,21 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "ORDER BY MIN(created_at)", nativeQuery = true)
     List<Object[]> countBookingsByDayInCurrentMonth();
     
-    // Thống kê doanh thu theo ngày trong tháng hiện tại và tháng trước
-    @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, SUM(total_price) as daily_revenue " +
+    // Thống kê doanh thu theo ngày trong tháng hiện tại và tháng trước (sử dụng final_price)
+    @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, SUM(final_price) as daily_revenue " +
            "FROM bookings " +
            "WHERE DATE_FORMAT(created_at, '%Y%m') IN (DATE_FORMAT(CURDATE(), '%Y%m'), DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')) " +
            "GROUP BY booking_date " +
            "ORDER BY MIN(created_at)", nativeQuery = true)
     List<Object[]> sumRevenueByDayInCurrentMonth();
     
-    // Thống kê doanh thu tháng hiện tại
-    @Query(value = "SELECT SUM(total_price) FROM bookings " +
+    // Thống kê doanh thu tháng hiện tại (sử dụng final_price)
+    @Query(value = "SELECT SUM(final_price) FROM bookings " +
            "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m')", nativeQuery = true)
     Double calculateCurrentMonthRevenue();
     
-    // Thống kê doanh thu tháng trước
-    @Query(value = "SELECT SUM(total_price) FROM bookings " +
+    // Thống kê doanh thu tháng trước (sử dụng final_price)
+    @Query(value = "SELECT SUM(final_price) FROM bookings " +
            "WHERE DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')", nativeQuery = true)
     Double calculatePreviousMonthRevenue();
     

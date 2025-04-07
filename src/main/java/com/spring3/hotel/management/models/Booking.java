@@ -34,6 +34,9 @@ public class Booking {
 
     @Column(name = "total_price", nullable = false)
     private Double totalPrice;
+    
+    @Column(name = "final_price")
+    private Double finalPrice;
 
     @ManyToOne
     @JoinColumn(name = "discount_id")

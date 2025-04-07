@@ -53,8 +53,9 @@ public class Payment {
     @JoinColumn(name = "booking_id")
     private Booking booking;
 
-    @Column(name = "booking_id", insertable = false, updatable = false)
-    private Integer bookingId;
+    public Integer getBookingId() {
+        return booking != null ? booking.getId() : null;
+    }
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

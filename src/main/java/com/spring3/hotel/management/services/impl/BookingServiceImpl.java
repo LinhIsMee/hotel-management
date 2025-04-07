@@ -72,92 +72,88 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponseDTO createBooking(UpsertBookingRequest request) {
-        // Kiểm tra tính hợp lệ của ngày
+        // Kiểm tra xem có user không
+        if (request.getUserId() == null) {
+            throw new RuntimeException("User ID is required");
+        }
+        
+        // Kiểm tra xem có danh sách phòng được chọn không
+        if (request.getRoomIds() == null || request.getRoomIds().isEmpty()) {
+            throw new RuntimeException("At least one room must be selected");
+        }
+        
+        // Kiểm tra ngày check-in và check-out
         if (request.getCheckInDate() == null || request.getCheckOutDate() == null) {
-            throw new IllegalArgumentException("Ngày nhận phòng và trả phòng không được để trống");
+            throw new RuntimeException("Check-in and check-out dates are required");
         }
         
-        if (request.getCheckInDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("Ngày nhận phòng không thể là ngày trong quá khứ");
+        if (!request.getCheckOutDate().isAfter(request.getCheckInDate())) {
+            throw new RuntimeException("Check-out date must be after check-in date");
         }
         
-        if (request.getCheckOutDate().isBefore(request.getCheckInDate())) {
-            throw new IllegalArgumentException("Ngày trả phòng phải sau ngày nhận phòng");
-        }
+        // Tìm user
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + request.getUserId()));
         
+        // Kiểm tra xem phòng có sẵn không
+        checkRoomAvailability(request.getRoomIds(), request.getCheckInDate(), request.getCheckOutDate());
+        
+        // Tạo mới booking
         Booking booking = new Booking();
-        
-        // Kiểm tra userId và lấy thông tin user
-        if (request.getUserId() != null) {
-            User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            booking.setUser(user);
-        } else {
-            throw new RuntimeException("userId không được để trống");
-        }
-        
+        booking.setUser(user);
         booking.setCheckInDate(request.getCheckInDate());
         booking.setCheckOutDate(request.getCheckOutDate());
-        booking.setTotalPrice(request.getTotalPrice());
         
-        // Xử lý trường hợp discountId là null
-        if (request.getDiscountId() != null) {
-            Discount discount = discountRepository.findDiscountById(request.getDiscountId());
-            booking.setDiscount(discount);
+        // Tính tổng giá phòng nếu không được chỉ định
+        if (request.getTotalPrice() == null) {
+            double totalPrice = 0;
+            long stayDuration = java.time.temporal.ChronoUnit.DAYS.between(
+                    request.getCheckInDate(), request.getCheckOutDate());
+            if (stayDuration < 1) stayDuration = 1;
+            
+            for (Integer roomId : request.getRoomIds()) {
+                Room room = roomRepository.findById(roomId)
+                    .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+                totalPrice += room.getRoomType().getBasePrice() * stayDuration;
+            }
+            booking.setTotalPrice(totalPrice);
+        } else {
+            booking.setTotalPrice(request.getTotalPrice());
         }
         
+        // Tính finalPrice dựa trên discount nếu có
+        if (request.getDiscountId() != null) {
+            Discount discount = discountRepository.findById(request.getDiscountId())
+                .orElse(null);
+            
+            if (discount != null) {
+                booking.setDiscount(discount);
+                
+                // Tính giá sau khi giảm giá
+                double finalPrice = booking.getTotalPrice();
+                if ("PERCENT".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+                } else if ("FIXED".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice - discount.getDiscountValue();
+                    if (finalPrice < 0) finalPrice = 0;
+                }
+                
+                booking.setFinalPrice(finalPrice);
+            }
+        } else {
+            // Nếu không có discount thì finalPrice = totalPrice
+            booking.setFinalPrice(booking.getTotalPrice());
+        }
+        
+        // Đặt trạng thái mặc định là PENDING nếu không được chỉ định
         booking.setStatus(request.getStatus() != null ? request.getStatus() : "PENDING");
         
-        // Kiểm tra xem các phòng có khả dụng không
-        if (request.getRoomIds() == null || request.getRoomIds().isEmpty()) {
-            throw new RuntimeException("Danh sách phòng không được để trống");
-        }
-        
-        // Lấy danh sách phòng đã đặt trong khoảng thời gian
-        List<Room> bookedRooms = roomRepository.findBookedRoomsBetweenDates(
-                request.getCheckInDate(), request.getCheckOutDate());
-        
-        // Lấy danh sách ID của các phòng đã đặt
-        List<Integer> bookedRoomIds = bookedRooms.stream()
-                .map(Room::getId)
-                .collect(Collectors.toList());
-        
-        // Kiểm tra xem có phòng nào trong request đã được đặt hay không
-        List<Integer> unavailableRoomIds = request.getRoomIds().stream()
-                .filter(bookedRoomIds::contains)
-                .collect(Collectors.toList());
-        
-        if (!unavailableRoomIds.isEmpty()) {
-            // Lấy thông tin các phòng không khả dụng để hiển thị thông báo chi tiết
-            List<Room> unavailableRooms = roomRepository.findAllById(unavailableRoomIds);
-            String roomNumbers = unavailableRooms.stream()
-                    .map(Room::getRoomNumber)
-                    .collect(Collectors.joining(", "));
-            
-            throw new RuntimeException("Các phòng sau không khả dụng trong khoảng thời gian đã chọn: " + roomNumbers);
-        }
-        
-        // Kiểm tra trạng thái phòng
-        List<Room> requestedRooms = roomRepository.findAllById(request.getRoomIds());
-        List<Room> invalidStatusRooms = requestedRooms.stream()
-                .filter(room -> !"VACANT".equals(room.getStatus()) && !"BOOKED".equals(room.getStatus()))
-                .collect(Collectors.toList());
-        
-        if (!invalidStatusRooms.isEmpty()) {
-            String roomNumbers = invalidStatusRooms.stream()
-                    .map(room -> room.getRoomNumber() + " (" + room.getStatus() + ")")
-                    .collect(Collectors.joining(", "));
-            
-            throw new RuntimeException("Các phòng sau có trạng thái không hợp lệ để đặt: " + roomNumbers);
-        }
-        
-        // Lưu booking để có ID cho booking details
         booking = bookingRepository.save(booking);
         
         // Tạo payment với trạng thái từ request
         Payment payment = new Payment();
         payment.setBooking(booking);
-        payment.setAmount(booking.getTotalPrice().longValue());
+        payment.setAmount(booking.getFinalPrice().longValue());
         payment.setStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "UNPAID");
         payment.setMethod(request.getPaymentMethod());
         if (request.getPaymentDate() != null) {
@@ -193,12 +189,27 @@ public class BookingServiceImpl implements BookingService {
         // Kiểm tra và cập nhật tổng giá nếu cần
         if (Math.abs(totalPriceCalculated - booking.getTotalPrice()) > 0.01) {
             booking.setTotalPrice(totalPriceCalculated);
+            // Cập nhật lại finalPrice nếu totalPrice thay đổi
+            if (booking.getDiscount() != null) {
+                Discount discount = booking.getDiscount();
+                double finalPrice = totalPriceCalculated;
+                if ("PERCENT".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+                } else if ("FIXED".equals(discount.getDiscountType())) {
+                    finalPrice = finalPrice - discount.getDiscountValue();
+                    if (finalPrice < 0) finalPrice = 0;
+                }
+                booking.setFinalPrice(finalPrice);
+            } else {
+                booking.setFinalPrice(totalPriceCalculated);
+            }
+            
             Booking savedBooking = bookingRepository.save(booking);
             
             // Cập nhật lại payment nếu có
             final Integer bookingId = savedBooking.getId();
-            paymentRepository.findByBookingId(bookingId).ifPresent(paymentRecord -> {
-                paymentRecord.setAmount(savedBooking.getTotalPrice().longValue());
+            paymentRepository.findByBooking_Id(bookingId).ifPresent(paymentRecord -> {
+                paymentRecord.setAmount(savedBooking.getFinalPrice().longValue());
                 paymentRepository.save(paymentRecord);
             });
             
@@ -377,7 +388,7 @@ public class BookingServiceImpl implements BookingService {
                 
                 // Cập nhật lại payment nếu có
                 final Integer bookingId = savedBooking.getId();
-                paymentRepository.findByBookingId(bookingId).ifPresent(paymentRecord -> {
+                paymentRepository.findByBooking_Id(bookingId).ifPresent(paymentRecord -> {
                     paymentRecord.setAmount(savedBooking.getTotalPrice().longValue());
                     paymentRepository.save(paymentRecord);
                 });
@@ -407,7 +418,7 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment nếu có
-        paymentRepository.findByBookingId(id).ifPresent(payment -> {
+        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
             payment.setStatus("REFUNDED");
             paymentRepository.save(payment);
         });
@@ -445,14 +456,29 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
-        // Chỉ có thể xác nhận booking nếu trạng thái là PENDING
+        // Chỉ cho phép xác nhận booking đang ở trạng thái PENDING
         if (!"PENDING".equals(booking.getStatus())) {
-            throw new RuntimeException("Không thể xác nhận booking có trạng thái: " + booking.getStatus());
+            throw new IllegalStateException("Chỉ có thể xác nhận booking ở trạng thái PENDING. Trạng thái hiện tại: " + booking.getStatus());
         }
         
-        // Cập nhật trạng thái booking thành CONFIRMED
-        booking.setStatus("CONFIRMED");
-        bookingRepository.save(booking);
+        // Kiểm tra xem đã thanh toán chưa
+        List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        Payment payment = payments.isEmpty() ? null : payments.get(0);
+        
+        // Nếu có payment với trạng thái 00 (thành công), cập nhật
+        boolean hasSuccessfulPayment = payment != null && "00".equals(payment.getStatus());
+        
+        if (hasSuccessfulPayment) {
+            // Đã thanh toán thành công, cập nhật trạng thái booking
+            booking.setStatus("CONFIRMED");
+            booking = bookingRepository.save(booking);
+            System.out.println("Đã xác nhận booking #" + id + " sau khi kiểm tra thanh toán thành công");
+        } else {
+            // Chưa thanh toán, vẫn xác nhận booking (manual confirm)
+            booking.setStatus("CONFIRMED");
+            booking = bookingRepository.save(booking);
+            System.out.println("Đã xác nhận booking #" + id + " thủ công mặc dù chưa thanh toán");
+        }
         
         return convertToBookingResponseDTO(booking);
     }
@@ -583,41 +609,65 @@ public class BookingServiceImpl implements BookingService {
         dto.setCheckOutDate(booking.getCheckOutDate());
         dto.setTotalPrice(booking.getTotalPrice());
         
-        // Tính finalPrice
-        double finalPrice = booking.getTotalPrice();
-        if (booking.getDiscount() != null) {
-            Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
-            if (discount != null) {
-                dto.setDiscountCode(discount.getCode());
-                dto.setDiscountValue(discount.getDiscountValue());
-                dto.setDiscountType(discount.getDiscountType());
-                
-                // Tính giá sau khi giảm giá
-                if ("PERCENT".equals(discount.getDiscountType())) {
-                    finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
-                } else if ("FIXED".equals(discount.getDiscountType())) {
-                    finalPrice = finalPrice - discount.getDiscountValue();
-                    if (finalPrice < 0) finalPrice = 0;
+        // Tính finalPrice nếu chưa được tính
+        if (booking.getFinalPrice() != null) {
+            dto.setFinalPrice(booking.getFinalPrice());
+        } else if (booking.getDiscount() != null) {
+            Discount discount = booking.getDiscount();
+            double finalPrice = booking.getTotalPrice();
+            if ("PERCENT".equals(discount.getDiscountType())) {
+                finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+            } else if ("FIXED".equals(discount.getDiscountType())) {
+                finalPrice = finalPrice - discount.getDiscountValue();
+                if (finalPrice < 0) finalPrice = 0;
+            }
+            dto.setFinalPrice(finalPrice);
+        } else {
+            dto.setFinalPrice(booking.getTotalPrice());
+        }
+        
+        // Lấy thông tin payment
+        List<Payment> payments = paymentRepository.findByBooking_Id(booking.getId());
+        Payment payment = null;
+        if (!payments.isEmpty()) {
+            // Tìm payment với status là "00" (thành công) trước
+            payment = payments.stream()
+                    .filter(p -> "00".equals(p.getStatus()))
+                    .findFirst()
+                    .orElse(payments.get(0)); // Nếu không có payment thành công, lấy payment đầu tiên
+            
+            // Cập nhật thông tin payment vào DTO
+            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
+            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
+            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
+            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
+            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : 0L));
+            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
+            
+            // Cập nhật trạng thái success và pending
+            dto.setPaymentSuccess("00".equals(payment.getStatus()));
+            dto.setPaymentPending("01".equals(payment.getStatus()) || "04".equals(payment.getStatus()) 
+                    || "05".equals(payment.getStatus()) || "06".equals(payment.getStatus()));
+            
+            // Format lại số tiền và thời gian thanh toán
+            dto.setFormattedAmount(String.format("%,d", payment.getAmount() != null ? payment.getAmount() : 0).replace(",", ".") + " ₫");
+            
+            // Định dạng ngày giờ thanh toán nếu có
+            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
+                try {
+                    String payDate = payment.getPayDate();
+                    String year = payDate.substring(0, 4);
+                    String month = payDate.substring(4, 6);
+                    String day = payDate.substring(6, 8);
+                    String hour = payDate.substring(8, 10);
+                    String minute = payDate.substring(10, 12);
+                    String second = payDate.substring(12, 14);
+                    
+                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
+                } catch (Exception e) {
+                    System.out.println("Lỗi khi định dạng ngày thanh toán: " + e.getMessage());
                 }
             }
-        }
-        dto.setFinalPrice(finalPrice);
-        
-        // Kiểm tra và đồng bộ trạng thái payment
-        Optional<Payment> paymentOpt = paymentRepository.findByBookingId(booking.getId());
-        if (paymentOpt.isPresent()) {
-            Payment payment = paymentOpt.get();
-            
-            // Nếu payment thành công (status=00) nhưng booking chưa được xác nhận
-            if ("00".equals(payment.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
-                booking.setStatus("CONFIRMED");
-                booking = bookingRepository.save(booking);
-                System.out.println("Đã tự động cập nhật trạng thái booking #" + booking.getId() + " thành CONFIRMED do payment thành công");
-            }
-            
-            dto.setPaymentMethod(payment.getMethod());
-            dto.setPaymentStatus(payment.getStatus());
-            dto.setPaymentDate(payment.getPayDate());
         }
         
         // Đặt trạng thái booking sau khi đã đồng bộ
@@ -661,9 +711,18 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
         
-        // Lấy thông tin payment
-        Payment payment = paymentRepository.findByBookingId(bookingId)
-                .orElse(null);
+        // Lấy thông tin payment - lấy payment thành công hoặc mới nhất
+        List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+        
+        // Tìm payment thành công hoặc lấy payment mới nhất
+        Payment payment = null;
+        if (!payments.isEmpty()) {
+            // Tìm payment với status là "00" (thành công) trước
+            payment = payments.stream()
+                    .filter(p -> "00".equals(p.getStatus()))
+                    .findFirst()
+                    .orElse(payments.get(0)); // Nếu không có payment thành công, lấy payment đầu tiên
+        }
         
         Map<String, Object> result = new HashMap<>();
         

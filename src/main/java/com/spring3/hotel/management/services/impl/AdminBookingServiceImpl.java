@@ -213,7 +213,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         booking = bookingRepository.save(booking);
         
         // Cập nhật payment nếu có thông tin thanh toán mới
-        paymentRepository.findByBookingId(id).ifPresent(payment -> {
+        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
             if (request.getPaymentMethod() != null) {
                 payment.setMethod(request.getPaymentMethod());
             }
@@ -257,7 +257,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment nếu có
-        paymentRepository.findByBookingId(id).ifPresent(payment -> {
+        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
             payment.setStatus("REFUNDED");
             paymentRepository.save(payment);
         });
@@ -275,7 +275,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment thành PAID
-        paymentRepository.findByBookingId(id).ifPresent(payment -> {
+        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
             payment.setStatus("PAID");
             paymentRepository.save(payment);
         });
@@ -389,10 +389,33 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 }
             }
         }
+        
+        // Cập nhật finalPrice vào booking nếu chưa có
+        if (booking.getFinalPrice() == null) {
+            Booking updatedBooking = booking;
+            updatedBooking.setFinalPrice(finalPrice);
+            updatedBooking = bookingRepository.save(updatedBooking);
+            // Sử dụng updatedBooking.getFinalPrice() nếu cần, nhưng ở đây chúng ta có thể giữ giá trị finalPrice
+        } else {
+            finalPrice = booking.getFinalPrice();
+        }
+        
         dto.setFinalPrice(finalPrice);
         
+        // Thiết lập giá trị mặc định cho các trường payment
+        dto.setPaymentMethod("VNPAY");
+        dto.setPaymentStatus("UNPAID");
+        dto.setPaymentDate("");
+        dto.setTransactionNo("");
+        dto.setAmount((long) finalPrice);
+        dto.setBankCode("");
+        dto.setPaymentSuccess(false);
+        dto.setPaymentPending(false);
+        dto.setFormattedAmount(String.format("%,.0f", finalPrice).replace(",", ".") + " ₫");
+        dto.setFormattedPaymentTime("");
+        
         // Thông tin thanh toán - lấy payment mới nhất và đầy đủ
-        List<Payment> payments = paymentRepository.findAllByBookingId(booking.getId());
+        List<Payment> payments = paymentRepository.findAllByBooking_Id(booking.getId());
         if (!payments.isEmpty()) {
             Payment payment = payments.get(payments.size() - 1); // Lấy payment mới nhất
             
@@ -405,17 +428,17 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             }
             
             // Set thông tin payment cơ bản
-            dto.setPaymentMethod(payment.getMethod());
-            dto.setPaymentStatus(payment.getStatus());
-            dto.setPaymentDate(payment.getPayDate());
+            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
+            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
+            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
             
             // Bổ sung thêm thông tin chi tiết payment
-            dto.setTransactionNo(payment.getTransactionNo());
-            dto.setAmount(payment.getAmount());
-            dto.setBankCode(payment.getBankCode());
+            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
+            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (long) finalPrice);
+            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
             
             // Đặt success và pending dựa vào trạng thái payment
-            String transactionStatus = payment.getStatus();
+            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
             dto.setPaymentSuccess("00".equals(transactionStatus));
             dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
                 "05".equals(transactionStatus) || "06".equals(transactionStatus));
@@ -427,8 +450,8 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             
             // Định dạng thời gian thanh toán
             if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
-                String payDate = payment.getPayDate();
                 try {
+                    String payDate = payment.getPayDate();
                     String year = payDate.substring(0, 4);
                     String month = payDate.substring(4, 6);
                     String day = payDate.substring(6, 8);
@@ -439,6 +462,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
                 } catch (Exception e) {
                     System.out.println("Lỗi khi định dạng ngày thanh toán: " + e.getMessage());
+                    dto.setFormattedPaymentTime("");
                 }
             }
         }

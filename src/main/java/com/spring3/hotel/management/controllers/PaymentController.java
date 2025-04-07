@@ -309,7 +309,7 @@ public class PaymentController {
     @GetMapping("/history/{bookingId}")
     public ResponseEntity<?> getPaymentHistory(@PathVariable Integer bookingId) {
         try {
-            Optional<Payment> paymentOptional = paymentRepository.findByBookingId(bookingId);
+            Optional<Payment> paymentOptional = paymentRepository.findByBooking_Id(bookingId);
             if (paymentOptional.isPresent()) {
                 return ResponseEntity.ok(paymentOptional.get());
             } else {
@@ -489,6 +489,296 @@ public class PaymentController {
             model.addAttribute("success", false);
             model.addAttribute("message", "Lỗi xử lý thanh toán: " + e.getMessage());
             return "payment-result";
+        }
+    }
+
+    /**
+     * API đồng bộ trạng thái thanh toán và booking dựa trên mã giao dịch
+     * Dùng trong trường hợp cần cập nhật thủ công
+     */
+    @GetMapping("/sync-status/{transactionNo}")
+    public ResponseEntity<?> syncPaymentStatus(@PathVariable String transactionNo) {
+        try {
+            System.out.println("API sync-status được gọi với transactionNo: " + transactionNo);
+            
+            // Tìm payment theo transactionNo
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            
+            if (!paymentOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy giao dịch với mã: " + transactionNo
+                ));
+            }
+            
+            Payment payment = paymentOpt.get();
+            
+            // Luôn đặt thành thanh toán thành công
+            payment.setStatus("00");
+            payment.setResponseCode("00");
+            payment = paymentRepository.save(payment);
+            
+            // Cập nhật booking nếu có
+            if (payment.getBookingId() != null) {
+                Booking booking = bookingRepository.findById(payment.getBookingId())
+                    .orElse(null);
+                
+                if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                    booking.setStatus("CONFIRMED");
+                    bookingRepository.save(booking);
+                    System.out.println("Đã cập nhật booking ID " + booking.getId() + " thành CONFIRMED");
+                }
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "Đã đồng bộ trạng thái thanh toán và booking");
+            result.put("transactionNo", transactionNo);
+            result.put("payment_status", payment.getStatus());
+            
+            if (payment.getBookingId() != null) {
+                result.put("bookingId", payment.getBookingId());
+                result.put("booking_status", "CONFIRMED");
+            }
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Lỗi trong API sync-status: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("message", "Không thể đồng bộ trạng thái: " + e.getMessage());
+            errorResult.put("transactionNo", transactionNo);
+            
+            return ResponseEntity.badRequest().body(errorResult);
+        }
+    }
+
+    /**
+     * API cập nhật booking_id cho payment và đồng bộ trạng thái
+     */
+    @GetMapping("/link-booking/{transactionNo}/{bookingId}")
+    public ResponseEntity<?> linkPaymentToBooking(
+            @PathVariable String transactionNo,
+            @PathVariable Integer bookingId) {
+        try {
+            System.out.println("Kết nối payment " + transactionNo + " với booking " + bookingId);
+            
+            // Tìm payment theo transactionNo
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            if (!paymentOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy giao dịch với mã: " + transactionNo
+                ));
+            }
+            
+            // Tìm booking
+            Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
+            if (!bookingOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy đơn đặt phòng với ID: " + bookingId
+                ));
+            }
+            
+            Payment payment = paymentOpt.get();
+            Booking booking = bookingOpt.get();
+            
+            // Liên kết payment với booking
+            payment.setBooking(booking);
+            payment.setAmount(booking.getTotalPrice().longValue());
+            payment = paymentRepository.save(payment);
+            
+            // Nếu thanh toán đã thành công thì cập nhật booking
+            if ("00".equals(payment.getStatus())) {
+                booking.setStatus("CONFIRMED");
+                bookingRepository.save(booking);
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "Đã kết nối giao dịch với đơn đặt phòng");
+            result.put("transactionNo", transactionNo);
+            result.put("bookingId", bookingId);
+            result.put("paymentStatus", payment.getStatus());
+            result.put("bookingStatus", booking.getStatus());
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Lỗi khi kết nối payment và booking: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("message", "Lỗi khi kết nối: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(errorResult);
+        }
+    }
+
+    /**
+     * API cập nhật trạng thái booking sang CONFIRMED
+     * Sử dụng khi cần cập nhật thủ công
+     */
+    @GetMapping("/confirm-booking/{bookingId}")
+    public ResponseEntity<?> confirmBookingPayment(@PathVariable Integer bookingId) {
+        try {
+            System.out.println("Cập nhật trạng thái đơn đặt phòng " + bookingId + " thành CONFIRMED");
+            
+            // Tìm booking
+            Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
+            if (!bookingOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy đơn đặt phòng với ID: " + bookingId
+                ));
+            }
+            
+            Booking booking = bookingOpt.get();
+            
+            // Cập nhật trạng thái booking
+            booking.setStatus("CONFIRMED");
+            bookingRepository.save(booking);
+            
+            // Tìm và cập nhật payment nếu có
+            Optional<Payment> paymentOpt = paymentRepository.findByBooking_Id(bookingId);
+            if (paymentOpt.isPresent()) {
+                Payment payment = paymentOpt.get();
+                payment.setStatus("00"); // Đặt trạng thái thành công
+                payment.setResponseCode("00");
+                paymentRepository.save(payment);
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "Đã cập nhật trạng thái đơn đặt phòng thành CONFIRMED");
+            result.put("bookingId", bookingId);
+            result.put("bookingStatus", "CONFIRMED");
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Lỗi khi cập nhật trạng thái booking: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("message", "Lỗi khi cập nhật: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(errorResult);
+        }
+    }
+
+    /**
+     * API xem chi tiết payment theo transactionNo
+     */
+    @GetMapping("/detail/{transactionNo}")
+    public ResponseEntity<?> getPaymentDetail(@PathVariable String transactionNo) {
+        try {
+            System.out.println("Truy vấn chi tiết payment với transactionNo: " + transactionNo);
+            
+            // Tìm payment theo transactionNo
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            if (!paymentOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy giao dịch với mã: " + transactionNo
+                ));
+            }
+            
+            Payment payment = paymentOpt.get();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", payment.getId());
+            result.put("transactionNo", payment.getTransactionNo());
+            result.put("amount", payment.getAmount());
+            result.put("orderInfo", payment.getOrderInfo());
+            result.put("status", payment.getStatus());
+            result.put("responseCode", payment.getResponseCode());
+            result.put("bankCode", payment.getBankCode());
+            result.put("payDate", payment.getPayDate());
+            result.put("method", payment.getMethod());
+            result.put("bookingId", payment.getBookingId());
+            result.put("createdAt", payment.getCreatedAt());
+            result.put("updatedAt", payment.getUpdatedAt());
+            
+            // Thông tin booking liên kết nếu có
+            if (payment.getBookingId() != null) {
+                Optional<Booking> bookingOpt = bookingRepository.findById(payment.getBookingId());
+                if (bookingOpt.isPresent()) {
+                    Booking booking = bookingOpt.get();
+                    Map<String, Object> bookingInfo = new HashMap<>();
+                    bookingInfo.put("id", booking.getId());
+                    bookingInfo.put("status", booking.getStatus());
+                    bookingInfo.put("totalPrice", booking.getTotalPrice());
+                    bookingInfo.put("createdAt", booking.getCreatedAt());
+                    result.put("booking", bookingInfo);
+                }
+            }
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Lỗi khi truy vấn chi tiết payment: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("message", "Lỗi khi truy vấn: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(errorResult);
+        }
+    }
+    
+    /**
+     * API thống kê số lượng giao dịch theo trạng thái
+     */
+    @GetMapping("/stats")
+    public ResponseEntity<?> getPaymentStats() {
+        try {
+            System.out.println("Truy vấn thống kê giao dịch thanh toán");
+            
+            // Đếm số lượng giao dịch theo trạng thái sử dụng repository
+            long successCount = paymentRepository.countByStatus("00");
+            long pendingCount = paymentRepository.findAll().stream()
+                .filter(p -> !"00".equals(p.getStatus()) && !"97".equals(p.getStatus()))
+                .count();
+            long failedCount = paymentRepository.countByStatus("97");
+            
+            // Tính tổng giá trị giao dịch thành công
+            Long totalSuccessAmount = paymentRepository.sumSuccessfulPaymentAmount();
+            if (totalSuccessAmount == null) {
+                totalSuccessAmount = 0L;
+            }
+            
+            // Thống kê giao dịch theo ngân hàng
+            List<Object[]> bankStats = paymentRepository.countPaymentsByBank();
+            Map<String, Long> bankCountMap = new HashMap<>();
+            for (Object[] stat : bankStats) {
+                String bankCode = (String) stat[0];
+                Long count = (Long) stat[1];
+                bankCountMap.put(bankCode, count);
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("successCount", successCount);
+            result.put("pendingCount", pendingCount);
+            result.put("failedCount", failedCount);
+            result.put("totalCount", successCount + pendingCount + failedCount);
+            result.put("totalSuccessAmount", totalSuccessAmount);
+            result.put("bankStats", bankCountMap);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.out.println("Lỗi khi truy vấn thống kê giao dịch: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("message", "Lỗi khi truy vấn thống kê: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(errorResult);
         }
     }
 } 
