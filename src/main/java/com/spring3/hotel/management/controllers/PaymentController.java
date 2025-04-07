@@ -309,9 +309,9 @@ public class PaymentController {
     @GetMapping("/history/{bookingId}")
     public ResponseEntity<?> getPaymentHistory(@PathVariable Integer bookingId) {
         try {
-            Optional<Payment> paymentOptional = paymentRepository.findByBooking_Id(bookingId);
-            if (paymentOptional.isPresent()) {
-                return ResponseEntity.ok(paymentOptional.get());
+            List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+            if (!payments.isEmpty()) {
+                return ResponseEntity.ok(payments.get(0));
             } else {
                 return ResponseEntity.ok(Map.of(
                     "success", false,
@@ -643,9 +643,9 @@ public class PaymentController {
             bookingRepository.save(booking);
             
             // Tìm và cập nhật payment nếu có
-            Optional<Payment> paymentOpt = paymentRepository.findByBooking_Id(bookingId);
-            if (paymentOpt.isPresent()) {
-                Payment payment = paymentOpt.get();
+            List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+            if (!payments.isEmpty()) {
+                Payment payment = payments.get(0);
                 payment.setStatus("00"); // Đặt trạng thái thành công
                 payment.setResponseCode("00");
                 paymentRepository.save(payment);

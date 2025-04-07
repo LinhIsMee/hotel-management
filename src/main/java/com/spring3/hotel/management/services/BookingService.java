@@ -25,4 +25,6 @@ public interface BookingService {
     // Phương thức mới
     Map<String, Object> getBookingPaymentInfo(Integer bookingId);
     List<BookingResponseDTO> getConfirmedBookingsByDateRange(LocalDate startDate, LocalDate endDate);
+    BookingResponseDTO createBookingTest(UpsertBookingRequest request);
+    BookingResponseDTO markBookingAsPaid(Integer bookingId, String paymentMethod);
 }

@@ -208,10 +208,12 @@ public class BookingServiceImpl implements BookingService {
             
             // Cập nhật lại payment nếu có
             final Integer bookingId = savedBooking.getId();
-            paymentRepository.findByBooking_Id(bookingId).ifPresent(paymentRecord -> {
+            List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+            if (!payments.isEmpty()) {
+                Payment paymentRecord = payments.get(0);
                 paymentRecord.setAmount(savedBooking.getFinalPrice().longValue());
                 paymentRepository.save(paymentRecord);
-            });
+            }
             
             return convertToBookingResponseDTO(savedBooking);
         }
@@ -388,10 +390,12 @@ public class BookingServiceImpl implements BookingService {
                 
                 // Cập nhật lại payment nếu có
                 final Integer bookingId = savedBooking.getId();
-                paymentRepository.findByBooking_Id(bookingId).ifPresent(paymentRecord -> {
+                List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+                if (!payments.isEmpty()) {
+                    Payment paymentRecord = payments.get(0);
                     paymentRecord.setAmount(savedBooking.getTotalPrice().longValue());
                     paymentRepository.save(paymentRecord);
-                });
+                }
                 
                 return convertToBookingResponseDTO(savedBooking);
             }
@@ -418,10 +422,12 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment nếu có
-        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
+        List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(0);
             payment.setStatus("REFUNDED");
             paymentRepository.save(payment);
-        });
+        }
         
         return convertToBookingResponseDTO(booking);
     }
@@ -687,11 +693,9 @@ public class BookingServiceImpl implements BookingService {
             Room room = roomRepository.findById(roomId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với ID: " + roomId));
 
-            // Kiểm tra xem phòng có đang trống không
-            if (!"VACANT".equals(room.getStatus())) {
-                throw new RuntimeException("Phòng " + roomId + " không còn trống");
-            }
-
+            // Bỏ kiểm tra phòng có đang trống hay không
+            // Chỉ kiểm tra phòng đã bị đặt trong khoảng thời gian này chưa
+            
             // Kiểm tra xem phòng có bị đặt trong khoảng thời gian này không
             List<BookingDetail> existingBookings = bookingDetailRepository.findByRoomIdAndDateRange(
                     roomId, checkInDate, checkOutDate);
@@ -795,5 +799,87 @@ public class BookingServiceImpl implements BookingService {
         return bookings.stream()
                 .map(this::convertToBookingResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public BookingResponseDTO createBookingTest(UpsertBookingRequest request) {
+        try {
+            // Tạo booking
+            BookingResponseDTO bookingResponseDTO = createBooking(request);
+            Integer bookingId = bookingResponseDTO.getId();
+            
+            // Tạo thanh toán (nếu yêu cầu)
+            if ("PAID".equals(request.getPaymentStatus()) || "00".equals(request.getPaymentStatus())) {
+                // Tìm payment đã tạo
+                List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+                if (!payments.isEmpty()) {
+                    Payment payment = payments.get(0);
+                    // Cập nhật trạng thái thành công
+                    payment.setStatus("00");
+                    payment.setResponseCode("00");
+                    payment.setMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "CASH");
+                    if (request.getPaymentDate() != null) {
+                        payment.setPayDate(request.getPaymentDate().toString());
+                    } else {
+                        payment.setPayDate(LocalDateTime.now().toString());
+                    }
+                    paymentRepository.save(payment);
+                    
+                    // Xác nhận booking
+                    confirmBooking(bookingId);
+                }
+            }
+            
+            return getBookingById(bookingId);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi tạo booking test: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public BookingResponseDTO markBookingAsPaid(Integer bookingId, String paymentMethod) {
+        // Kiểm tra booking có tồn tại không
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking không tồn tại với ID: " + bookingId));
+        
+        // Chỉ cho phép thanh toán cho booking PENDING hoặc CONFIRMED
+        if (!"PENDING".equals(booking.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
+            throw new IllegalStateException("Chỉ có thể thanh toán cho booking PENDING hoặc CONFIRMED. Trạng thái hiện tại: " + booking.getStatus());
+        }
+        
+        // Tìm payment hiện có hoặc tạo mới
+        List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+        Payment payment;
+        
+        if (!payments.isEmpty()) {
+            payment = payments.get(0);
+            // Cập nhật trạng thái thanh toán
+            payment.setStatus("00"); // 00: Thành công
+            payment.setResponseCode("00");
+            payment.setMethod(paymentMethod != null ? paymentMethod : "CASH");
+            payment.setAmount(booking.getFinalPrice().longValue());
+            payment.setPayDate(LocalDateTime.now().toString());
+        } else {
+            // Tạo mới payment
+            payment = new Payment();
+            payment.setBooking(booking);
+            payment.setAmount(booking.getFinalPrice().longValue());
+            payment.setStatus("00");
+            payment.setResponseCode("00");
+            payment.setMethod(paymentMethod != null ? paymentMethod : "CASH");
+            payment.setPayDate(LocalDateTime.now().toString());
+            payment.setOrderInfo("Thanh toán đặt phòng #" + bookingId);
+        }
+        
+        // Lưu payment
+        payment = paymentRepository.save(payment);
+        
+        // Cập nhật trạng thái booking thành CONFIRMED
+        if (!"CONFIRMED".equals(booking.getStatus())) {
+            booking.setStatus("CONFIRMED");
+            bookingRepository.save(booking);
+        }
+        
+        return getBookingById(bookingId);
     }
 }

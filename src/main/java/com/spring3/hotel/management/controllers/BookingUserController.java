@@ -252,7 +252,7 @@ public class BookingUserController {
     @GetMapping("/detail/{id}")
     public ResponseEntity<?> getBookingDetail(@PathVariable Integer id) {
         try {
-            // Lấy thông tin booking
+            // Kiểm tra booking có tồn tại không
             BookingResponseDTO booking = bookingService.getBookingById(id);
             
             // Đồng bộ lại thông tin payment và booking mới nhất từ VNPay trước khi trả về

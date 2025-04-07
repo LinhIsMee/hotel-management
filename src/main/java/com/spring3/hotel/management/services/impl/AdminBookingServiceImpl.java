@@ -213,7 +213,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         booking = bookingRepository.save(booking);
         
         // Cập nhật payment nếu có thông tin thanh toán mới
-        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
+        List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(0);
             if (request.getPaymentMethod() != null) {
                 payment.setMethod(request.getPaymentMethod());
             }
@@ -224,7 +226,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 payment.setPayDate(request.getPaymentDate().toString());
             }
             paymentRepository.save(payment);
-        });
+        }
         
         // Cập nhật booking details nếu có danh sách phòng mới
         if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
@@ -257,10 +259,12 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment nếu có
-        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
+        List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(0);
             payment.setStatus("REFUNDED");
             paymentRepository.save(payment);
-        });
+        }
         
         return convertToBookingResponseDTO(booking);
     }
@@ -275,10 +279,12 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment thành PAID
-        paymentRepository.findByBooking_Id(id).ifPresent(payment -> {
+        List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(0);
             payment.setStatus("PAID");
             paymentRepository.save(payment);
-        });
+        }
         
         return convertToBookingResponseDTO(booking);
     }
