@@ -3,6 +3,7 @@ package com.spring3.hotel.management.controllers;
 import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
 import com.spring3.hotel.management.dtos.response.PaymentLinkResponse;
+import com.spring3.hotel.management.dtos.response.PaymentResponse;
 import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.services.BookingService;
@@ -89,12 +90,17 @@ public class BookingUserController {
         // Tạo liên kết thanh toán VNPay
         String orderInfo = "Thanh toan dat phong khach san - Ma dat phong: " + bookingResponseDTO.getId();
         Long amount = bookingResponseDTO.getFinalPrice().longValue();
-        String paymentUrl = vnPayService.createPayment(bookingResponseDTO.getId(), amount, orderInfo);
+        // Tạo returnUrl của ứng dụng
+        String returnUrl = "http://localhost:9000/api/v1/payments/callback";
+        // IP Address của khách hàng
+        String ipAddress = "127.0.0.1";
+        
+        PaymentResponse paymentResponse = vnPayService.createPayment(orderInfo, amount, ipAddress, returnUrl);
         
         // Trả về thông tin booking và liên kết thanh toán
         Map<String, Object> response = new HashMap<>();
         response.put("booking", bookingResponseDTO);
-        response.put("payment", new PaymentLinkResponse(paymentUrl, orderInfo));
+        response.put("payment", paymentResponse);
         
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -131,11 +137,16 @@ public class BookingUserController {
         if (!existingBooking.getFinalPrice().equals(bookingResponseDTO.getFinalPrice())) {
             String orderInfo = "Thanh toan dat phong khach san - Ma dat phong: " + bookingResponseDTO.getId();
             Long amount = bookingResponseDTO.getFinalPrice().longValue();
-            String paymentUrl = vnPayService.createPayment(bookingResponseDTO.getId(), amount, orderInfo);
+            // Tạo returnUrl của ứng dụng
+            String returnUrl = "http://localhost:9000/api/v1/payments/callback";
+            // IP Address của khách hàng
+            String ipAddress = "127.0.0.1";
+            
+            PaymentResponse paymentResponse = vnPayService.createPayment(orderInfo, amount, ipAddress, returnUrl);
             
             Map<String, Object> response = new HashMap<>();
             response.put("booking", bookingResponseDTO);
-            response.put("payment", new PaymentLinkResponse(paymentUrl, orderInfo));
+            response.put("payment", paymentResponse);
             
             return ResponseEntity.ok(response);
         }
@@ -221,11 +232,16 @@ public class BookingUserController {
 
             String orderInfo = "Thanh toán đặt phòng " + bookingResponseDTO.getId();
             Long amount = bookingResponseDTO.getFinalPrice().longValue();
-            String paymentUrl = vnPayService.createPayment(bookingResponseDTO.getId(), amount, orderInfo);
+            // Tạo returnUrl của ứng dụng
+            String returnUrl = "http://localhost:9000/api/v1/payments/callback";
+            // IP Address của khách hàng
+            String ipAddress = "127.0.0.1";
+            
+            PaymentResponse paymentResponse = vnPayService.createPayment(orderInfo, amount, ipAddress, returnUrl);
 
             return ResponseEntity.ok(Map.of(
                     "booking", bookingResponseDTO,
-                    "payment", new PaymentLinkResponse(paymentUrl, orderInfo)
+                    "payment", paymentResponse
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", "Lỗi khi tạo booking test: " + e.getMessage()));
