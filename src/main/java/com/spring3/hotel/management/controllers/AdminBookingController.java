@@ -26,8 +26,10 @@ public class AdminBookingController {
 
     // Lấy tất cả booking (cho admin)
     @GetMapping("/")
-    public ResponseEntity<List<BookingResponseDTO>> getAllBookings() {
-        List<BookingResponseDTO> bookings = adminBookingService.getAllBookings();
+    public ResponseEntity<List<BookingResponseDTO>> getAllBookings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        List<BookingResponseDTO> bookings = adminBookingService.getAllBookings(page, size);
         return ResponseEntity.ok(bookings);
     }
 

@@ -12,7 +12,7 @@ public interface AdminBookingService {
     // Các phương thức quản lý đặt phòng cho admin
     List<NewBookingResponse> getRecentBookings();
     BookingResponseDTO getBookingById(Integer id);
-    List<BookingResponseDTO> getAllBookings();
+    List<BookingResponseDTO> getAllBookings(int page, int size);
     List<BookingResponseDTO> getBookingsByStatus(String status);
     List<BookingResponseDTO> getBookingsByDateRange(LocalDate startDate, LocalDate endDate);
     List<RoomListResponseDTO> getBookedRoomsByDateRange(LocalDate startDate, LocalDate endDate);

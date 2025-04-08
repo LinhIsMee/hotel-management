@@ -321,7 +321,7 @@ public class BookingServiceImpl implements BookingService {
             }
             
             // Kiểm tra trạng thái phòng (trừ các phòng đã thuộc booking hiện tại)
-            List<Room> currentBookingRooms = booking.getBookingDetail().stream()
+            List<Room> currentBookingRooms = booking.getBookingDetails().stream()
                     .map(BookingDetail::getRoom)
                     .collect(Collectors.toList());
                     

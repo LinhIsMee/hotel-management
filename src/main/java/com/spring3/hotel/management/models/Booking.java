@@ -49,7 +49,10 @@ public class Booking {
     private LocalDateTime createdAt;
     
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<BookingDetail> bookingDetail = new ArrayList<>();
+    private List<BookingDetail> bookingDetails = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Payment> payments = new ArrayList<>();
 
     @PrePersist
     public void prePersist() {

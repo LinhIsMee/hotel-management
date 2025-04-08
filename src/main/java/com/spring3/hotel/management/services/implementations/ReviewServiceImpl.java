@@ -182,7 +182,7 @@ public class ReviewServiceImpl implements ReviewService {
         String validRoomType = "";
         
         // Duyệt qua chi tiết đặt phòng để xác nhận thông tin phòng
-        for (BookingDetail detail : booking.getBookingDetail()) {
+        for (BookingDetail detail : booking.getBookingDetails()) {
             if (request.getRoomNumber().equals(detail.getRoomNumber())) {
                 roomExists = true;
                 validRoomType = detail.getRoomType();
@@ -267,8 +267,8 @@ public class ReviewServiceImpl implements ReviewService {
                 hasChanges = true;
                 
                 // Nếu cập nhật booking, đồng bộ lại thông tin phòng và loại phòng
-                if (booking.getBookingDetail() != null && !booking.getBookingDetail().isEmpty()) {
-                    BookingDetail detail = booking.getBookingDetail().get(0);
+                if (booking.getBookingDetails() != null && !booking.getBookingDetails().isEmpty()) {
+                    BookingDetail detail = booking.getBookingDetails().get(0);
                     review.setRoomNumber(detail.getRoomNumber());
                     review.setRoomType(detail.getRoomType());
                     log.info("Cập nhật tự động thông tin phòng theo booking mới: Phòng {}, Loại {}", 
@@ -301,7 +301,7 @@ public class ReviewServiceImpl implements ReviewService {
                 boolean isValid = false;
                 String validRoomType = "";
                 
-                for (BookingDetail detail : booking.getBookingDetail()) {
+                for (BookingDetail detail : booking.getBookingDetails()) {
                     if (newRoomNumber.equals(detail.getRoomNumber())) {
                         isValid = true;
                         validRoomType = detail.getRoomType();

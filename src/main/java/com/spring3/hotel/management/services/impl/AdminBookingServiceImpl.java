@@ -8,6 +8,9 @@ import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.AdminBookingService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,11 +63,46 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     }
 
     @Override
-    public List<BookingResponseDTO> getAllBookings() {
+    public List<BookingResponseDTO> getAllBookings(int page, int size) {
         try {
-            List<Booking> bookings = bookingRepository.findAll();
+            // Step 1: Get basic booking information with user and discount
+            Pageable pageable = PageRequest.of(page, size);
+            Page<Booking> bookingsPage = bookingRepository.findAllWithDetails(pageable);
+            List<Booking> bookings = bookingsPage.getContent();
+            
+            if (bookings.isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            // Step 2: Extract booking IDs
+            List<Integer> bookingIds = bookings.stream()
+                    .map(Booking::getId)
+                    .collect(Collectors.toList());
+            
+            // Step 3: Load booking details in a separate query
+            List<Booking> bookingsWithDetails = bookingRepository.findBookingsWithDetails(bookingIds);
+            Map<Integer, List<BookingDetail>> detailsMap = new java.util.HashMap<>();
+            for (Booking b : bookingsWithDetails) {
+                detailsMap.put(b.getId(), b.getBookingDetails());
+            }
+            
+            // Step 4: Load payments in a separate query
+            List<Booking> bookingsWithPayments = bookingRepository.findBookingsWithPayments(bookingIds);
+            Map<Integer, List<Payment>> paymentsMap = new java.util.HashMap<>();
+            for (Booking b : bookingsWithPayments) {
+                paymentsMap.put(b.getId(), b.getPayments());
+            }
+            
+            // Step 5: Convert to DTOs with all the data
             return bookings.stream()
-                    .map(this::convertToBookingResponseDTO)
+                    .map(booking -> {
+                        // Attach the separately loaded collections
+                        List<BookingDetail> details = detailsMap.getOrDefault(booking.getId(), new ArrayList<>());
+                        List<Payment> payments = paymentsMap.getOrDefault(booking.getId(), new ArrayList<>());
+                        
+                        // Convert to DTO
+                        return convertToBookingResponseDTOWithCollections(booking, details, payments);
+                    })
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
@@ -511,4 +550,271 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         
         return dto;
     }
-} 
+    
+    private BookingResponseDTO convertToBookingResponseDTOOptimized(Booking booking) {
+        BookingResponseDTO dto = new BookingResponseDTO();
+        dto.setId(booking.getId());
+        dto.setUserId(booking.getUser().getId());
+        dto.setFullName(booking.getUser().getFullName());
+        dto.setNationalId(booking.getUser().getNationalId());
+        dto.setEmail(booking.getUser().getEmail());
+        dto.setPhone(booking.getUser().getPhoneNumber());
+        
+        // Get booking details in a single query instead of per booking
+        List<BookingDetail> bookingDetails = booking.getBookingDetails() != null ? 
+                booking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(booking.getId());
+        
+        dto.setRooms(bookingDetails.stream()
+                .map(detail -> {
+                    RoomListResponseDTO roomDto = new RoomListResponseDTO();
+                    Room room = detail.getRoom();
+                    roomDto.setRoomId(room.getId());
+                    roomDto.setRoomNumber(room.getRoomNumber());
+                    roomDto.setRoomType(room.getRoomType().getName());
+                    
+                    // Calculate price
+                    if (detail.getPrice() != null) {
+                        roomDto.setPrice(detail.getPrice());
+                    } else {
+                        // Calculate based on stay duration
+                        long days = java.time.temporal.ChronoUnit.DAYS.between(
+                                booking.getCheckInDate(), booking.getCheckOutDate());
+                        if (days < 1) days = 1;
+                        roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
+                    }
+                    
+                    // Set images
+                    roomDto.setImages(room.getImages());
+                    
+                    return roomDto;
+                })
+                .toList());
+        
+        dto.setCheckInDate(booking.getCheckInDate());
+        dto.setCheckOutDate(booking.getCheckOutDate());
+        dto.setTotalPrice(booking.getTotalPrice());
+        
+        // Calculate final price
+        double finalPrice = booking.getTotalPrice();
+        if (booking.getDiscount() != null) {
+            Discount discount = booking.getDiscount();
+            dto.setDiscountCode(discount.getCode());
+            dto.setDiscountValue(discount.getDiscountValue());
+            dto.setDiscountType(discount.getDiscountType());
+            
+            // Calculate discounted price
+            if ("PERCENT".equals(discount.getDiscountType())) {
+                finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+            } else if ("FIXED".equals(discount.getDiscountType())) {
+                finalPrice = finalPrice - discount.getDiscountValue();
+                if (finalPrice < 0) finalPrice = 0;
+            }
+        }
+        
+        // Use finalPrice from booking if available
+        if (booking.getFinalPrice() != null) {
+            finalPrice = booking.getFinalPrice();
+        }
+        
+        dto.setFinalPrice(finalPrice);
+        
+        // Set default payment values
+        dto.setPaymentMethod("VNPAY");
+        dto.setPaymentStatus("UNPAID");
+        dto.setPaymentDate("");
+        dto.setTransactionNo("");
+        dto.setAmount((long) finalPrice);
+        dto.setBankCode("");
+        dto.setPaymentSuccess(false);
+        dto.setPaymentPending(false);
+        dto.setFormattedAmount(String.format("%,.0f", finalPrice).replace(",", ".") + " ₫");
+        dto.setFormattedPaymentTime("");
+        
+        // Get payment info efficiently
+        List<Payment> payments = booking.getPayments() != null ? 
+                booking.getPayments() : paymentRepository.findAllByBooking_Id(booking.getId());
+        
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(payments.size() - 1); // Get latest payment
+            
+            // Set payment info
+            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
+            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
+            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
+            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
+            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (long) finalPrice);
+            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
+            
+            // Set payment status flags
+            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
+            dto.setPaymentSuccess("00".equals(transactionStatus));
+            dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
+                "05".equals(transactionStatus) || "06".equals(transactionStatus));
+            
+            // Format amount
+            if (payment.getAmount() != null) {
+                dto.setFormattedAmount(String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
+            }
+            
+            // Format payment time
+            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
+                try {
+                    String payDate = payment.getPayDate();
+                    String year = payDate.substring(0, 4);
+                    String month = payDate.substring(4, 6);
+                    String day = payDate.substring(6, 8);
+                    String hour = payDate.substring(8, 10);
+                    String minute = payDate.substring(10, 12);
+                    String second = payDate.substring(12, 14);
+                    
+                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
+                } catch (Exception e) {
+                    // Just set empty string on error, no need to log
+                    dto.setFormattedPaymentTime("");
+                }
+            }
+        }
+        
+        // Set status
+        dto.setStatus(booking.getStatus());
+        
+        // Format createdAt
+        if (booking.getCreatedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            dto.setCreatedAt(booking.getCreatedAt().format(formatter));
+        }
+        
+        return dto;
+    }
+    
+    private BookingResponseDTO convertToBookingResponseDTOWithCollections(
+            Booking booking, List<BookingDetail> bookingDetails, List<Payment> payments) {
+        BookingResponseDTO dto = new BookingResponseDTO();
+        dto.setId(booking.getId());
+        dto.setUserId(booking.getUser().getId());
+        dto.setFullName(booking.getUser().getFullName());
+        dto.setNationalId(booking.getUser().getNationalId());
+        dto.setEmail(booking.getUser().getEmail());
+        dto.setPhone(booking.getUser().getPhoneNumber());
+        
+        // Process booking details
+        dto.setRooms(bookingDetails.stream()
+                .map(detail -> {
+                    RoomListResponseDTO roomDto = new RoomListResponseDTO();
+                    Room room = detail.getRoom();
+                    roomDto.setRoomId(room.getId());
+                    roomDto.setRoomNumber(room.getRoomNumber());
+                    roomDto.setRoomType(room.getRoomType().getName());
+                    
+                    // Calculate price
+                    if (detail.getPrice() != null) {
+                        roomDto.setPrice(detail.getPrice());
+                    } else {
+                        // Calculate based on stay duration
+                        long days = java.time.temporal.ChronoUnit.DAYS.between(
+                                booking.getCheckInDate(), booking.getCheckOutDate());
+                        if (days < 1) days = 1;
+                        roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
+                    }
+                    
+                    // Set images
+                    roomDto.setImages(room.getImages());
+                    
+                    return roomDto;
+                })
+                .toList());
+        
+        dto.setCheckInDate(booking.getCheckInDate());
+        dto.setCheckOutDate(booking.getCheckOutDate());
+        dto.setTotalPrice(booking.getTotalPrice());
+        
+        // Calculate final price
+        double finalPrice = booking.getTotalPrice();
+        if (booking.getDiscount() != null) {
+            Discount discount = booking.getDiscount();
+            dto.setDiscountCode(discount.getCode());
+            dto.setDiscountValue(discount.getDiscountValue());
+            dto.setDiscountType(discount.getDiscountType());
+            
+            // Calculate discounted price
+            if ("PERCENT".equals(discount.getDiscountType())) {
+                finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
+            } else if ("FIXED".equals(discount.getDiscountType())) {
+                finalPrice = finalPrice - discount.getDiscountValue();
+                if (finalPrice < 0) finalPrice = 0;
+            }
+        }
+        
+        // Use finalPrice from booking if available
+        if (booking.getFinalPrice() != null) {
+            finalPrice = booking.getFinalPrice();
+        }
+        
+        dto.setFinalPrice(finalPrice);
+        
+        // Set default payment values
+        dto.setPaymentMethod("VNPAY");
+        dto.setPaymentStatus("UNPAID");
+        dto.setPaymentDate("");
+        dto.setTransactionNo("");
+        dto.setAmount((long) finalPrice);
+        dto.setBankCode("");
+        dto.setPaymentSuccess(false);
+        dto.setPaymentPending(false);
+        dto.setFormattedAmount(String.format("%,.0f", finalPrice).replace(",", ".") + " ₫");
+        dto.setFormattedPaymentTime("");
+        
+        // Process payment info
+        if (!payments.isEmpty()) {
+            Payment payment = payments.get(payments.size() - 1); // Get latest payment
+            
+            // Set payment info
+            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
+            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
+            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
+            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
+            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (long) finalPrice);
+            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
+            
+            // Set payment status flags
+            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
+            dto.setPaymentSuccess("00".equals(transactionStatus));
+            dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
+                "05".equals(transactionStatus) || "06".equals(transactionStatus));
+            
+            // Format amount
+            if (payment.getAmount() != null) {
+                dto.setFormattedAmount(String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
+            }
+            
+            // Format payment time
+            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
+                try {
+                    String payDate = payment.getPayDate();
+                    String year = payDate.substring(0, 4);
+                    String month = payDate.substring(4, 6);
+                    String day = payDate.substring(6, 8);
+                    String hour = payDate.substring(8, 10);
+                    String minute = payDate.substring(10, 12);
+                    String second = payDate.substring(12, 14);
+                    
+                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
+                } catch (Exception e) {
+                    // Just set empty string on error, no need to log
+                    dto.setFormattedPaymentTime("");
+                }
+            }
+        }
+        
+        // Set status
+        dto.setStatus(booking.getStatus());
+        
+        // Format createdAt
+        if (booking.getCreatedAt() != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            dto.setCreatedAt(booking.getCreatedAt().format(formatter));
+        }
+        
+        return dto;
+    }
+}

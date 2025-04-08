@@ -3,6 +3,7 @@ package com.spring3.hotel.management.repositories;
 import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
 import com.spring3.hotel.management.dtos.response.NewBookingResponse;
 import com.spring3.hotel.management.models.Booking;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -111,4 +112,22 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     // Tìm các booking đã được xác nhận (CONFIRMED) trong khoảng thời gian
     List<Booking> findByStatusAndCheckInDateBetween(String status, LocalDate startDate, LocalDate endDate);
+    
+    // Tìm tất cả booking với eager loading của các entities liên quan để tối ưu hiệu suất
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.user " +
+           "LEFT JOIN FETCH b.discount")
+    Page<Booking> findAllWithDetails(Pageable pageable);
+    
+    // Truy vấn bổ sung để lấy booking details
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.bookingDetails " +
+           "WHERE b.id IN :ids")
+    List<Booking> findBookingsWithDetails(List<Integer> ids);
+    
+    // Truy vấn bổ sung để lấy payments
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.payments " +
+           "WHERE b.id IN :ids")
+    List<Booking> findBookingsWithPayments(List<Integer> ids);
 }

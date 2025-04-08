@@ -114,7 +114,7 @@ public class StatisticServiceImpl implements StatisticService {
             String roomNumber = "N/A";
             String roomType = "N/A";
             
-            List<BookingDetail> details = booking.getBookingDetail();
+            List<BookingDetail> details = booking.getBookingDetails();
             if (details != null && !details.isEmpty()) {
                 BookingDetail detail = details.get(0);
                 roomNumber = detail.getRoomNumber();
