@@ -32,7 +32,7 @@ build/
 !**/src/test/**/build/
 
 /target/
-/api-docs/
+# /api-docs/
 data/   
 ### VS Code ###
 .vscode/
