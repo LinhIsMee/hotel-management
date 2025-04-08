@@ -235,12 +235,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Integer getUserIdByUsername(String username) {
-        return userRepository.findByUsername(username).getId();
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("User not found with username: " + username);
+        }
+        return user.getId();
     }
 
     @Override
     public String getUserRoleByUsername(String username) {
         User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("User not found with username: " + username);
+        }
         return user.getRole().getName();
     }
 

@@ -32,7 +32,38 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String requestPath = request.getRequestURI();
-        logger.info("Processing request for path: {}", requestPath); 
+        logger.info("Processing request for path: {}", requestPath);
+        
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        String username = null;
+        
+        // Check if the Authorization header exists and has the Bearer token format
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+            try {
+                username = jwtService.extractUsername(token);
+            } catch (Exception e) {
+                logger.error("Error extracting username from token: {}", e.getMessage());
+            }
+        }
+        
+        // If we have a username and no authentication is already set up
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsServiceImpl.loadUserByUsername(username);
+            
+            // Validate the token
+            if (jwtService.validateToken(token, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                
+                // Set the authentication in the SecurityContext
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+                logger.info("User authenticated: {}", username);
+            }
+        }
+        
         filterChain.doFilter(request, response);
     }
 }
