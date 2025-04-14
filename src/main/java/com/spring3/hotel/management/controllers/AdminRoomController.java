@@ -20,35 +20,45 @@ public class AdminRoomController {
     @Autowired
     private RoomService roomService;
 
-    // Lấy danh sách tất cả phòng
+    /**
+     * Lấy danh sách tất cả phòng
+     */
     @GetMapping
     public ResponseEntity<List<RoomResponseDTO>> getAllRooms() {
         List<RoomResponseDTO> rooms = roomService.getAllRooms();
         return ResponseEntity.ok(rooms);
     }
 
-    // Lấy thông tin phòng bằng ID
+    /**
+     * Lấy thông tin phòng bằng ID
+     */
     @GetMapping("/{id}")
     public ResponseEntity<RoomResponseDTO> getRoomById(@PathVariable Integer id) {
         RoomResponseDTO roomResponseDTO = roomService.getRoomById(id);
         return ResponseEntity.ok(roomResponseDTO);
     }
 
-    // Lấy thông tin phòng bằng số phòng
+    /**
+     * Lấy thông tin phòng bằng số phòng
+     */
     @GetMapping("/room-number/{roomNumber}")
     public ResponseEntity<RoomResponseDTO> getRoomByRoomNumber(@PathVariable String roomNumber) {
         RoomResponseDTO roomResponseDTO = roomService.getRoomByRoomNumber(roomNumber);
         return ResponseEntity.ok(roomResponseDTO);
     }
 
-    // Tạo mới phòng
+    /**
+     * Tạo mới phòng
+     */
     @PostMapping
     public ResponseEntity<RoomResponseDTO> createRoom(@Valid @RequestBody UpsertRoomRequest request) {
         RoomResponseDTO roomResponseDTO = roomService.createRoom(request);
         return new ResponseEntity<>(roomResponseDTO, HttpStatus.CREATED);
     }
 
-    // Cập nhật thông tin phòng
+    /**
+     * Cập nhật thông tin phòng
+     */
     @PutMapping("/{id}")
     public ResponseEntity<RoomResponseDTO> updateRoom(
             @PathVariable Integer id,
@@ -57,21 +67,27 @@ public class AdminRoomController {
         return ResponseEntity.ok(roomResponseDTO);
     }
 
-    // Xóa phòng (soft delete)
+    /**
+     * Xóa phòng (soft delete)
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteRoom(@PathVariable Integer id) {
         roomService.deleteRoom(id);
         return ResponseEntity.noContent().build();
     }
 
-    // Lấy danh sách phòng theo loại phòng
+    /**
+     * Lấy danh sách phòng theo loại phòng
+     */
     @GetMapping("/room-type/{roomTypeId}")
     public ResponseEntity<List<RoomResponseDTO>> getRoomsByRoomType(@PathVariable Integer roomTypeId) {
         List<RoomResponseDTO> rooms = roomService.getRoomsByRoomType(roomTypeId);
         return ResponseEntity.ok(rooms);
     }
 
-    // Lấy danh sách phòng theo trạng thái
+    /**
+     * Lấy danh sách phòng theo trạng thái
+     */
     @GetMapping("/status/{status}")
     public ResponseEntity<List<RoomResponseDTO>> getRoomsByStatus(@PathVariable String status) {
         List<RoomResponseDTO> rooms = roomService.getRoomsByStatus(status);

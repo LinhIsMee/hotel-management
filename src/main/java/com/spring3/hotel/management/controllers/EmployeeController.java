@@ -32,6 +32,9 @@ public class EmployeeController {
     @Autowired
     private EmployeeService employeeService;
     
+    /**
+     * Lấy danh sách nhân viên với bộ lọc tùy chọn
+     */
     @GetMapping
     public ResponseEntity<?> getAllEmployees(
             @RequestParam(required = false) String department,
@@ -76,6 +79,9 @@ public class EmployeeController {
         }
     }
     
+    /**
+     * Lấy thông tin nhân viên theo ID
+     */
     @GetMapping("/{employeeId}")
     public ResponseEntity<?> getEmployeeById(@PathVariable Integer employeeId) {
         try {
@@ -92,6 +98,9 @@ public class EmployeeController {
         }
     }
     
+    /**
+     * Tạo mới nhân viên
+     */
     @PostMapping
     public ResponseEntity<?> createEmployee(@RequestBody CreateEmployeeRequest request) {
         try {
@@ -112,6 +121,9 @@ public class EmployeeController {
         }
     }
     
+    /**
+     * Cập nhật thông tin nhân viên
+     */
     @PutMapping("/{employeeId}")
     public ResponseEntity<?> updateEmployee(
             @PathVariable Integer employeeId,
@@ -138,6 +150,9 @@ public class EmployeeController {
         }
     }
     
+    /**
+     * Xóa nhân viên
+     */
     @DeleteMapping("/{employeeId}")
     public ResponseEntity<?> deleteEmployee(@PathVariable Integer employeeId) {
         try {

@@ -31,15 +31,5 @@ public class BookingResponseDTO {
     private String status;
     private String paymentMethod;
     private String paymentStatus;
-    private String paymentDate;
     private String createdAt;
-    
-    // Bổ sung thông tin chi tiết về payment
-    private String transactionNo;
-    private Long amount;
-    private String bankCode;
-    private Boolean paymentSuccess;
-    private Boolean paymentPending;
-    private String formattedAmount;
-    private String formattedPaymentTime;
 }

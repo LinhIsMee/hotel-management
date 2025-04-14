@@ -638,22 +638,34 @@ public class PaymentController {
             
             Booking booking = bookingOpt.get();
             
-            // Cập nhật trạng thái booking
-            booking.setStatus("CONFIRMED");
-            bookingRepository.save(booking);
-            
             // Tìm và cập nhật payment nếu có
             List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
             if (!payments.isEmpty()) {
-                Payment payment = payments.get(0);
-                payment.setStatus("00"); // Đặt trạng thái thành công
+                // Lấy payment mới nhất để cập nhật
+                Payment payment = payments.get(payments.size() - 1); 
+                payment.setStatus("00"); // Sử dụng mã "00" cho trạng thái thành công
                 payment.setResponseCode("00");
+                // Cập nhật thêm các thông tin khác nếu cần, ví dụ ngày thanh toán
+                if (payment.getPayDate() == null) {
+                    payment.setPayDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                }
+                paymentRepository.save(payment);
+            } else {
+                // Nếu không có payment, tạo mới một payment
+                Payment payment = new Payment();
+                payment.setBooking(booking);
+                payment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
+                payment.setStatus("00"); // Sử dụng mã "00"
+                payment.setResponseCode("00");
+                payment.setMethod("CASH"); // Giả sử là thanh toán tiền mặt
+                payment.setPayDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))); // Format ngày giờ
+                payment.setOrderInfo("Thanh toán đặt phòng #" + bookingId);
                 paymentRepository.save(payment);
             }
             
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
-            result.put("message", "Đã cập nhật trạng thái đơn đặt phòng thành CONFIRMED");
+            result.put("message", "Đã cập nhật trạng thái thanh toán thành công (00)");
             result.put("bookingId", bookingId);
             result.put("bookingStatus", "CONFIRMED");
             
@@ -779,6 +791,64 @@ public class PaymentController {
             errorResult.put("message", "Lỗi khi truy vấn thống kê: " + e.getMessage());
             
             return ResponseEntity.badRequest().body(errorResult);
+        }
+    }
+
+    /**
+     * API cập nhật trạng thái thanh toán cho booking (dành cho admin)
+     */
+    @GetMapping("/update-payment-status/{bookingId}")
+    public ResponseEntity<?> updatePaymentStatus(@PathVariable Integer bookingId) {
+        try {
+            System.out.println("Cập nhật trạng thái thanh toán cho đơn đặt phòng " + bookingId + " thành PAID");
+            
+            // Tìm booking
+            Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
+            if (!bookingOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy đơn đặt phòng với ID: " + bookingId
+                ));
+            }
+            
+            Booking booking = bookingOpt.get();
+            
+            // Tìm và cập nhật payment nếu có
+            List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
+            if (!payments.isEmpty()) {
+                // Lấy payment mới nhất để cập nhật
+                Payment payment = payments.get(payments.size() - 1); 
+                payment.setStatus("00"); // Sử dụng mã "00" cho trạng thái thành công
+                payment.setResponseCode("00");
+                // Cập nhật thêm các thông tin khác nếu cần, ví dụ ngày thanh toán
+                if (payment.getPayDate() == null) {
+                    payment.setPayDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                }
+                paymentRepository.save(payment);
+            } else {
+                // Nếu không có payment, tạo mới một payment
+                Payment payment = new Payment();
+                payment.setBooking(booking);
+                payment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
+                payment.setStatus("00"); // Sử dụng mã "00"
+                payment.setResponseCode("00");
+                payment.setMethod("CASH"); // Giả sử là thanh toán tiền mặt
+                payment.setPayDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))); // Format ngày giờ
+                payment.setOrderInfo("Thanh toán đặt phòng #" + bookingId);
+                paymentRepository.save(payment);
+            }
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "Đã cập nhật trạng thái thanh toán thành công (00)");
+            result.put("bookingId", bookingId);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Lỗi khi cập nhật trạng thái thanh toán: " + e.getMessage()
+            ));
         }
     }
 } 

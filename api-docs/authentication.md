@@ -87,10 +87,10 @@ Authentication failed
 }
 ```
 
-**Response (Error - 400 Bad Request)**:
+**Response (Error - 403 Forbidden)**:
 ```json
 {
-  "message": "Refresh token is not in database!"
+  "message": "Refresh token không tồn tại trong cơ sở dữ liệu"
 }
 ```
 
@@ -135,14 +135,14 @@ Authentication failed
 **Response (Success - 200 OK)**:
 ```json
 {
-  "message": "Password reset instructions sent to your email"
+  "message": "Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn"
 }
 ```
 
-**Response (Error - 400 Bad Request)**:
+**Response (Error - 404 Not Found)**:
 ```json
 {
-  "message": "Email not found"
+  "message": "Không tìm thấy email"
 }
 ```
 
@@ -161,14 +161,14 @@ Authentication failed
 **Response (Success - 200 OK)**:
 ```json
 {
-  "message": "Password has been reset successfully"
+  "message": "Mật khẩu đã được đặt lại thành công"
 }
 ```
 
-**Response (Error - 400 Bad Request)**:
+**Response (Error - 403 Forbidden)**:
 ```json
 {
-  "message": "Invalid or expired token"
+  "message": "Token không hợp lệ hoặc đã hết hạn"
 }
 ```
 
@@ -184,13 +184,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNjgwM
 **Response (Success - 200 OK)**:
 ```json
 {
-  "message": "Logged out successfully"
+  "message": "Đăng xuất thành công"
 }
 ```
 
-## 8. Lấy thông tin người dùng (Get User Profile)
+## 8. Lấy thông tin người dùng hiện tại (Get Current User Profile)
 
-**Endpoint**: `POST /api/v1/user`
+**Endpoint**: `GET /api/v1/user/profile`
 
 **Request Header**:
 ```
@@ -202,84 +202,23 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNjgwM
 {
   "id": 1,
   "username": "johndoe",
-  "email": "john.doe@example.com", 
+  "email": "john.doe@example.com",
   "fullName": "John Doe",
-  "role": "ROLE_USER"
-}
-```
-
-## 9. Tạo người dùng mới (Quyền Admin)
-
-**Endpoint**: `POST /api/v1/user/create`
-
-**Quyền truy cập**: API này được cấu hình để cho phép truy cập công khai (permitAll) nhưng nên được sử dụng bởi Admin
-
-**Request Header** (không bắt buộc):
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4MDEyMzQ1NiwiZXhwIjoxNjgwMTI3MDU2fQ.abcdefghijklmnopqrstuvwxyz
-```
-
-**Request Body (Mẫu User)**:
-```json
-{
-  "username": "user1",
-  "password": "Password123!",
-  "email": "user1@example.com",
-  "fullName": "Regular User",
-  "phone": "0987654321",
-  "gender": "Female",
-  "dateOfBirth": "1995-05-15",
-  "address": "456 User Street, City",
-  "nationalId": "987654321098",
-  "role": {
-    "id": 3,
-    "name": "ROLE_USER",
-    "description": "Regular user role"
-  }
-}
-```
-
-**Request Body (Mẫu Staff)**:
-```json
-{
-  "username": "staff1",
-  "password": "StaffPass123!",
-  "email": "staff1@example.com",
-  "fullName": "Hotel Staff",
-  "phone": "0912345678",
+  "phoneNumber": "0987654321",
   "gender": "Male",
-  "dateOfBirth": "1992-08-20",
-  "address": "789 Staff Road, City",
-  "nationalId": "456789012345",
-  "role": {
-    "id": 2,
-    "name": "ROLE_STAFF",
-    "description": "Hotel staff role"
-  }
+  "dateOfBirth": "1990-01-01",
+  "address": "123 Main Street, City",
+  "nationalId": "123456789012",
+  "role": "ROLE_USER",
+  "profileImage": "https://example.com/images/profile/johndoe.jpg",
+  "createdAt": "2023-01-01T10:00:00",
+  "updatedAt": "2023-01-15T14:30:00"
 }
 ```
 
-**Response (Success - 201 Created)**:
-```json
-{
-  "id": 2,
-  "username": "staff1",
-  "fullName": "Hotel Staff",
-  "email": "staff1@example.com",
-  "phone": "0912345678",
-  "address": "789 Staff Road, City",
-  "gender": "Male",
-  "dateOfBirth": "1992-08-20",
-  "nationalId": "456789012345",
-  "createdAt": "15:30:22 - 27/03/2025",
-  "updatedAt": null,
-  "role": "ROLE_STAFF"
-}
-```
+## 9. Đổi mật khẩu (Change Password)
 
-## 10. Cập nhật thông tin người dùng
-
-**Endpoint**: `PUT /api/v1/user/update/{userId}`
+**Endpoint**: `POST /api/v1/user/change-password`
 
 **Request Header**:
 ```
@@ -289,167 +228,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNjgwM
 **Request Body (Mẫu)**:
 ```json
 {
-  "fullName": "John Smith Doe",
-  "email": "john.smith@example.com",
-  "phone": "0987123456",
-  "gender": "Male",
-  "dateOfBirth": "1990-01-15",
-  "address": "123 Updated Street, City",
-  "nationalId": "123456789012"
+  "oldPassword": "Password123!",
+  "newPassword": "NewPassword456!"
 }
-```
-
-**Response (Success - 201 Created)**:
-```json
-{
-  "id": 1,
-  "username": "johndoe",
-  "fullName": "John Smith Doe",
-  "email": "john.smith@example.com",
-  "phone": "0987123456",
-  "address": "123 Updated Street, City",
-  "gender": "Male",
-  "dateOfBirth": "1990-01-15",
-  "nationalId": "123456789012",
-  "createdAt": "10:15:30 - 26/03/2025",
-  "updatedAt": "16:45:22 - 27/03/2025",
-  "role": "ROLE_USER"
-}
-```
-
-## 11. Xóa người dùng (Quyền Admin)
-
-**Endpoint**: `DELETE /api/v1/users/{userId}`
-
-**Request Header**:
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4MDEyMzQ1NiwiZXhwIjoxNjgwMTI3MDU2fQ.abcdefghijklmnopqrstuvwxyz
 ```
 
 **Response (Success - 200 OK)**:
 ```json
 {
-  "message": "User deleted successfully"
+  "message": "Đổi mật khẩu thành công"
 }
 ```
 
-**Response (Error - 500 Internal Server Error)**:
+**Response (Error - 400 Bad Request)**:
 ```json
 {
-  "message": "Error deleting user: User not found with id: 999"
+  "message": "Mật khẩu cũ không chính xác"
 }
 ```
-
-**Lưu ý**: Khi xóa người dùng, hệ thống sẽ tự động xóa các refresh token và password reset token liên quan đến người dùng đó để tránh lỗi foreign key constraint. Không cần thực hiện thêm bất kỳ thao tác nào khác.
-
-## 12. Lấy danh sách người dùng (Quyền Admin hoặc Staff)
-
-**Endpoint**: `GET /api/v1/users`
-
-**Request Header**:
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4MDEyMzQ1NiwiZXhwIjoxNjgwMTI3MDU2fQ.abcdefghijklmnopqrstuvwxyz
-```
-
-**Response (Success - 200 OK)**:
-```json
-[
-  {
-    "id": 1,
-    "username": "johndoe",
-    "fullName": "John Smith Doe",
-    "email": "john.smith@example.com",
-    "phone": "0987123456",
-    "address": "123 Updated Street, City",
-    "gender": "Male",
-    "dateOfBirth": "1990-01-15",
-    "nationalId": "123456789012",
-    "createdAt": "10:15:30 - 26/03/2025",
-    "updatedAt": "16:45:22 - 27/03/2025",
-    "role": "ROLE_USER"
-  },
-  {
-    "id": 2,
-    "username": "staff1",
-    "fullName": "Hotel Staff",
-    "email": "staff1@example.com",
-    "phone": "0912345678",
-    "address": "789 Staff Road, City",
-    "gender": "Male",
-    "dateOfBirth": "1992-08-20",
-    "nationalId": "456789012345",
-    "createdAt": "15:30:22 - 27/03/2025",
-    "updatedAt": null,
-    "role": "ROLE_STAFF"
-  }
-]
-```
-
-## 13. Phân quyền và Vai trò
-
-Hệ thống có 3 vai trò (roles):
-
-1. **ROLE_ADMIN**: Có quyền cao nhất, có thể thực hiện tất cả các thao tác
-   - Quản lý người dùng (xem, thêm, sửa, xóa)
-   - Quản lý đặt phòng
-   - Quản lý phòng và loại phòng
-   - Quản lý đánh giá
-   - Xem báo cáo thống kê
-
-2. **ROLE_STAFF**: Nhân viên khách sạn
-   - Xem danh sách người dùng
-   - Quản lý đặt phòng (xem, thêm, sửa, không được xóa)
-   - Quản lý phòng (xem, cập nhật trạng thái)
-   - Xem đánh giá
-
-3. **ROLE_USER**: Người dùng đăng ký thông thường
-   - Quản lý thông tin cá nhân
-   - Đặt phòng
-   - Xem lịch sử đặt phòng cá nhân
-   - Đánh giá
-
-### Các API yêu cầu quyền Admin
-
-- `GET /api/v1/users` - Xem danh sách người dùng (Admin, Staff)
-- `POST /api/v1/user/create` - Tạo người dùng mới (Admin)
-- `DELETE /api/v1/users/{userId}` - Xóa người dùng (Admin)
-
-## 14. Dữ liệu khởi tạo
-
-### Vai trò (Roles)
-```sql
-INSERT INTO ROLES (id, name, description) VALUES (1, 'ROLE_ADMIN', 'Administrator role');
-INSERT INTO ROLES (id, name, description) VALUES (2, 'ROLE_STAFF', 'Hotel staff role');
-INSERT INTO ROLES (id, name, description) VALUES (3, 'ROLE_USER', 'Regular user role');
-```
-
-### Tài khoản Admin mặc định
-```sql
--- Mật khẩu: Admin123! (đã được mã hóa)
-INSERT INTO USERS (username, password_hash, email, full_name, phone_number, role_id, created_at) 
-VALUES ('admin', '$2a$10$X7DvfcJ8vZVwI7ZvZgVGvOaDgxpCmLJA7tNI1zK.f2bRUGrpFZkYe', 'admin@hotel.com', 'Hotel Admin', '0123456789', 1, NOW());
-```
-
-## 15. Lưu ý về bảo mật
-
-1. Mật khẩu được mã hóa bằng BCryptPasswordEncoder trước khi lưu vào cơ sở dữ liệu
-2. Access token có thời hạn 1 giờ
-3. Refresh token có thời hạn 10 phút
-4. Token đặt lại mật khẩu có thời hạn 24 giờ
-5. Tài khoản admin mặc định được tạo trong quá trình khởi tạo hệ thống
-
-## 16. Cấu hình Email cho quên mật khẩu
-
-Để chức năng quên mật khẩu hoạt động, cần cấu hình SMTP trong file `application.properties`:
-
-```properties
-# Email Configuration
-spring.mail.host=smtp.gmail.com
-spring.mail.port=587
-spring.mail.username=your-email@gmail.com
-spring.mail.password=your-app-password
-spring.mail.properties.mail.smtp.auth=true
-spring.mail.properties.mail.smtp.starttls.enable=true
-```
-
-**Lưu ý**: Khi sử dụng Gmail, bạn cần tạo "App Password" từ tài khoản Google.

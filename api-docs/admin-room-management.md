@@ -167,7 +167,7 @@ Authorization: Bearer <your_admin_jwt_token>
 
 ## 2. Lấy thông tin phòng theo ID
 
-**Endpoint**: `GET /api/v1/admin/rooms/{roomId}`
+**Endpoint**: `GET /api/v1/admin/rooms/{id}`
 
 **Mô tả**: Lấy thông tin chi tiết của một phòng dựa trên ID. **Chỉ dành cho Admin**.
 
@@ -212,41 +212,7 @@ Authorization: Bearer <your_admin_jwt_token>
   "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
   "specialFeatures": "Phòng hướng biển",
   "averageRating": 4.5,
-  "totalReviews": 10,
-  "recentReviews": [
-    {
-      "id": 1,
-      "bookingId": "BK2023001",
-      "guestName": "Nguyễn Văn A",
-      "displayName": "Nguyễn Văn A",
-      "roomNumber": "101",
-      "roomType": "Phòng Đơn Tiêu Chuẩn",
-      "rating": 5,
-      "cleanliness": 5,
-      "service": 4,
-      "comfort": 5,
-      "location": 4,
-      "facilities": 5,
-      "valueForMoney": 4,
-      "comment": "Phòng rất thoải mái và sạch sẽ",
-      "images": [],
-      "replyComment": "Cảm ơn quý khách đã đánh giá",
-      "replyBy": "Quản lý",
-      "replyDate": "30/03/2023",
-      "isFeatured": true,
-      "isAnonymous": false,
-      "status": "REPLIED",
-      "createdAt": "29/03/2023",
-      "updatedAt": "30/03/2023"
-    }
-  ]
-}
-```
-
-**Response (Error - 404 Not Found)**:
-```json
-{
-  "message": "Không tìm thấy phòng với ID: 999"
+  "totalReviews": 10
 }
 ```
 
@@ -285,24 +251,13 @@ Authorization: Bearer <your_admin_jwt_token>
       "name": "Wifi",
       "description": "Wifi tốc độ cao",
       "price": 0.0
-    },
-    {
-      "id": 2,
-      "name": "Dịch vụ giặt ủi",
-      "description": "Giặt ủi trong ngày",
-      "price": 150000.0
     }
   ],
   "maxOccupancy": 2,
   "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
-  "specialFeatures": "Phòng hướng biển"
-}
-```
-
-**Response (Error - 404 Not Found)**:
-```json
-{
-  "message": "Không tìm thấy phòng với số phòng: 999"
+  "specialFeatures": "Phòng hướng biển",
+  "averageRating": 4.5,
+  "totalReviews": 10
 }
 ```
 
@@ -315,116 +270,64 @@ Authorization: Bearer <your_admin_jwt_token>
 **Request Header**:
 ```
 Authorization: Bearer <your_admin_jwt_token>
-Content-Type: application/json
 ```
 
-**Request Body**:
+**Request Body (Mẫu)**:
 ```json
 {
-  "roomNumber": "201",
-  "roomTypeId": 3,
+  "roomNumber": "103",
+  "roomTypeId": 1,
   "status": "VACANT",
-  "floor": "2",
+  "floor": "1",
   "isActive": true,
-  "notes": "Phòng gia đình rộng rãi",
-  "images": [
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEA...", 
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQDT..."
-  ],
-  "serviceIds": [1, 3, 5]
+  "notes": "Phòng hướng vườn"
 }
 ```
-
-**Lưu ý**:
-- `roomNumber` và `roomTypeId` là bắt buộc
-- `roomNumber` phải là duy nhất trong hệ thống
-- `images` là danh sách chuỗi Base64 của hình ảnh
-- `serviceIds` là danh sách ID của các dịch vụ liên quan đến phòng
 
 **Response (Success - 201 Created)**:
 ```json
 {
   "id": 3,
-  "roomNumber": "201",
-  "roomTypeId": 3,
-  "roomTypeName": "Phòng Gia Đình",
+  "roomNumber": "103",
+  "roomTypeId": 1,
+  "roomTypeName": "Phòng Đơn Tiêu Chuẩn",
   "status": "VACANT",
-  "floor": "2",
+  "floor": "1",
   "isActive": true,
-  "notes": "Phòng gia đình rộng rãi",
-  "createdAt": "29/03/2023",
+  "notes": "Phòng hướng vườn",
+  "createdAt": "08/04/2025",
   "updatedAt": null,
-  "pricePerNight": 1200000,
-  "images": [
-    "https://hotel-images.s3.amazonaws.com/room201-img1.jpg",
-    "https://hotel-images.s3.amazonaws.com/room201-img2.jpg"
-  ],
-  "services": [
-    {
-      "id": 1,
-      "name": "Wifi",
-      "description": "Wifi tốc độ cao",
-      "price": 0.0
-    },
-    {
-      "id": 3,
-      "name": "Buổi ăn sáng",
-      "description": "Bữa ăn sáng buffet",
-      "price": 120000.0
-    },
-    {
-      "id": 5,
-      "name": "Dịch vụ spa",
-      "description": "Spa và massage",
-      "price": 500000.0
-    }
-  ],
-  "maxOccupancy": 6,
-  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công", "Bồn tắm"],
-  "specialFeatures": "Phòng gia đình rộng rãi"
-}
-```
-
-**Response (Error - 400 Bad Request)**: _(Khi số phòng đã tồn tại)_
-```json
-{
-  "message": "Số phòng đã tồn tại: 201"
-}
-```
-
-**Response (Error - 404 Not Found)**: _(Khi loại phòng không tồn tại)_
-```json
-{
-  "message": "Không tìm thấy loại phòng với ID: 999"
+  "pricePerNight": 500000,
+  "images": [],
+  "services": [],
+  "maxOccupancy": 2,
+  "amenities": ["TV", "Điều hòa", "Tủ lạnh"],
+  "specialFeatures": "",
+  "averageRating": 0,
+  "totalReviews": 0
 }
 ```
 
 ## 5. Cập nhật thông tin phòng
 
-**Endpoint**: `PUT /api/v1/admin/rooms/{roomId}`
+**Endpoint**: `PUT /api/v1/admin/rooms/{id}`
 
 **Mô tả**: Cập nhật thông tin của một phòng dựa trên ID. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
 Authorization: Bearer <your_admin_jwt_token>
-Content-Type: application/json
 ```
 
-**Request Body**:
+**Request Body (Mẫu)**:
 ```json
 {
-  "roomNumber": "201",
-  "roomTypeId": 4,
+  "roomNumber": "103",
+  "roomTypeId": 2,
   "status": "MAINTENANCE",
-  "floor": "2",
+  "floor": "1",
   "isActive": true,
-  "notes": "Phòng đang được nâng cấp thiết bị",
-  "images": [
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEA...", 
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQDT..."
-  ],
-  "serviceIds": [1, 2, 4, 6]
+  "notes": "Phòng đang sửa chữa điều hòa"
 }
 ```
 
@@ -432,71 +335,31 @@ Content-Type: application/json
 ```json
 {
   "id": 3,
-  "roomNumber": "201",
-  "roomTypeId": 4,
-  "roomTypeName": "Phòng Hạng Sang",
+  "roomNumber": "103",
+  "roomTypeId": 2,
+  "roomTypeName": "Phòng Đôi Tiêu Chuẩn",
   "status": "MAINTENANCE",
-  "floor": "2",
+  "floor": "1",
   "isActive": true,
-  "notes": "Phòng đang được nâng cấp thiết bị",
-  "createdAt": "29/03/2023",
-  "updatedAt": "29/03/2023",
-  "pricePerNight": 1800000,
-  "images": [
-    "https://hotel-images.s3.amazonaws.com/room201-img1-updated.jpg",
-    "https://hotel-images.s3.amazonaws.com/room201-img2-updated.jpg"
-  ],
-  "services": [
-    {
-      "id": 1,
-      "name": "Wifi",
-      "description": "Wifi tốc độ cao",
-      "price": 0.0
-    },
-    {
-      "id": 2,
-      "name": "Dịch vụ giặt ủi",
-      "description": "Giặt ủi trong ngày",
-      "price": 150000.0
-    },
-    {
-      "id": 4,
-      "name": "Minibar",
-      "description": "Minibar đầy đủ đồ uống",
-      "price": 200000.0
-    },
-    {
-      "id": 6,
-      "name": "Xe đưa đón sân bay",
-      "description": "Xe đưa đón sân bay VIP",
-      "price": 300000.0
-    }
-  ],
-  "maxOccupancy": 2,
-  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công", "Bồn tắm", "Minibar"],
-  "specialFeatures": "Phòng đang được nâng cấp thiết bị"
-}
-```
-
-**Response (Error - 404 Not Found)**:
-```json
-{
-  "message": "Không tìm thấy phòng với ID: 999"
-}
-```
-
-**Response (Error - 400 Bad Request)**: _(Khi số phòng đã tồn tại)_
-```json
-{
-  "message": "Số phòng đã tồn tại: 201"
+  "notes": "Phòng đang sửa chữa điều hòa",
+  "createdAt": "08/04/2025",
+  "updatedAt": "08/04/2025",
+  "pricePerNight": 800000,
+  "images": [],
+  "services": [],
+  "maxOccupancy": 4,
+  "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Két sắt"],
+  "specialFeatures": "",
+  "averageRating": 0,
+  "totalReviews": 0
 }
 ```
 
 ## 6. Xóa phòng
 
-**Endpoint**: `DELETE /api/v1/admin/rooms/{roomId}`
+**Endpoint**: `DELETE /api/v1/admin/rooms/{id}`
 
-**Mô tả**: Xóa (soft delete) một phòng khỏi hệ thống dựa trên ID. Thực tế là đánh dấu phòng không hoạt động (isActive = false). **Chỉ dành cho Admin**.
+**Mô tả**: Xóa một phòng khỏi hệ thống (soft delete). **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
@@ -504,20 +367,15 @@ Authorization: Bearer <your_admin_jwt_token>
 ```
 
 **Response (Success - 204 No Content)**:
-_Không có nội dung phản hồi_
-
-**Response (Error - 404 Not Found)**:
-```json
-{
-  "message": "Không tìm thấy phòng với ID: 999"
-}
+```
+Không có nội dung trả về
 ```
 
 ## 7. Lấy danh sách phòng theo loại phòng
 
 **Endpoint**: `GET /api/v1/admin/rooms/room-type/{roomTypeId}`
 
-**Mô tả**: Lấy danh sách các phòng thuộc về một loại phòng cụ thể. **Chỉ dành cho Admin**.
+**Mô tả**: Lấy danh sách phòng theo loại phòng. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
@@ -549,44 +407,13 @@ Authorization: Bearer <your_admin_jwt_token>
         "name": "Wifi",
         "description": "Wifi tốc độ cao",
         "price": 0.0
-      },
-      {
-        "id": 2,
-        "name": "Dịch vụ giặt ủi",
-        "description": "Giặt ủi trong ngày",
-        "price": 150000.0
       }
     ],
     "maxOccupancy": 2,
     "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
-    "specialFeatures": "Phòng hướng biển"
-  },
-  {
-    "id": 4,
-    "roomNumber": "102",
-    "roomTypeId": 1,
-    "roomTypeName": "Phòng Đơn Tiêu Chuẩn",
-    "status": "CLEANING",
-    "floor": "1",
-    "isActive": true,
-    "notes": "Phòng góc",
-    "createdAt": "20/03/2023",
-    "updatedAt": "25/03/2023",
-    "pricePerNight": 500000,
-    "images": [
-      "https://hotel-images.s3.amazonaws.com/room102-img1.jpg"
-    ],
-    "services": [
-      {
-        "id": 1,
-        "name": "Wifi",
-        "description": "Wifi tốc độ cao",
-        "price": 0.0
-      }
-    ],
-    "maxOccupancy": 2,
-    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
-    "specialFeatures": "Phòng góc"
+    "specialFeatures": "Phòng hướng biển",
+    "averageRating": 4.5,
+    "totalReviews": 10
   }
 ]
 ```
@@ -595,16 +422,13 @@ Authorization: Bearer <your_admin_jwt_token>
 
 **Endpoint**: `GET /api/v1/admin/rooms/status/{status}`
 
-**Mô tả**: Lấy danh sách các phòng có cùng trạng thái. **Chỉ dành cho Admin**.
+**Mô tả**: Lấy danh sách phòng theo trạng thái. **Chỉ dành cho Admin**.
 
 **Request Header**:
 ```
 Authorization: Bearer <your_admin_jwt_token>
 ```
 
-**Tham số đường dẫn**:
-- `status`: VACANT, OCCUPIED, MAINTENANCE, CLEANING
-
 **Response (Success - 200 OK)**:
 ```json
 [
@@ -630,117 +454,13 @@ Authorization: Bearer <your_admin_jwt_token>
         "name": "Wifi",
         "description": "Wifi tốc độ cao",
         "price": 0.0
-      },
-      {
-        "id": 2,
-        "name": "Dịch vụ giặt ủi",
-        "description": "Giặt ủi trong ngày",
-        "price": 150000.0
       }
     ],
     "maxOccupancy": 2,
     "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
-    "specialFeatures": "Phòng hướng biển"
-  },
-  {
-    "id": 5,
-    "roomNumber": "103",
-    "roomTypeId": 2,
-    "roomTypeName": "Phòng Đôi Tiêu Chuẩn",
-    "status": "VACANT",
-    "floor": "1",
-    "isActive": true,
-    "notes": "Phòng góc",
-    "createdAt": "20/03/2023",
-    "updatedAt": null,
-    "pricePerNight": 800000,
-    "images": [
-      "https://hotel-images.s3.amazonaws.com/room103-img1.jpg"
-    ],
-    "services": [
-      {
-        "id": 1,
-        "name": "Wifi",
-        "description": "Wifi tốc độ cao",
-        "price": 0.0
-      }
-    ],
-    "maxOccupancy": 4,
-    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Bồn tắm"],
-    "specialFeatures": "Phòng góc"
-  }
-]
-```
-
-## 9. Lấy danh sách phòng theo loại phòng (API công khai)
-
-**Endpoint**: `GET /api/v1/room-types/{roomTypeId}/rooms`
-
-**Mô tả**: Lấy danh sách các phòng thuộc về một loại phòng cụ thể. API này có thể được sử dụng công khai mà không cần quyền admin.
-
-**Response (Success - 200 OK)**:
-```json
-[
-  {
-    "id": 1,
-    "roomNumber": "101",
-    "roomTypeId": 1,
-    "roomTypeName": "Phòng Đơn Tiêu Chuẩn",
-    "status": "VACANT",
-    "floor": "1",
-    "isActive": true,
-    "notes": "Phòng hướng biển",
-    "createdAt": "20/03/2023",
-    "updatedAt": null,
-    "pricePerNight": 500000,
-    "images": [
-      "https://hotel-images.s3.amazonaws.com/room101-img1.jpg", 
-      "https://hotel-images.s3.amazonaws.com/room101-img2.jpg"
-    ],
-    "services": [
-      {
-        "id": 1,
-        "name": "Wifi",
-        "description": "Wifi tốc độ cao",
-        "price": 0.0
-      },
-      {
-        "id": 2,
-        "name": "Dịch vụ giặt ủi",
-        "description": "Giặt ủi trong ngày",
-        "price": 150000.0
-      }
-    ],
-    "maxOccupancy": 2,
-    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
-    "specialFeatures": "Phòng hướng biển"
-  },
-  {
-    "id": 4,
-    "roomNumber": "102",
-    "roomTypeId": 1,
-    "roomTypeName": "Phòng Đơn Tiêu Chuẩn",
-    "status": "VACANT",
-    "floor": "1",
-    "isActive": true,
-    "notes": "Phòng góc",
-    "createdAt": "20/03/2023",
-    "updatedAt": "25/03/2023",
-    "pricePerNight": 500000,
-    "images": [
-      "https://hotel-images.s3.amazonaws.com/room102-img1.jpg"
-    ],
-    "services": [
-      {
-        "id": 1,
-        "name": "Wifi",
-        "description": "Wifi tốc độ cao",
-        "price": 0.0
-      }
-    ],
-    "maxOccupancy": 2,
-    "amenities": ["TV", "Điều hòa", "Tủ lạnh", "Ban công"],
-    "specialFeatures": "Phòng góc"
+    "specialFeatures": "Phòng hướng biển",
+    "averageRating": 4.5,
+    "totalReviews": 10
   }
 ]
 ```

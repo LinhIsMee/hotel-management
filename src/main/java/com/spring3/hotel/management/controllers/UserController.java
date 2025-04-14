@@ -58,6 +58,9 @@ public class UserController {
     @Autowired
     private  AuthenticationManager authenticationManager;
 
+    /**
+     * Đăng ký tài khoản mới
+     */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
         try {
@@ -68,6 +71,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Lưu thông tin người dùng
+     */
     @PostMapping(value = "/save")
     public ResponseEntity saveUser(@RequestBody UserRequest userRequest) {
         try {
@@ -78,7 +84,9 @@ public class UserController {
         }
     }
 
-
+    /**
+     * Lấy thông tin người dùng hiện tại
+     */
     @PostMapping("/user")
     public ResponseEntity<?> getUserProfile() {
         try {
@@ -90,6 +98,9 @@ public class UserController {
         }
     }
 
+    /**
+     * API kiểm tra hệ thống
+     */
     @GetMapping("/test")
     public String test() {
         try {
@@ -99,6 +110,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Đăng nhập và tạo token
+     */
     @PostMapping("/login")
     public JwtResponseDTO AuthenticateAndGetToken(@RequestBody AuthRequestDTO authRequestDTO) {
         // Xác thực người dùng
@@ -127,6 +141,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Làm mới token
+     */
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
@@ -162,6 +179,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Kiểm tra token có hợp lệ
+     */
     @PostMapping("/validate-token")
     public ResponseEntity<?> validateToken(@RequestBody ValidateTokenRequest request) {
         try {
@@ -185,6 +205,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Yêu cầu khôi phục mật khẩu
+     */
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
         try {
@@ -206,6 +229,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Đặt lại mật khẩu
+     */
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
         try {
@@ -231,6 +257,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Đăng xuất khỏi hệ thống
+     */
     @PostMapping("/logout")
     public ResponseEntity<?> logoutUser() {
         try {
@@ -255,6 +284,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Lấy thông tin chi tiết của người dùng theo ID
+     */
     @GetMapping("/user/profile/{userId}")
     public ResponseEntity<?> getProfile(@PathVariable Integer userId) {
         try {
@@ -266,6 +298,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Cập nhật thông tin người dùng
+     */
     @PutMapping("/user/update/{userId}")
     public ResponseEntity<?> updateUser(@RequestBody UpdateUserRequest request, @PathVariable Integer userId) {
         try {
@@ -277,6 +312,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Tạo người dùng mới
+     */
     @PostMapping("/user/create")
     public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request) {
         try {
@@ -288,6 +326,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Lấy danh sách tất cả người dùng
+     */
     @GetMapping("/users")
     public ResponseEntity<?> getUserList() {
         try {
@@ -299,6 +340,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Xóa người dùng theo ID
+     */
     @DeleteMapping("/users/{userId}")
     public ResponseEntity<?> deleteUser(@PathVariable Integer userId) {
         try {
@@ -310,6 +354,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Lấy thông tin cá nhân của người dùng đang đăng nhập
+     */
     @GetMapping("/user/profile")
     public ResponseEntity<?> getCurrentUserProfile() {
         try {
@@ -329,6 +376,9 @@ public class UserController {
         }
     }
     
+    /**
+     * Thay đổi mật khẩu
+     */
     @PostMapping("/user/change-password")
     public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
         try {
@@ -356,6 +406,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Lấy thông tin người dùng theo ID
+     */
     @GetMapping("/users/{userId}")
     public ResponseEntity<?> getUserById(@PathVariable Integer userId) {
         try {

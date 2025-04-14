@@ -27,4 +27,7 @@ public interface BookingService {
     List<BookingResponseDTO> getConfirmedBookingsByDateRange(LocalDate startDate, LocalDate endDate);
     BookingResponseDTO createBookingTest(UpsertBookingRequest request);
     BookingResponseDTO markBookingAsPaid(Integer bookingId, String paymentMethod);
+    
+    // Phương thức mới để xử lý callback VNPay
+    void updatePaymentAndBookingStatusAfterVNPay(Integer bookingId, String transactionNo, String responseCode);
 }

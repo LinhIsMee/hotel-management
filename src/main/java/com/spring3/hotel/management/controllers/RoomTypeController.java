@@ -26,24 +26,36 @@ public class RoomTypeController {
     @Autowired
     private RoomService roomService;
 
+    /**
+     * Lấy thông tin loại phòng theo ID
+     */
     @GetMapping("/{id}")
     public ResponseEntity<RoomTypeResponseDTO> getRoomTypeById(@PathVariable Integer id) {
         RoomTypeResponseDTO roomType = roomTypeService.getRoomTypeById(id);
         return ResponseEntity.ok(roomType);
     }
     
+    /**
+     * Lấy danh sách phòng theo loại phòng
+     */
     @GetMapping("/{id}/rooms")
     public ResponseEntity<List<RoomResponseDTO>> getRoomsByRoomType(@PathVariable Integer id) {
         List<RoomResponseDTO> rooms = roomService.getRoomsByRoomType(id);
         return ResponseEntity.ok(rooms);
     }
 
+    /**
+     * Tạo mới loại phòng
+     */
     @PostMapping
     public ResponseEntity<RoomTypeResponseDTO> createRoomType(@Valid @RequestBody UpsertRoomTypeRequest request) {
         RoomTypeResponseDTO createdRoomType = roomTypeService.createRoomType(request);
         return new ResponseEntity<>(createdRoomType, HttpStatus.CREATED);
     }
 
+    /**
+     * Cập nhật thông tin loại phòng
+     */
     @PutMapping("/{id}")
     public ResponseEntity<RoomTypeResponseDTO> updateRoomType(
         @PathVariable Integer id,
@@ -52,12 +64,18 @@ public class RoomTypeController {
         return ResponseEntity.ok(updatedRoomType);
     }
 
+    /**
+     * Xóa loại phòng
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<RoomTypeResponseDTO> deleteRoomType(@PathVariable Integer id) {
         RoomTypeResponseDTO deletedRoomType = roomTypeService.deleteRoomType(id);
         return ResponseEntity.ok(deletedRoomType);
     }
 
+    /**
+     * Lấy danh sách tất cả loại phòng
+     */
     @GetMapping
     public ResponseEntity<List<RoomTypeResponseDTO>> getAllRoomTypes() {
         List<RoomTypeResponseDTO> roomTypes = roomTypeService.getAllRoomTypes();

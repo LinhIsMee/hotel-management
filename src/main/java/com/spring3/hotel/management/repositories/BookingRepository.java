@@ -119,6 +119,13 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "LEFT JOIN FETCH b.discount")
     Page<Booking> findAllWithDetails(Pageable pageable);
     
+    // Tìm tất cả booking không phân trang (lấy ALL)
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.user " +
+           "LEFT JOIN FETCH b.discount " +
+           "ORDER BY b.createdAt DESC")
+    List<Booking> findAllWithDetailsNoPage();
+    
     // Truy vấn bổ sung để lấy booking details
     @Query("SELECT DISTINCT b FROM Booking b " +
            "LEFT JOIN FETCH b.bookingDetails " +

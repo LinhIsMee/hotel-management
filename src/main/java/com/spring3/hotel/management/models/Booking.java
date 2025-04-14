@@ -45,6 +45,9 @@ public class Booking {
     @Column(name = "status", nullable = false)
     private String status;
 
+    @Column(name = "payment_status")
+    private String paymentStatus;
+
     @Column(name = "created_at", columnDefinition = "TIMESTAMP")
     private LocalDateTime createdAt;
     

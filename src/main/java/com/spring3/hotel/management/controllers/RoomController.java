@@ -5,6 +5,7 @@ import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
+import com.spring3.hotel.management.services.impl.RoomServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 
@@ -148,6 +150,22 @@ public class RoomController {
         } catch (Exception e) {
             log.error("Lỗi khi tái khởi tạo dữ liệu phòng mẫu: {}", e.getMessage());
             return ResponseEntity.status(500).body("Lỗi khi tái khởi tạo dữ liệu: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/batch-update-status")
+    public ResponseEntity<?> updateRoomStatusBatch(@RequestBody Map<String, String> roomStatusMap) {
+        try {
+            ((RoomServiceImpl) roomService).updateRoomStatusBatch(roomStatusMap);
+            return ResponseEntity.ok()
+                .body(Map.of("message", "Đã cập nhật trạng thái thành công cho " + roomStatusMap.size() + " phòng"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Lỗi khi cập nhật trạng thái phòng hàng loạt", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Có lỗi xảy ra khi cập nhật trạng thái phòng: " + e.getMessage()));
         }
     }
 } 

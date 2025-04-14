@@ -23,6 +23,9 @@ public class AdminController {
     @Autowired
     private EmployeeService employeeService;
     
+    /**
+     * Hiển thị trang quản lý nhân viên
+     */
     @GetMapping("/employees")
     public String employeesPage(Model model) {
         try {

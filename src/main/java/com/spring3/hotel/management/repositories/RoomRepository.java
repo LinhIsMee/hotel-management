@@ -2,6 +2,7 @@ package com.spring3.hotel.management.repositories;
 
 import com.spring3.hotel.management.models.Room;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -33,6 +34,17 @@ public interface RoomRepository extends JpaRepository<Room, Integer> {
     List<Room> findByIsActiveTrue();
     
     @Query("SELECT r FROM Room r JOIN BookingDetail bd ON bd.room.id = r.id JOIN Booking b ON bd.booking.id = b.id " +
-           "WHERE b.checkInDate <= ?2 AND b.checkOutDate >= ?1 AND b.status NOT IN ('CANCELLED')")
+           "WHERE ((b.checkInDate <= ?2 AND b.checkOutDate >= ?1) " +
+           "OR (b.checkInDate >= ?1 AND b.checkInDate < ?2) " +
+           "OR (b.checkOutDate > ?1 AND b.checkOutDate <= ?2)) " +
+           "AND b.status NOT IN ('CANCELLED', 'COMPLETED')")
     List<Room> findBookedRoomsBetweenDates(LocalDate checkInDate, LocalDate checkOutDate);
+
+    @Modifying
+    @Query(value = "UPDATE rooms SET status = :status WHERE room_number = :roomNumber", nativeQuery = true)
+    void updateRoomStatus(@Param("roomNumber") String roomNumber, @Param("status") String status);
+
+    @Modifying
+    @Query(value = "UPDATE rooms SET status = :status WHERE room_number IN :roomNumbers", nativeQuery = true)
+    void updateRoomStatusBatch(@Param("roomNumbers") List<String> roomNumbers, @Param("status") String status);
 }

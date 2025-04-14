@@ -15,6 +15,7 @@ import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -23,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -293,17 +295,30 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate) {
-        // Lấy danh sách tất cả phòng đang hoạt động
-        List<Room> allRooms = roomRepository.findByIsActiveTrue();
+        // Lấy danh sách tất cả phòng (không chỉ phòng active)
+        List<Room> allRooms = roomRepository.findAll();
+        log.info("Tìm thấy tổng cộng {} phòng trong hệ thống", allRooms.size());
         
         // Lấy danh sách phòng đã được đặt trong khoảng thời gian
         List<Room> bookedRooms = roomRepository.findBookedRoomsBetweenDates(checkInDate, checkOutDate);
+        log.info("Tìm thấy {} phòng đã đặt trong khoảng thời gian từ {} đến {}", 
+                 bookedRooms.size(), checkInDate, checkOutDate);
         
-        // Lọc ra các phòng còn trống
+        // Lọc ra các phòng còn trống với nhiều loại trạng thái phù hợp
         List<Room> availableRooms = allRooms.stream()
                 .filter(room -> !bookedRooms.contains(room))
-                .filter(room -> "VACANT".equals(room.getStatus()))
+                .filter(room -> {
+                    // Các trạng thái phòng có thể đặt
+                    String status = room.getStatus();
+                    return "VACANT".equals(status) || 
+                           "READY".equals(status) || 
+                           "CLEANED".equals(status) || 
+                           "AVAILABLE".equals(status) ||
+                           "INSPECTION".equals(status);
+                })
                 .collect(Collectors.toList());
+        
+        log.info("Sau khi lọc, tìm thấy {} phòng có sẵn để đặt", availableRooms.size());
         
         // Chuyển đổi sang DTO và trả về
         return availableRooms.stream()
@@ -313,25 +328,37 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public List<RoomResponseDTO> getAllActiveRooms() {
-        // Lấy tất cả phòng không phân biệt trạng thái active
-        List<Room> allRooms = roomRepository.findAll();
-        log.info("Đã tìm thấy {} phòng trong DB", allRooms.size());
-        
-        // Kiểm tra nếu không có phòng nào hoặc ít hơn 5 phòng (dữ liệu không đủ)
-        if (allRooms.isEmpty() || allRooms.size() < 5) {
-            // Tạo phòng mẫu nếu DB trống hoặc ít dữ liệu
-            log.warn("Không tìm thấy đủ phòng trong cơ sở dữ liệu, khởi tạo dữ liệu mẫu");
-            initRoomsFromJson();
-            allRooms = roomRepository.findAll();
-            log.info("Sau khi khởi tạo dữ liệu mẫu: {} phòng", allRooms.size());
-        }
-        
-        // Chuyển đổi sang DTO và trả về
-        List<RoomResponseDTO> result = allRooms.stream()
+        return roomRepository.findByIsActiveTrue()
+                .stream()
                 .map(RoomResponseDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateRoomStatusBatch(Map<String, String> roomStatusMap) {
+        // Kiểm tra tính hợp lệ của trạng thái
+        Set<String> validStatuses = Set.of("VACANT", "OCCUPIED", "BOOKED", "MAINTENANCE", "CLEANING", "READY", "INSPECTION", "AVAILABLE");
         
-        log.info("Trả về {} phòng từ getAllActiveRooms", result.size());
-        return result;
+        // Lọc và kiểm tra các trạng thái không hợp lệ
+        List<String> invalidStatuses = roomStatusMap.values().stream()
+                .filter(status -> !validStatuses.contains(status))
+                .collect(Collectors.toList());
+                
+        if (!invalidStatuses.isEmpty()) {
+            throw new IllegalArgumentException("Trạng thái không hợp lệ: " + String.join(", ", invalidStatuses));
+        }
+
+        // Nhóm các phòng theo trạng thái để cập nhật hàng loạt
+        Map<String, List<String>> statusToRooms = roomStatusMap.entrySet().stream()
+                .collect(Collectors.groupingBy(
+                    Map.Entry::getValue,
+                    Collectors.mapping(Map.Entry::getKey, Collectors.toList())
+                ));
+
+        // Cập nhật từng nhóm phòng
+        statusToRooms.forEach((status, roomNumbers) -> {
+            roomRepository.updateRoomStatusBatch(roomNumbers, status);
+            log.info("Đã cập nhật {} phòng sang trạng thái {}", roomNumbers.size(), status);
+        });
     }
 }

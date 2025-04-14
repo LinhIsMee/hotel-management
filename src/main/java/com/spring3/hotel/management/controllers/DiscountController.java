@@ -24,16 +24,25 @@ public class DiscountController {
     @Autowired
     private DiscountService discountService;
 
+    /**
+     * Lấy danh sách tất cả mã giảm giá
+     */
     @GetMapping
     public ResponseEntity<List<DiscountDTO>> getAllDiscounts() {
         return ResponseEntity.ok(discountService.getAllDiscounts());
     }
 
+    /**
+     * Lấy danh sách mã giảm giá đang hoạt động
+     */
     @GetMapping("/active")
     public ResponseEntity<List<DiscountDTO>> getActiveDiscounts() {
         return ResponseEntity.ok(discountService.getActiveDiscounts());
     }
 
+    /**
+     * Lấy thông tin mã giảm giá theo ID
+     */
     @GetMapping("/{id}")
     public ResponseEntity<DiscountDTO> getDiscountById(@PathVariable Integer id) {
         try {
@@ -44,6 +53,9 @@ public class DiscountController {
         }
     }
 
+    /**
+     * Lấy thông tin mã giảm giá theo mã code
+     */
     @GetMapping("/code/{code}")
     public ResponseEntity<DiscountDTO> getDiscountByCode(@PathVariable String code) {
         try {
@@ -54,6 +66,9 @@ public class DiscountController {
         }
     }
 
+    /**
+     * Tạo mới mã giảm giá
+     */
     @PostMapping
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Object> createDiscount(@RequestBody DiscountDTO discountDTO) {
@@ -67,6 +82,9 @@ public class DiscountController {
         }
     }
     
+    /**
+     * Tạo nhiều mã giảm giá ngẫu nhiên
+     */
     @PostMapping("/generate")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Object> generateDiscounts(@RequestBody GenerateDiscountRequest request) {
@@ -83,6 +101,9 @@ public class DiscountController {
         }
     }
 
+    /**
+     * Cập nhật thông tin mã giảm giá
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Object> updateDiscount(@PathVariable Integer id, @RequestBody DiscountDTO discountDTO) {
@@ -100,6 +121,9 @@ public class DiscountController {
         }
     }
 
+    /**
+     * Xóa mã giảm giá
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Object> deleteDiscount(@PathVariable Integer id) {
@@ -113,12 +137,18 @@ public class DiscountController {
         }
     }
 
+    /**
+     * Kiểm tra mã giảm giá có hợp lệ
+     */
     @GetMapping("/validate/{code}")
     public ResponseEntity<Boolean> validateDiscount(@PathVariable String code) {
         boolean isValid = discountService.isDiscountValid(code);
         return ResponseEntity.ok(isValid);
     }
 
+    /**
+     * Áp dụng mã giảm giá vào số tiền
+     */
     @GetMapping("/apply")
     public ResponseEntity<Object> applyDiscount(
             @RequestParam String code,
@@ -142,6 +172,9 @@ public class DiscountController {
         }
     }
     
+    /**
+     * Tăng số lần sử dụng của mã giảm giá
+     */
     @PostMapping("/use/{code}")
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_STAFF')")
     public ResponseEntity<Object> useDiscount(@PathVariable String code) {

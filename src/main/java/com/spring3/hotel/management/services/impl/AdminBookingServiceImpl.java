@@ -13,6 +13,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,6 +25,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AdminBookingServiceImpl implements AdminBookingService {
 
     @Autowired
@@ -224,7 +228,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     }
 
     @Override
+    @Transactional
     public BookingResponseDTO updateBookingByAdmin(AdminBookingRequest request, Integer id) {
+        log.info("Admin updating booking ID: {}", id);
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
@@ -246,31 +252,92 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             booking.setDiscount(null);
         }
         
+        // Cập nhật trạng thái booking và paymentStatus của Booking
         booking.setStatus(request.getStatus());
-        
-        // Lưu booking để có ID cho booking details
-        booking = bookingRepository.save(booking);
-        
-        // Cập nhật payment nếu có thông tin thanh toán mới
-        List<Payment> payments = paymentRepository.findByBooking_Id(id);
-        if (!payments.isEmpty()) {
-            Payment payment = payments.get(0);
-            if (request.getPaymentMethod() != null) {
-                payment.setMethod(request.getPaymentMethod());
+        log.debug("Updating booking status to: {}", request.getStatus());
+        String requestedPaymentStatus = request.getPaymentStatus();
+        log.debug("Requested payment status: {}", requestedPaymentStatus);
+        String newBookingPaymentStatus = requestedPaymentStatus;
+        String newPaymentRecordStatus = "";
+        boolean createNewPaymentRecord = false;
+
+        if ("PAID".equalsIgnoreCase(requestedPaymentStatus)) {
+            newBookingPaymentStatus = "PAID";
+            newPaymentRecordStatus = "00";
+            if (!List.of("CONFIRMED", "CHECKED_IN", "COMPLETED").contains(booking.getStatus())) {
+                 booking.setStatus("CONFIRMED");
+                 log.debug("Updating booking status to CONFIRMED due to PAID payment status.");
             }
-            if (request.getPaymentStatus() != null) {
-                payment.setStatus(request.getPaymentStatus());
+            createNewPaymentRecord = true;
+        } else if ("UNPAID".equalsIgnoreCase(requestedPaymentStatus) || "PENDING".equalsIgnoreCase(requestedPaymentStatus)) {
+            newBookingPaymentStatus = "PENDING";
+            newPaymentRecordStatus = "01";
+        } else if ("REFUNDED".equalsIgnoreCase(requestedPaymentStatus)) {
+            newBookingPaymentStatus = "REFUNDED";
+            newPaymentRecordStatus = "REFUNDED";
+             if (!"CANCELLED".equals(booking.getStatus())) {
+                 booking.setStatus("CANCELLED");
+                 log.debug("Updating booking status to CANCELLED due to REFUNDED payment status.");
             }
-            if (request.getPaymentDate() != null) {
-                payment.setPayDate(request.getPaymentDate().toString());
-            }
-            paymentRepository.save(payment);
+            createNewPaymentRecord = true;
+        } else {
+            log.warn("Unrecognized payment status requested: {}. Keeping it as is for booking paymentStatus.", requestedPaymentStatus);
+            newBookingPaymentStatus = requestedPaymentStatus;
+            newPaymentRecordStatus = requestedPaymentStatus;
         }
+
+        booking.setPaymentStatus(newBookingPaymentStatus);
+        log.debug("Setting booking payment status to: {}", newBookingPaymentStatus);
         
-        // Cập nhật booking details nếu có danh sách phòng mới
+        try {
+             final Booking bookingToSave = booking; // Sử dụng biến mới để lưu cuối cùng
+
+            // 1. Xử lý Payment record trước
+            if (createNewPaymentRecord) {
+                log.debug("Creating new payment record for booking ID: {} with status: {}", id, newPaymentRecordStatus);
+                Payment adminPayment = new Payment();
+                adminPayment.setBooking(bookingToSave); // Liên kết với booking sẽ được lưu
+                long amount = 0;
+                if (bookingToSave.getFinalPrice() != null) amount = bookingToSave.getFinalPrice().longValue();
+                else if (bookingToSave.getTotalPrice() != null) amount = bookingToSave.getTotalPrice().longValue();
+                adminPayment.setAmount(amount);
+                adminPayment.setStatus(newPaymentRecordStatus);
+                adminPayment.setResponseCode(newPaymentRecordStatus); 
+                adminPayment.setMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "ADMIN_UPDATE");
+                if ("00".equals(newPaymentRecordStatus) || "REFUNDED".equals(newPaymentRecordStatus)) {
+                    adminPayment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                }
+                adminPayment.setOrderInfo("Admin update payment status to: " + newBookingPaymentStatus);
+                paymentRepository.save(adminPayment);
+                log.info("Successfully saved new payment record for booking ID: {}", id);
+            } else {
+                 log.debug("Not creating a new payment record for booking ID: {} (status: {})", id, newBookingPaymentStatus);
+                 List<Payment> payments = paymentRepository.findByBooking_Id(id);
+                 if (!payments.isEmpty()) {
+                     Payment paymentToUpdate = payments.get(payments.size() - 1);
+                     if (!newPaymentRecordStatus.equals(paymentToUpdate.getStatus())) {
+                          log.debug("Updating latest payment record (ID: {}) status to: {}", paymentToUpdate.getId(), newPaymentRecordStatus);
+                          paymentToUpdate.setStatus(newPaymentRecordStatus);
+                          paymentToUpdate.setResponseCode(newPaymentRecordStatus);
+                          paymentRepository.save(paymentToUpdate);
+                          log.info("Successfully updated latest payment record (ID: {})", paymentToUpdate.getId());
+                     }
+                 }
+            }
+            
+            // 2. Cập nhật booking details nếu có danh sách phòng mới
         if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
+                 // Kiểm tra xem danh sách phòng có thực sự thay đổi không để tránh xóa/tạo lại không cần thiết
+                 List<Integer> currentRoomIds = bookingDetailRepository.findAllByBooking_Id(id).stream()
+                                                     .map(bd -> bd.getRoom().getId())
+                                                     .sorted()
+                                                     .toList();
+                 List<Integer> requestedRoomIds = request.getRoomIds().stream().sorted().toList();
+
+                 if (!currentRoomIds.equals(requestedRoomIds)) {
+                     log.debug("Updating booking details for booking ID: {}", id);
             // Xóa booking details cũ
-            bookingDetailRepository.deleteAllByBookingId(booking.getId());
+                     bookingDetailRepository.deleteAllByBookingId(bookingToSave.getId());
             
             // Tạo booking details mới
             for (Integer roomId : request.getRoomIds()) {
@@ -278,14 +345,29 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
                 
                 BookingDetail bookingDetail = new BookingDetail();
-                bookingDetail.setBooking(booking);
+                         bookingDetail.setBooking(bookingToSave); // Liên kết với booking sẽ được lưu
                 bookingDetail.setRoom(room);
-                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                         bookingDetail.setPricePerNight(room.getRoomType().getBasePrice()); // Hoặc giá từ request nếu có
                 bookingDetailRepository.save(bookingDetail);
+                     }
+                     log.info("Successfully updated booking details for booking ID: {}", id);
+                 } else {
+                      log.debug("Room IDs haven't changed for booking ID: {}. Skipping booking detail update.", id);
+                 }
             }
+            
+            // 3. Lưu booking cuối cùng sau khi mọi thứ thành công
+            log.info("Saving final booking state for ID: {} with paymentStatus: {}", id, bookingToSave.getPaymentStatus());
+            Booking savedBooking = bookingRepository.save(bookingToSave);
+            log.info("Successfully saved final booking state for ID: {}", id);
+            
+            log.info("Admin update completed successfully for booking ID: {}", id);
+            return convertToBookingResponseDTO(savedBooking);
+
+        } catch (Exception e) {
+            log.error("Error during admin update for booking ID: {}. Rolling back transaction.", id, e);
+            throw new RuntimeException("Error updating booking by admin: " + e.getMessage(), e);
         }
-        
-        return convertToBookingResponseDTO(booking);
     }
 
     @Override
@@ -293,17 +375,22 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
-        // Admin có thể hủy booking ở bất kỳ trạng thái nào
         booking.setStatus("CANCELLED");
+        booking.setPaymentStatus("REFUNDED"); // Cập nhật trạng thái payment của booking
         bookingRepository.save(booking);
         
-        // Cập nhật trạng thái payment nếu có
+        // Tìm hoặc tạo payment record cho việc refund
         List<Payment> payments = paymentRepository.findByBooking_Id(id);
-        if (!payments.isEmpty()) {
-            Payment payment = payments.get(0);
-            payment.setStatus("REFUNDED");
-            paymentRepository.save(payment);
-        }
+        // Luôn tạo mới record cho hành động cancel/refund từ admin
+        Payment refundPayment = new Payment();
+        refundPayment.setBooking(booking);
+        refundPayment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
+        refundPayment.setStatus("REFUNDED"); // Trạng thái refund
+        refundPayment.setResponseCode("REFUNDED"); // Có thể dùng mã khác nếu cần
+        refundPayment.setMethod("CANCELLED_BY_ADMIN");
+        refundPayment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+        refundPayment.setOrderInfo("Booking cancelled and refunded by admin");
+        paymentRepository.save(refundPayment);
         
         return convertToBookingResponseDTO(booking);
     }
@@ -313,17 +400,36 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
-        // Admin có thể xác nhận booking từ bất kỳ trạng thái nào
         booking.setStatus("CONFIRMED");
+        booking.setPaymentStatus("PAID"); // Cập nhật trạng thái payment của booking
         bookingRepository.save(booking);
         
-        // Cập nhật trạng thái payment thành PAID
+        // Tìm hoặc tạo payment record
         List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        Payment payment;
         if (!payments.isEmpty()) {
-            Payment payment = payments.get(0);
-            payment.setStatus("PAID");
-            paymentRepository.save(payment);
+             // Ưu tiên cập nhật payment chưa có transaction_no (có thể là payment do admin tạo)
+             payment = payments.stream()
+                        .filter(p -> p.getTransactionNo() == null || p.getTransactionNo().isEmpty())
+                        .findFirst()
+                        .orElse(payments.get(payments.size() - 1)); // Nếu không có thì cập nhật cái mới nhất
+            payment.setStatus("00"); // Trạng thái thành công
+            payment.setResponseCode("00");
+            payment.setMethod(payment.getMethod() != null ? payment.getMethod() : "CONFIRMED_BY_ADMIN");
+             if (payment.getPayDate() == null) { // Chỉ đặt ngày nếu chưa có
+                 payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+             }
+        } else {
+            payment = new Payment();
+            payment.setBooking(booking);
+            payment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
+            payment.setStatus("00");
+            payment.setResponseCode("00");
+            payment.setMethod("CONFIRMED_BY_ADMIN");
+            payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+            payment.setOrderInfo("Booking confirmed by admin");
         }
+        paymentRepository.save(payment);
         
         return convertToBookingResponseDTO(booking);
     }
@@ -383,142 +489,129 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         bookingRepository.deleteById(id);
     }
 
+    @Override
+    public List<BookingResponseDTO> getAllBookingsNoPage() {
+        try {
+            // Step 1: Get all bookings with user and discount
+            List<Booking> bookings = bookingRepository.findAllWithDetailsNoPage();
+            
+            if (bookings.isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            // Step 2: Extract booking IDs
+            List<Integer> bookingIds = bookings.stream()
+                    .map(Booking::getId)
+                    .collect(Collectors.toList());
+            
+            // Step 3: Load booking details in a separate query
+            List<Booking> bookingsWithDetails = bookingRepository.findBookingsWithDetails(bookingIds);
+            Map<Integer, List<BookingDetail>> detailsMap = new java.util.HashMap<>();
+            for (Booking b : bookingsWithDetails) {
+                detailsMap.put(b.getId(), b.getBookingDetails());
+            }
+            
+            // Step 4: Load payments in a separate query
+            List<Booking> bookingsWithPayments = bookingRepository.findBookingsWithPayments(bookingIds);
+            Map<Integer, List<Payment>> paymentsMap = new java.util.HashMap<>();
+            for (Booking b : bookingsWithPayments) {
+                paymentsMap.put(b.getId(), b.getPayments());
+            }
+            
+            // Step 5: Convert to DTOs with all the data
+            return bookings.stream()
+                    .map(booking -> {
+                        // Attach the separately loaded collections
+                        List<BookingDetail> details = detailsMap.getOrDefault(booking.getId(), new ArrayList<>());
+                        List<Payment> payments = paymentsMap.getOrDefault(booking.getId(), new ArrayList<>());
+                        
+                        // Convert to DTO
+                        return convertToBookingResponseDTOWithCollections(booking, details, payments);
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
+        }
+    }
+
     // Phương thức hỗ trợ
     private BookingResponseDTO convertToBookingResponseDTO(Booking booking) {
+        final Booking finalBooking = booking; // Sử dụng biến final này xuyên suốt
         BookingResponseDTO dto = new BookingResponseDTO();
-        dto.setId(booking.getId());
-        dto.setUserId(booking.getUser().getId());
-        dto.setFullName(booking.getUser().getFullName());
-        dto.setNationalId(booking.getUser().getNationalId());
-        dto.setEmail(booking.getUser().getEmail());
-        dto.setPhone(booking.getUser().getPhoneNumber());
+        dto.setId(finalBooking.getId());
+        dto.setUserId(finalBooking.getUser().getId());
+        dto.setFullName(finalBooking.getUser().getFullName());
+        dto.setNationalId(finalBooking.getUser().getNationalId());
+        dto.setEmail(finalBooking.getUser().getEmail());
+        dto.setPhone(finalBooking.getUser().getPhoneNumber());
         
-        // Lấy danh sách phòng từ booking_details
-        List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
+        List<BookingDetail> bookingDetails = finalBooking.getBookingDetails() != null ? 
+                finalBooking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(finalBooking.getId());
+        
         dto.setRooms(bookingDetails.stream()
                 .map(detail -> {
-                    RoomListResponseDTO roomDto = convertToRoomListResponseDTO(detail.getRoom());
-                    // Ghi đè giá phòng từ booking detail
+                    RoomListResponseDTO roomDto = new RoomListResponseDTO();
+                    Room room = detail.getRoom();
+                    roomDto.setRoomId(room.getId());
+                    roomDto.setRoomNumber(room.getRoomNumber());
+                    roomDto.setRoomType(room.getRoomType().getName());
                     if (detail.getPrice() != null) {
                         roomDto.setPrice(detail.getPrice());
                     } else {
-                        // Tính giá dựa vào số ngày ở
                         long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                booking.getCheckInDate(), booking.getCheckOutDate());
+                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
                         if (days < 1) days = 1;
-                        roomDto.setPrice(detail.getRoom().getRoomType().getPricePerNight() * days);
+                         roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
                     }
+                    roomDto.setImages(room.getImages());
                     return roomDto;
                 })
                 .toList());
         
-        dto.setCheckInDate(booking.getCheckInDate());
-        dto.setCheckOutDate(booking.getCheckOutDate());
-        dto.setTotalPrice(booking.getTotalPrice());
-        
-        // Calculate final price
-        double finalPrice = booking.getTotalPrice();
-        if (booking.getDiscount() != null) {
-            Discount discount = discountRepository.findDiscountById(booking.getDiscount().getId());
+        dto.setCheckInDate(finalBooking.getCheckInDate());
+        dto.setCheckOutDate(finalBooking.getCheckOutDate());
+        dto.setTotalPrice(finalBooking.getTotalPrice());
+
+        // Calculate final price - Chỉ tính toán, không lưu lại DB ở đây
+        double finalPrice = finalBooking.getTotalPrice();
+        if (finalBooking.getDiscount() != null) {
+            Discount discount = discountRepository.findDiscountById(finalBooking.getDiscount().getId()); 
             if (discount != null) {
-                dto.setDiscountCode(discount.getCode());
-                dto.setDiscountValue(discount.getDiscountValue());
-                dto.setDiscountType(discount.getDiscountType());
-                
-                // Tính giá sau khi giảm giá
                 if ("PERCENT".equals(discount.getDiscountType())) {
                     finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
                 } else if ("FIXED".equals(discount.getDiscountType())) {
                     finalPrice = finalPrice - discount.getDiscountValue();
                     if (finalPrice < 0) finalPrice = 0;
                 }
-            }
-        }
-        
-        // Cập nhật finalPrice vào booking nếu chưa có
-        if (booking.getFinalPrice() == null) {
-            Booking updatedBooking = booking;
-            updatedBooking.setFinalPrice(finalPrice);
-            updatedBooking = bookingRepository.save(updatedBooking);
-            // Sử dụng updatedBooking.getFinalPrice() nếu cần, nhưng ở đây chúng ta có thể giữ giá trị finalPrice
-        } else {
-            finalPrice = booking.getFinalPrice();
-        }
-        
+                 dto.setDiscountCode(discount.getCode());
+                 dto.setDiscountValue(discount.getDiscountValue());
+                 dto.setDiscountType(discount.getDiscountType());
+            } 
+         } else if (finalBooking.getFinalPrice() != null) {
+             // Nếu có finalPrice đã lưu trong booking thì dùng nó
+             finalPrice = finalBooking.getFinalPrice();
+         }
+         // Chỉ gán giá trị finalPrice đã tính/lấy được vào DTO
         dto.setFinalPrice(finalPrice);
         
-        // Thiết lập giá trị mặc định cho các trường payment
-        dto.setPaymentMethod("VNPAY");
-        dto.setPaymentStatus("UNPAID");
-        dto.setPaymentDate("");
-        dto.setTransactionNo("");
-        dto.setAmount((long) finalPrice);
-        dto.setBankCode("");
-        dto.setPaymentSuccess(false);
-        dto.setPaymentPending(false);
-        dto.setFormattedAmount(String.format("%,.0f", finalPrice).replace(",", ".") + " ₫");
-        dto.setFormattedPaymentTime("");
-        
-        // Thông tin thanh toán - lấy payment mới nhất và đầy đủ
-        List<Payment> payments = paymentRepository.findAllByBooking_Id(booking.getId());
+        // Lấy trạng thái booking và payment từ Booking entity
+        dto.setStatus(finalBooking.getStatus());
+        dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
+
+        // Lấy phương thức thanh toán từ payment mới nhất (nếu có) để tham khảo
+        List<Payment> payments = finalBooking.getPayments() != null ? 
+                finalBooking.getPayments() : paymentRepository.findAllByBooking_Id(finalBooking.getId());
         if (!payments.isEmpty()) {
-            Payment payment = payments.get(payments.size() - 1); // Lấy payment mới nhất
-            
-            // Kiểm tra và đồng bộ trạng thái booking với payment
-            if ("00".equals(payment.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
-                // Nếu payment thành công (00) nhưng booking chưa được xác nhận
-                // Cập nhật trạng thái booking thành CONFIRMED
-                booking.setStatus("CONFIRMED");
-                bookingRepository.save(booking);
-            }
-            
-            // Set thông tin payment cơ bản
-            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
-            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
-            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
-            
-            // Bổ sung thêm thông tin chi tiết payment
-            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
-            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (long) finalPrice);
-            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
-            
-            // Đặt success và pending dựa vào trạng thái payment
-            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
-            dto.setPaymentSuccess("00".equals(transactionStatus));
-            dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
-                "05".equals(transactionStatus) || "06".equals(transactionStatus));
-            
-            // Định dạng số tiền và thời gian
-            if (payment.getAmount() != null) {
-                dto.setFormattedAmount(String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
-            }
-            
-            // Định dạng thời gian thanh toán
-            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
-                try {
-                    String payDate = payment.getPayDate();
-                    String year = payDate.substring(0, 4);
-                    String month = payDate.substring(4, 6);
-                    String day = payDate.substring(6, 8);
-                    String hour = payDate.substring(8, 10);
-                    String minute = payDate.substring(10, 12);
-                    String second = payDate.substring(12, 14);
-                    
-                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
-                } catch (Exception e) {
-                    System.out.println("Lỗi khi định dạng ngày thanh toán: " + e.getMessage());
-                    dto.setFormattedPaymentTime("");
-                }
-            }
+             Payment latestPayment = payments.get(payments.size() - 1);
+             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
+        } else {
+             dto.setPaymentMethod("NONE");
         }
-        
-        // Cập nhật trạng thái dựa trên giá trị đã đồng bộ
-        dto.setStatus(booking.getStatus());
-        
-        // Format createdAt
-        if (booking.getCreatedAt() != null) {
+
+        // Format createdAt (giữ nguyên)
+        if (finalBooking.getCreatedAt() != null) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(booking.getCreatedAt().format(formatter));
+            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
         }
         
         return dto;
@@ -552,17 +645,18 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     }
     
     private BookingResponseDTO convertToBookingResponseDTOOptimized(Booking booking) {
+        final Booking finalBooking = booking;
         BookingResponseDTO dto = new BookingResponseDTO();
-        dto.setId(booking.getId());
-        dto.setUserId(booking.getUser().getId());
-        dto.setFullName(booking.getUser().getFullName());
-        dto.setNationalId(booking.getUser().getNationalId());
-        dto.setEmail(booking.getUser().getEmail());
-        dto.setPhone(booking.getUser().getPhoneNumber());
+        // ... (set các trường booking cơ bản từ finalBooking)
+        dto.setId(finalBooking.getId());
+        dto.setUserId(finalBooking.getUser().getId());
+        dto.setFullName(finalBooking.getUser().getFullName());
+        dto.setNationalId(finalBooking.getUser().getNationalId());
+        dto.setEmail(finalBooking.getUser().getEmail());
+        dto.setPhone(finalBooking.getUser().getPhoneNumber());
         
-        // Get booking details in a single query instead of per booking
-        List<BookingDetail> bookingDetails = booking.getBookingDetails() != null ? 
-                booking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(booking.getId());
+        List<BookingDetail> bookingDetails = finalBooking.getBookingDetails() != null ? 
+                finalBooking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(finalBooking.getId());
         
         dto.setRooms(bookingDetails.stream()
                 .map(detail -> {
@@ -571,117 +665,58 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomId(room.getId());
                     roomDto.setRoomNumber(room.getRoomNumber());
                     roomDto.setRoomType(room.getRoomType().getName());
-                    
-                    // Calculate price
                     if (detail.getPrice() != null) {
                         roomDto.setPrice(detail.getPrice());
                     } else {
-                        // Calculate based on stay duration
                         long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                booking.getCheckInDate(), booking.getCheckOutDate());
+                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
                         if (days < 1) days = 1;
                         roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
                     }
-                    
-                    // Set images
                     roomDto.setImages(room.getImages());
-                    
                     return roomDto;
                 })
                 .toList());
         
-        dto.setCheckInDate(booking.getCheckInDate());
-        dto.setCheckOutDate(booking.getCheckOutDate());
-        dto.setTotalPrice(booking.getTotalPrice());
-        
-        // Calculate final price
-        double finalPrice = booking.getTotalPrice();
-        if (booking.getDiscount() != null) {
-            Discount discount = booking.getDiscount();
-            dto.setDiscountCode(discount.getCode());
-            dto.setDiscountValue(discount.getDiscountValue());
-            dto.setDiscountType(discount.getDiscountType());
-            
-            // Calculate discounted price
-            if ("PERCENT".equals(discount.getDiscountType())) {
-                finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
-            } else if ("FIXED".equals(discount.getDiscountType())) {
-                finalPrice = finalPrice - discount.getDiscountValue();
+        dto.setCheckInDate(finalBooking.getCheckInDate());
+        dto.setCheckOutDate(finalBooking.getCheckOutDate());
+        dto.setTotalPrice(finalBooking.getTotalPrice());
+
+        // Final price calculation
+        double finalPrice = finalBooking.getTotalPrice();
+        if (finalBooking.getDiscount() != null) {
+             if ("PERCENT".equals(finalBooking.getDiscount().getDiscountType())) {
+                 finalPrice = finalPrice * (1 - finalBooking.getDiscount().getDiscountValue() / 100);
+             } else if ("FIXED".equals(finalBooking.getDiscount().getDiscountType())) {
+                 finalPrice = finalPrice - finalBooking.getDiscount().getDiscountValue();
                 if (finalPrice < 0) finalPrice = 0;
             }
-        }
-        
-        // Use finalPrice from booking if available
-        if (booking.getFinalPrice() != null) {
-            finalPrice = booking.getFinalPrice();
-        }
-        
+             dto.setDiscountCode(finalBooking.getDiscount().getCode());
+             dto.setDiscountValue(finalBooking.getDiscount().getDiscountValue());
+             dto.setDiscountType(finalBooking.getDiscount().getDiscountType());
+         } else if (finalBooking.getFinalPrice() != null) {
+             finalPrice = finalBooking.getFinalPrice();
+         }
         dto.setFinalPrice(finalPrice);
         
-        // Set default payment values
-        dto.setPaymentMethod("VNPAY");
-        dto.setPaymentStatus("UNPAID");
-        dto.setPaymentDate("");
-        dto.setTransactionNo("");
-        dto.setAmount((long) finalPrice);
-        dto.setBankCode("");
-        dto.setPaymentSuccess(false);
-        dto.setPaymentPending(false);
-        dto.setFormattedAmount(String.format("%,.0f", finalPrice).replace(",", ".") + " ₫");
-        dto.setFormattedPaymentTime("");
-        
-        // Get payment info efficiently
-        List<Payment> payments = booking.getPayments() != null ? 
-                booking.getPayments() : paymentRepository.findAllByBooking_Id(booking.getId());
-        
+        // Set status and payment status from Booking entity
+        dto.setStatus(finalBooking.getStatus());
+        dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
+
+         // Get payment method from the latest payment record if available
+        List<Payment> payments = finalBooking.getPayments() != null ? 
+                finalBooking.getPayments() : paymentRepository.findAllByBooking_Id(finalBooking.getId());
         if (!payments.isEmpty()) {
-            Payment payment = payments.get(payments.size() - 1); // Get latest payment
-            
-            // Set payment info
-            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
-            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
-            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
-            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
-            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (long) finalPrice);
-            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
-            
-            // Set payment status flags
-            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
-            dto.setPaymentSuccess("00".equals(transactionStatus));
-            dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
-                "05".equals(transactionStatus) || "06".equals(transactionStatus));
-            
-            // Format amount
-            if (payment.getAmount() != null) {
-                dto.setFormattedAmount(String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
-            }
-            
-            // Format payment time
-            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
-                try {
-                    String payDate = payment.getPayDate();
-                    String year = payDate.substring(0, 4);
-                    String month = payDate.substring(4, 6);
-                    String day = payDate.substring(6, 8);
-                    String hour = payDate.substring(8, 10);
-                    String minute = payDate.substring(10, 12);
-                    String second = payDate.substring(12, 14);
-                    
-                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
-                } catch (Exception e) {
-                    // Just set empty string on error, no need to log
-                    dto.setFormattedPaymentTime("");
-                }
-            }
+             Payment latestPayment = payments.get(payments.size() - 1);
+             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
+        } else {
+             dto.setPaymentMethod("NONE");
         }
         
-        // Set status
-        dto.setStatus(booking.getStatus());
-        
-        // Format createdAt
-        if (booking.getCreatedAt() != null) {
+        // Format createdAt (remains)
+        if (finalBooking.getCreatedAt() != null) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(booking.getCreatedAt().format(formatter));
+            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
         }
         
         return dto;
@@ -689,15 +724,16 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     
     private BookingResponseDTO convertToBookingResponseDTOWithCollections(
             Booking booking, List<BookingDetail> bookingDetails, List<Payment> payments) {
+         final Booking finalBooking = booking;
         BookingResponseDTO dto = new BookingResponseDTO();
-        dto.setId(booking.getId());
-        dto.setUserId(booking.getUser().getId());
-        dto.setFullName(booking.getUser().getFullName());
-        dto.setNationalId(booking.getUser().getNationalId());
-        dto.setEmail(booking.getUser().getEmail());
-        dto.setPhone(booking.getUser().getPhoneNumber());
+        // ... (set các trường booking cơ bản từ finalBooking)
+         dto.setId(finalBooking.getId());
+        dto.setUserId(finalBooking.getUser().getId());
+        dto.setFullName(finalBooking.getUser().getFullName());
+        dto.setNationalId(finalBooking.getUser().getNationalId());
+        dto.setEmail(finalBooking.getUser().getEmail());
+        dto.setPhone(finalBooking.getUser().getPhoneNumber());
         
-        // Process booking details
         dto.setRooms(bookingDetails.stream()
                 .map(detail -> {
                     RoomListResponseDTO roomDto = new RoomListResponseDTO();
@@ -705,114 +741,56 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomId(room.getId());
                     roomDto.setRoomNumber(room.getRoomNumber());
                     roomDto.setRoomType(room.getRoomType().getName());
-                    
-                    // Calculate price
                     if (detail.getPrice() != null) {
                         roomDto.setPrice(detail.getPrice());
                     } else {
-                        // Calculate based on stay duration
                         long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                booking.getCheckInDate(), booking.getCheckOutDate());
+                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
                         if (days < 1) days = 1;
                         roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
                     }
-                    
-                    // Set images
                     roomDto.setImages(room.getImages());
-                    
                     return roomDto;
                 })
                 .toList());
         
-        dto.setCheckInDate(booking.getCheckInDate());
-        dto.setCheckOutDate(booking.getCheckOutDate());
-        dto.setTotalPrice(booking.getTotalPrice());
-        
-        // Calculate final price
-        double finalPrice = booking.getTotalPrice();
-        if (booking.getDiscount() != null) {
-            Discount discount = booking.getDiscount();
-            dto.setDiscountCode(discount.getCode());
-            dto.setDiscountValue(discount.getDiscountValue());
-            dto.setDiscountType(discount.getDiscountType());
-            
-            // Calculate discounted price
-            if ("PERCENT".equals(discount.getDiscountType())) {
-                finalPrice = finalPrice * (1 - discount.getDiscountValue() / 100);
-            } else if ("FIXED".equals(discount.getDiscountType())) {
-                finalPrice = finalPrice - discount.getDiscountValue();
+        dto.setCheckInDate(finalBooking.getCheckInDate());
+        dto.setCheckOutDate(finalBooking.getCheckOutDate());
+        dto.setTotalPrice(finalBooking.getTotalPrice());
+
+        // Final price calculation
+        double finalPrice = finalBooking.getTotalPrice();
+         if (finalBooking.getDiscount() != null) {
+             if ("PERCENT".equals(finalBooking.getDiscount().getDiscountType())) {
+                 finalPrice = finalPrice * (1 - finalBooking.getDiscount().getDiscountValue() / 100);
+             } else if ("FIXED".equals(finalBooking.getDiscount().getDiscountType())) {
+                 finalPrice = finalPrice - finalBooking.getDiscount().getDiscountValue();
                 if (finalPrice < 0) finalPrice = 0;
             }
-        }
-        
-        // Use finalPrice from booking if available
-        if (booking.getFinalPrice() != null) {
-            finalPrice = booking.getFinalPrice();
-        }
-        
+             dto.setDiscountCode(finalBooking.getDiscount().getCode());
+             dto.setDiscountValue(finalBooking.getDiscount().getDiscountValue());
+             dto.setDiscountType(finalBooking.getDiscount().getDiscountType());
+         } else if (finalBooking.getFinalPrice() != null) {
+             finalPrice = finalBooking.getFinalPrice();
+         }
         dto.setFinalPrice(finalPrice);
         
-        // Set default payment values
-        dto.setPaymentMethod("VNPAY");
-        dto.setPaymentStatus("UNPAID");
-        dto.setPaymentDate("");
-        dto.setTransactionNo("");
-        dto.setAmount((long) finalPrice);
-        dto.setBankCode("");
-        dto.setPaymentSuccess(false);
-        dto.setPaymentPending(false);
-        dto.setFormattedAmount(String.format("%,.0f", finalPrice).replace(",", ".") + " ₫");
-        dto.setFormattedPaymentTime("");
-        
-        // Process payment info
+        // Set status and payment status from Booking entity
+        dto.setStatus(finalBooking.getStatus());
+        dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
+
+        // Get payment method from the latest payment record if available
         if (!payments.isEmpty()) {
-            Payment payment = payments.get(payments.size() - 1); // Get latest payment
-            
-            // Set payment info
-            dto.setPaymentMethod(payment.getMethod() != null ? payment.getMethod() : "VNPAY");
-            dto.setPaymentStatus(payment.getStatus() != null ? payment.getStatus() : "UNPAID");
-            dto.setPaymentDate(payment.getPayDate() != null ? payment.getPayDate() : "");
-            dto.setTransactionNo(payment.getTransactionNo() != null ? payment.getTransactionNo() : "");
-            dto.setAmount(payment.getAmount() != null ? payment.getAmount() : (long) finalPrice);
-            dto.setBankCode(payment.getBankCode() != null ? payment.getBankCode() : "");
-            
-            // Set payment status flags
-            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
-            dto.setPaymentSuccess("00".equals(transactionStatus));
-            dto.setPaymentPending("01".equals(transactionStatus) || "04".equals(transactionStatus) || 
-                "05".equals(transactionStatus) || "06".equals(transactionStatus));
-            
-            // Format amount
-            if (payment.getAmount() != null) {
-                dto.setFormattedAmount(String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
-            }
-            
-            // Format payment time
-            if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
-                try {
-                    String payDate = payment.getPayDate();
-                    String year = payDate.substring(0, 4);
-                    String month = payDate.substring(4, 6);
-                    String day = payDate.substring(6, 8);
-                    String hour = payDate.substring(8, 10);
-                    String minute = payDate.substring(10, 12);
-                    String second = payDate.substring(12, 14);
-                    
-                    dto.setFormattedPaymentTime(day + "/" + month + "/" + year + " " + hour + ":" + minute + ":" + second);
-                } catch (Exception e) {
-                    // Just set empty string on error, no need to log
-                    dto.setFormattedPaymentTime("");
-                }
-            }
+             Payment latestPayment = payments.get(payments.size() - 1);
+             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
+        } else {
+             dto.setPaymentMethod("NONE");
         }
         
-        // Set status
-        dto.setStatus(booking.getStatus());
-        
         // Format createdAt
-        if (booking.getCreatedAt() != null) {
+        if (finalBooking.getCreatedAt() != null) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(booking.getCreatedAt().format(formatter));
+            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
         }
         
         return dto;

@@ -69,8 +69,9 @@ public class VNPayService {
             String vnp_TxnRef = generateTransactionNo();
             System.out.println("Tạo mã giao dịch: " + vnp_TxnRef);
             
-            // Sử dụng backend callback URL thay vì returnUrl từ frontend
-            String backendCallbackUrl = "http://localhost:9000/api/v1/payments/vnpay-callback";
+            // Sửa lại backend callback URL cho đúng với endpoint trong BookingUserController
+            // String backendCallbackUrl = "http://localhost:9000/api/v1/user/bookings/payment/vnpay_return"; 
+            String backendCallbackUrl = "http://localhost:9000/api/v1/payments/vnpay-callback"; 
             
         Map<String, String> vnp_Params = new HashMap<>();
             vnp_Params.put("vnp_Version", vnpVersion);
@@ -462,8 +463,6 @@ public class VNPayService {
             String vnp_TransactionType = queryParams.get("vnp_TransactionType");
             String vnp_TransactionStatus = queryParams.get("vnp_TransactionStatus");
             String vnp_TmnCode = queryParams.get("vnp_TmnCode");
-            String vnp_SecureHash = queryParams.get("vnp_SecureHash");
-            String vnp_SecureHashType = queryParams.get("vnp_SecureHashType");
             String vnp_CardType = queryParams.get("vnp_CardType");
             
             // Tìm payment theo transactionNo
@@ -484,41 +483,25 @@ public class VNPayService {
             
             // Lưu payment
             payment = paymentRepository.save(payment);
-            
-            // Khi thanh toán thành công (status = 00), cập nhật trạng thái booking thành "CONFIRMED"
-            if ("00".equals(vnp_ResponseCode) && payment.getBookingId() != null) {
-                // Tìm và cập nhật booking
-                Integer bookingId = payment.getBookingId();
-                bookingRepository.findById(bookingId).ifPresent(booking -> {
-                    if (!"CONFIRMED".equals(booking.getStatus())) {
-                        booking.setStatus("CONFIRMED");
-                        bookingRepository.save(booking);
-                        System.out.println("Tự động cập nhật booking ID " + bookingId + " thành CONFIRMED sau thanh toán thành công");
-                    }
-                });
+            System.out.println("Đã cập nhật payment, trạng thái mới: " + payment.getStatus());
+
+            // Cập nhật booking nếu thanh toán thành công
+            if ("00".equals(vnp_ResponseCode)) {
+                Booking booking = payment.getBooking();
+                if (booking != null) {
+                    System.out.println("Cập nhật trạng thái booking " + booking.getId());
+                    booking.setStatus("CONFIRMED");
+                    booking.setPaymentStatus("PAID");
+                    bookingRepository.save(booking);
+                    System.out.println("Đã cập nhật booking thành CONFIRMED và PAID");
+                } else {
+                    System.out.println("Không tìm thấy booking liên kết với payment");
+                }
             }
-    
-            // Chuẩn bị dữ liệu trả về
+
             Map<String, Object> result = new HashMap<>();
-            
-            // Thông tin VNPay nguyên bản
-            result.put("vnp_ResponseCode", vnp_ResponseCode);
-            result.put("vnp_TxnRef", vnp_TxnRef);
-            result.put("vnp_Amount", vnp_Amount);
-            result.put("vnp_BankCode", vnp_BankCode);
-            result.put("vnp_PayDate", vnp_PayDate);
-            result.put("vnp_TransactionNo", vnp_TransactionNo);
-            result.put("vnp_OrderInfo", vnp_OrderInfo);
-            result.put("vnp_TransactionType", vnp_TransactionType);
-            result.put("vnp_TransactionStatus", vnp_TransactionStatus);
-            result.put("vnp_TmnCode", vnp_TmnCode);
-            result.put("vnp_SecureHash", vnp_SecureHash);
-            result.put("vnp_SecureHashType", vnp_SecureHashType);
-            result.put("vnp_CardType", vnp_CardType);
-            
-            // Các trường bổ sung
+            result.put("transactionNo", vnp_TxnRef);
             result.put("amount", vnp_Amount != null ? Long.parseLong(vnp_Amount) / 100 : payment.getAmount());
-            result.put("transactionNo", payment.getTransactionNo());
             result.put("vnpTransactionNo", vnp_TransactionNo);
             result.put("success", "00".equals(vnp_ResponseCode));
             result.put("pending", "01".equals(vnp_ResponseCode) || "04".equals(vnp_ResponseCode) || 
@@ -558,6 +541,7 @@ public class VNPayService {
             return result;
         } catch (Exception e) {
             System.out.println("Lỗi khi xử lý callback: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Lỗi xử lý callback: " + e.getMessage());
         }
     }
@@ -680,6 +664,58 @@ public class VNPayService {
                 return "Thanh toán qua QR code";
             default:
                 return cardType;
+        }
+    }
+
+    /**
+     * Xác minh chữ ký dữ liệu trả về từ VNPay
+     * @param params Map chứa các tham số VNPay trả về
+     * @return true nếu chữ ký hợp lệ, false nếu không hợp lệ
+     */
+    public boolean verifyReturnSignature(Map<String, String> params) {
+        String vnp_SecureHash = params.get("vnp_SecureHash");
+        if (vnp_SecureHash == null || vnp_SecureHash.isEmpty()) {
+            System.out.println("VNPay return thiếu vnp_SecureHash");
+            return false;
+        }
+        
+        // Tạo một bản sao của map để không làm thay đổi map gốc
+        Map<String, String> paramsToHash = new HashMap<>(params);
+        
+        // Xóa vnp_SecureHash và vnp_SecureHashType khỏi map dùng để tạo hashData
+        paramsToHash.remove("vnp_SecureHash");
+        paramsToHash.remove("vnp_SecureHashType");
+
+        // Sắp xếp các trường theo thứ tự alphabet
+        List<String> fieldNames = new ArrayList<>(paramsToHash.keySet());
+        Collections.sort(fieldNames);
+        
+        StringBuilder hashData = new StringBuilder();
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = paramsToHash.get(fieldName); // Lấy từ map đã xóa hash
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                 try {
+                    hashData.append(fieldName).append('=').append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
+                } catch (Exception e) {
+                     System.out.println("Lỗi URL encoding khi tạo hashData: " + e.getMessage());
+                     return false; // Lỗi encoding -> chữ ký không hợp lệ
+                }
+                if (itr.hasNext()) {
+                    hashData.append('&');
+                }
+            }
+        }
+        
+        try {
+            String calculatedHash = hmacSHA512(vnpHashSecret, hashData.toString());
+             System.out.println("Calculated Hash: " + calculatedHash);
+             System.out.println("Received Hash:   " + vnp_SecureHash);
+            return calculatedHash.equals(vnp_SecureHash);
+        } catch (Exception e) {
+             System.out.println("Lỗi khi tính toán HMAC SHA512: " + e.getMessage());
+            return false;
         }
     }
 }

@@ -20,6 +20,9 @@ public class ServiceController {
     @Autowired
     private ServiceService serviceService;
     
+    /**
+     * Lấy danh sách tất cả dịch vụ
+     */
     @GetMapping
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getAllServices() {
         List<ServiceResponseDTO> services = serviceService.getAllServices();
@@ -28,6 +31,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Lấy thông tin dịch vụ theo ID
+     */
     @GetMapping("/{id}")
     public ResponseEntity<SuccessResponse<ServiceResponseDTO>> getServiceById(
             @PathVariable Integer id) {
@@ -37,6 +43,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Lấy thông tin dịch vụ theo mã
+     */
     @GetMapping("/code/{code}")
     public ResponseEntity<SuccessResponse<ServiceResponseDTO>> getServiceByCode(
             @PathVariable String code) {
@@ -46,6 +55,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Lấy danh sách dịch vụ theo loại
+     */
     @GetMapping("/type/{type}")
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getServicesByType(
             @PathVariable String type) {
@@ -55,6 +67,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Tìm kiếm dịch vụ theo tên
+     */
     @GetMapping("/search")
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> searchServicesByName(
             @RequestParam String name) {
@@ -64,6 +79,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Lọc dịch vụ theo giá tối đa
+     */
     @GetMapping("/price")
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getServicesByMaxPrice(
             @RequestParam Double price) {
@@ -73,6 +91,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Lấy danh sách dịch vụ đang khả dụng
+     */
     @GetMapping("/available")
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getAvailableServices() {
         List<ServiceResponseDTO> services = serviceService.getAvailableServices();
@@ -81,6 +102,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Tạo mới dịch vụ
+     */
     @PostMapping
     @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<SuccessResponse<ServiceResponseDTO>> createService(
@@ -92,6 +116,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Cập nhật thông tin dịch vụ
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<SuccessResponse<ServiceResponseDTO>> updateService(
@@ -103,6 +130,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Xóa dịch vụ
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<SuccessResponse<Void>> deleteService(
@@ -113,6 +143,9 @@ public class ServiceController {
         );
     }
     
+    /**
+     * Khởi tạo dữ liệu dịch vụ từ file JSON
+     */
     @PostMapping("/init")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<SuccessResponse<Void>> initServicesFromJson() {

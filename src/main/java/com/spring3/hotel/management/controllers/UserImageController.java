@@ -17,16 +17,25 @@ import java.io.IOException;
 public class UserImageController {
     private final UserImageServiceImpl imageService;
 
+    /**
+     * Lấy danh sách hình ảnh của người dùng hiện tại
+     */
     @GetMapping("/")
     public ResponseEntity<?> getFilesOfCurrentUser(@RequestParam Integer userId) {
         return ResponseEntity.ok(imageService.getFilesOfCurrentUser(userId));
     }
 
+    /**
+     * Tải lên hình ảnh mới cho người dùng
+     */
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file, @RequestParam Integer userId) throws IOException, IOException {
         return ResponseEntity.ok(imageService.uploadFile(file, userId));
     }
 
+    /**
+     * Xem hình ảnh theo ID
+     */
     @GetMapping("/{id}")
     public ResponseEntity<?> readFile(@PathVariable Integer id) {
         UserImage image = imageService.getFileById(id);
@@ -36,6 +45,9 @@ public class UserImageController {
             .body(image.getData()); // 200
     }
 
+    /**
+     * Xóa hình ảnh theo ID
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteFile(@PathVariable Integer id) {
         imageService.deleteFile(id);
