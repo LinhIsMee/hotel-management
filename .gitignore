@@ -62,3 +62,4 @@ Thumbs.db
 # src/main/resources/application-prod.properties
 
 .env
+.spring-api-helper.json

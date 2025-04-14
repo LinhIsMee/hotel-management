@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.OptionalDouble;
+import java.util.ArrayList;
 
 @Data
 @Builder
@@ -42,6 +43,8 @@ public class RoomResponseDTO {
     private Double averageRating;
     private Integer totalReviews;
     private List<ReviewResponseDTO> recentReviews;
+    private Boolean isBookedNextFiveDays;
+    private List<BookingPeriodDTO> bookingPeriods;
     
     private static ReviewRepository reviewRepository;
     
@@ -53,43 +56,41 @@ public class RoomResponseDTO {
     public static RoomResponseDTO fromEntity(Room room) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         
-        List<ServiceResponseDTO> serviceResponseDTOs = null;
-        if (room.getServices() != null) {
-            serviceResponseDTOs = room.getServices().stream()
-                    .map(ServiceResponseDTO::fromEntity)
-                    .collect(Collectors.toList());
-        }
+        // Chuyển đổi services sang DTO
+        List<ServiceResponseDTO> serviceResponseDTOs = room.getServices().stream()
+                .map(service -> ServiceResponseDTO.builder()
+                        .id(service.getId())
+                        .name(service.getName())
+                        .description(service.getDescription())
+                        .price(service.getPrice())
+                        .build())
+                .collect(Collectors.toList());
         
-        List<String> amenitiesList = null;
-        if (room.getRoomType().getAmenities() != null && !room.getRoomType().getAmenities().isEmpty()) {
-            amenitiesList = Arrays.stream(room.getRoomType().getAmenities().split(","))
-                    .map(String::trim)
-                    .collect(Collectors.toList());
-        }
+        // Xử lý amenities
+        List<String> amenitiesList = room.getRoomType().getAmenities() != null ?
+                Arrays.asList(room.getRoomType().getAmenities().split(",")) :
+                Collections.emptyList();
         
-        // Thông tin đánh giá sẽ được thêm từ RoomController nếu reviewRepository không được inject
-        Double averageRating = null;
-        Integer totalReviews = 0;
+        // Tính rating trung bình và số lượng đánh giá
+        double averageRating = 0.0;
+        int totalReviews = 0;
         List<ReviewResponseDTO> recentReviews = Collections.emptyList();
         
         if (reviewRepository != null) {
-            List<Review> reviews = reviewRepository.findByRoomId(room.getId());
-            totalReviews = reviews.size();
-            
+            List<Review> reviews = reviewRepository.findByRoomNumber(room.getRoomNumber());
             if (!reviews.isEmpty()) {
                 OptionalDouble avgRating = reviews.stream()
-                    .mapToDouble(Review::getRating)
-                    .average();
-                if (avgRating.isPresent()) {
-                    averageRating = avgRating.getAsDouble();
-                }
+                        .mapToDouble(Review::getRating)
+                        .average();
+                averageRating = avgRating.orElse(0.0);
+                totalReviews = reviews.size();
                 
                 // Lấy 3 đánh giá gần nhất
                 recentReviews = reviews.stream()
-                    .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
-                    .limit(3)
-                    .map(ReviewResponseDTO::fromEntity)
-                    .collect(Collectors.toList());
+                        .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
+                        .limit(3)
+                        .map(ReviewResponseDTO::fromEntity)
+                        .collect(Collectors.toList());
             }
         }
         
@@ -113,6 +114,8 @@ public class RoomResponseDTO {
                 .averageRating(averageRating)
                 .totalReviews(totalReviews)
                 .recentReviews(recentReviews)
+                .isBookedNextFiveDays(false) // Mặc định là false, sẽ được cập nhật sau
+                .bookingPeriods(new ArrayList<>()) // Mặc định là rỗng, sẽ được cập nhật sau
                 .build();
     }
 }

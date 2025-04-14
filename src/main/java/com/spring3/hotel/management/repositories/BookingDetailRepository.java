@@ -33,11 +33,14 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, In
     Double calculateRevenueByRoomTypeAndDateRange(@Param("roomTypeId") Integer roomTypeId, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT bd FROM BookingDetail bd " +
+           "JOIN bd.booking b " +
            "WHERE bd.room.id = :roomId " +
-           "AND bd.booking.checkInDate <= :checkOutDate " +
-           "AND bd.booking.checkOutDate >= :checkInDate")
+           "AND ((b.checkInDate <= :endDate AND b.checkOutDate >= :startDate) " +
+           "OR (b.checkInDate >= :startDate AND b.checkInDate < :endDate) " +
+           "OR (b.checkOutDate > :startDate AND b.checkOutDate <= :endDate)) " +
+           "AND b.status NOT IN ('CANCELLED', 'COMPLETED')")
     List<BookingDetail> findByRoomIdAndDateRange(
             @Param("roomId") Integer roomId,
-            @Param("checkInDate") LocalDate checkInDate,
-            @Param("checkOutDate") LocalDate checkOutDate);
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

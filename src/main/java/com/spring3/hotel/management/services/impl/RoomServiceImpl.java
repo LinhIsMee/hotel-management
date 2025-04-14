@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
+import com.spring3.hotel.management.dtos.response.BookingPeriodDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.models.Service;
+import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
 import com.spring3.hotel.management.repositories.ServiceRepository;
+import com.spring3.hotel.management.repositories.BookingDetailRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +42,9 @@ public class RoomServiceImpl implements RoomService {
     
     @Autowired
     private ServiceRepository serviceRepository;
+    
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
     
     @Autowired
     private ObjectMapper objectMapper;
@@ -328,9 +334,43 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public List<RoomResponseDTO> getAllActiveRooms() {
-        return roomRepository.findByIsActiveTrue()
-                .stream()
-                .map(RoomResponseDTO::fromEntity)
+        // Lấy ngày hiện tại và 5 ngày tới
+        LocalDate today = LocalDate.now();
+        LocalDate fiveDaysLater = today.plusDays(5);
+        
+        // Lấy danh sách phòng đang hoạt động
+        List<Room> activeRooms = roomRepository.findByIsActiveTrue();
+        
+        // Lấy danh sách phòng đã đặt trong 5 ngày tới
+        List<Room> bookedRooms = roomRepository.findBookedRoomsBetweenDates(today, fiveDaysLater);
+        
+        // Chuyển đổi sang DTO với thông tin đặt phòng
+        return activeRooms.stream()
+                .map(room -> {
+                    RoomResponseDTO dto = RoomResponseDTO.fromEntity(room);
+                    
+                    // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
+                    boolean isBooked = bookedRooms.contains(room);
+                    dto.setIsBookedNextFiveDays(isBooked);
+                    
+                    // Thêm thông tin về các khoảng thời gian đã đặt
+                    if (isBooked) {
+                        List<BookingPeriodDTO> bookingPeriods = bookingDetailRepository.findByRoomIdAndDateRange(
+                                room.getId(), today, fiveDaysLater)
+                                .stream()
+                                .map(detail -> {
+                                    Booking booking = detail.getBooking();
+                                    return BookingPeriodDTO.builder()
+                                            .checkInDate(booking.getCheckInDate())
+                                            .checkOutDate(booking.getCheckOutDate())
+                                            .build();
+                                })
+                                .collect(Collectors.toList());
+                        dto.setBookingPeriods(bookingPeriods);
+                    }
+                    
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
