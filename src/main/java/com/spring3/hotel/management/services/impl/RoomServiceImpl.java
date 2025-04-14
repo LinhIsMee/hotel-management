@@ -301,7 +301,7 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate) {
-        // Lấy danh sách tất cả phòng (không chỉ phòng active)
+        // Lấy danh sách tất cả phòng
         List<Room> allRooms = roomRepository.findAll();
         log.info("Tìm thấy tổng cộng {} phòng trong hệ thống", allRooms.size());
         
@@ -320,15 +320,43 @@ public class RoomServiceImpl implements RoomService {
                            "READY".equals(status) || 
                            "CLEANED".equals(status) || 
                            "AVAILABLE".equals(status) ||
-                           "INSPECTION".equals(status);
+                           "INSPECTION".equals(status) ||
+                           "BOOKED".equals(status); // Thêm BOOKED vì có thể đặt cho thời gian khác
                 })
                 .collect(Collectors.toList());
         
         log.info("Sau khi lọc, tìm thấy {} phòng có sẵn để đặt", availableRooms.size());
         
-        // Chuyển đổi sang DTO và trả về
+        // Chuyển đổi sang DTO và thêm thông tin booking
         return availableRooms.stream()
-                .map(RoomResponseDTO::fromEntity)
+                .map(room -> {
+                    RoomResponseDTO dto = RoomResponseDTO.fromEntity(room);
+                    
+                    // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
+                    LocalDate today = LocalDate.now();
+                    LocalDate fiveDaysLater = today.plusDays(5);
+                    List<Room> nextFiveDaysBookings = roomRepository.findBookedRoomsBetweenDates(today, fiveDaysLater);
+                    boolean isBooked = nextFiveDaysBookings.contains(room);
+                    dto.setIsBookedNextFiveDays(isBooked);
+                    
+                    // Thêm thông tin về các khoảng thời gian đã đặt
+                    if (isBooked) {
+                        List<BookingPeriodDTO> bookingPeriods = bookingDetailRepository.findByRoomIdAndDateRange(
+                                room.getId(), today, fiveDaysLater)
+                                .stream()
+                                .map(detail -> {
+                                    Booking booking = detail.getBooking();
+                                    return BookingPeriodDTO.builder()
+                                            .checkInDate(booking.getCheckInDate())
+                                            .checkOutDate(booking.getCheckOutDate())
+                                            .build();
+                                })
+                                .collect(Collectors.toList());
+                        dto.setBookingPeriods(bookingPeriods);
+                    }
+                    
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
