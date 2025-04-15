@@ -57,14 +57,17 @@ public class RoomResponseDTO {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         
         // Chuyển đổi services sang DTO
-        List<ServiceResponseDTO> serviceResponseDTOs = room.getServices().stream()
-                .map(service -> ServiceResponseDTO.builder()
-                        .id(service.getId())
-                        .name(service.getName())
-                        .description(service.getDescription())
-                        .price(service.getPrice())
-                        .build())
-                .collect(Collectors.toList());
+        List<ServiceResponseDTO> serviceResponseDTOs = new ArrayList<>();
+        if (room.getServices() != null) {
+            serviceResponseDTOs = room.getServices().stream()
+                    .map(service -> ServiceResponseDTO.builder()
+                            .id(service.getId())
+                            .name(service.getName())
+                            .description(service.getDescription())
+                            .price(service.getPrice())
+                            .build())
+                    .collect(Collectors.toList());
+        }
         
         // Xử lý amenities
         List<String> amenitiesList = room.getRoomType().getAmenities() != null ?

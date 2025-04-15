@@ -106,7 +106,14 @@ public class RoomServiceImpl implements RoomService {
                 .floor(request.getFloor())
                 .isActive(request.getIsActive())
                 .notes(request.getNotes())
+                .services(new ArrayList<>()) // Khởi tạo danh sách services rỗng
                 .build();
+        
+        // Thêm dịch vụ nếu có
+        if (request.getServiceIds() != null && !request.getServiceIds().isEmpty()) {
+            List<Service> services = serviceRepository.findAllById(request.getServiceIds());
+            room.setServices(services);
+        }
         
         Room savedRoom = roomRepository.save(room);
         return RoomResponseDTO.fromEntity(savedRoom);
