@@ -63,3 +63,6 @@ Thumbs.db
 
 .env
 .spring-api-helper.json
+.cursor/rules
+database-export-hotel_management.json
+.gitignore

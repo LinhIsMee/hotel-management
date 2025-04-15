@@ -4,6 +4,7 @@ import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
 import com.spring3.hotel.management.dtos.response.NewBookingResponse;
 import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.BookingService;
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,10 @@ public class BookingServiceImpl implements BookingService {
     private RoomRepository roomRepository;
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
+    @Autowired
+    private BookingServiceRepository bookingServiceRepository;
+    @Autowired
+    private OfferingRepository offeringRepository;
 
     @Override
     public BookingResponseDTO getBookingById(Integer id) {
@@ -187,6 +193,37 @@ public class BookingServiceImpl implements BookingService {
             bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
             bookingDetail.setPrice(roomPrice);
             bookingDetailRepository.save(bookingDetail);
+        }
+        
+        // Xử lý các dịch vụ bổ sung nếu có
+        if (request.getAdditionalServices() != null && !request.getAdditionalServices().isEmpty()) {
+            for (String serviceId : request.getAdditionalServices()) {
+                try {
+                    Integer offeringId = Integer.parseInt(serviceId);
+                    Offering offering = offeringRepository.findById(offeringId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy dịch vụ với id: " + offeringId));
+                    
+                    // Mặc định số lượng là 1 nếu không được chỉ định
+                    int quantity = 1;
+                    double serviceTotalPrice = offering.getPrice() * quantity;
+                    
+                    // Tạo BookingService
+                    com.spring3.hotel.management.models.BookingService bookingService 
+                        = new com.spring3.hotel.management.models.BookingService();
+                    bookingService.setBooking(booking);
+                    bookingService.setOffering(offering);
+                    bookingService.setQuantity(quantity);
+                    bookingService.setTotalPrice(serviceTotalPrice);
+                    bookingServiceRepository.save(bookingService);
+                    
+                    // Cập nhật tổng giá booking
+                    totalPriceCalculated += serviceTotalPrice;
+                } catch (NumberFormatException e) {
+                    log.error("Lỗi chuyển đổi ID dịch vụ: " + serviceId, e);
+                } catch (Exception e) {
+                    log.error("Lỗi khi thêm dịch vụ vào booking: " + e.getMessage(), e);
+                }
+            }
         }
         
         // Kiểm tra và cập nhật tổng giá nếu cần
@@ -658,6 +695,21 @@ public class BookingServiceImpl implements BookingService {
         if (finalBooking.getCreatedAt() != null) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
             dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
+        }
+        
+        // Lấy danh sách dịch vụ đã đặt
+        List<com.spring3.hotel.management.models.BookingService> bookingServices = bookingServiceRepository.findByBooking(finalBooking);
+        if (bookingServices != null && !bookingServices.isEmpty()) {
+            List<ServiceResponseDTO> services = bookingServices.stream().map(bs -> {
+                Offering offering = bs.getOffering();
+                ServiceResponseDTO serviceDTO = ServiceResponseDTO.fromOffering(offering);
+                serviceDTO.setQuantity(bs.getQuantity());
+                serviceDTO.setTotalPrice(bs.getTotalPrice());
+                return serviceDTO;
+            }).collect(Collectors.toList());
+            dto.setServices(services);
+        } else {
+            dto.setServices(Collections.emptyList());
         }
         
         return dto;

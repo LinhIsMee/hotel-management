@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -209,6 +210,12 @@ public class PaymentController {
                 }
             }
 
+            // Lấy thông tin dịch vụ bổ sung nếu có
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> additionalServices = request.containsKey("services") ? 
+                                                           (List<Map<String, Object>>) request.get("services") : 
+                                                           new ArrayList<>();
+            
             // Tạo booking request
             UpsertBookingRequest bookingRequest = new UpsertBookingRequest();
             bookingRequest.setUserId(userId);
@@ -221,6 +228,15 @@ public class PaymentController {
             bookingRequest.setCheckOutDate(checkOutDate);
             bookingRequest.setTotalPrice(totalPrice);
             bookingRequest.setFinalPrice(finalPrice);
+            
+            // Nếu có dịch vụ, thêm vào danh sách
+            if (!additionalServices.isEmpty()) {
+                List<String> serviceIds = additionalServices.stream()
+                    .map(s -> String.valueOf(s.get("id")))
+                    .collect(Collectors.toList());
+                bookingRequest.setAdditionalServices(serviceIds);
+            }
+            
             if (discountCode != null && !discountCode.isEmpty()) {
                 Discount discount = discountRepository.findByCode(discountCode)
                         .orElseThrow(() -> new RuntimeException("Mã giảm giá không hợp lệ"));

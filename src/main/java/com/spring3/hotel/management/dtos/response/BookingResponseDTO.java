@@ -32,4 +32,5 @@ public class BookingResponseDTO {
     private String paymentMethod;
     private String paymentStatus;
     private String createdAt;
+    private List<ServiceResponseDTO> services;
 }
