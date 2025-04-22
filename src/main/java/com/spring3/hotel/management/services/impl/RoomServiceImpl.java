@@ -462,7 +462,7 @@ public class RoomServiceImpl implements RoomService {
                 if (reviewCompare != 0) return reviewCompare;
                 
                 // Cuối cùng xét giá phòng
-                return Double.compare(r2.getRoomType().getPrice(), r1.getRoomType().getPrice());
+                return Double.compare(r2.getPricePerNight(), r1.getPricePerNight());
             })
             .limit(6) // Giới hạn 6 phòng nổi bật
             .collect(Collectors.toList());
