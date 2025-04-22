@@ -97,6 +97,16 @@ public class RoomController {
         return ResponseEntity.ok(rooms);
     }
     
+    // Lấy danh sách phòng nổi bật
+    @GetMapping("/featured")
+    public ResponseEntity<List<RoomResponseDTO>> getFeaturedRooms() {
+        log.info("Nhận yêu cầu lấy danh sách phòng nổi bật");
+        List<RoomResponseDTO> featuredRooms = roomService.getFeaturedRooms();
+        enrichWithReviewData(featuredRooms);
+        log.info("Trả về {} phòng nổi bật", featuredRooms.size());
+        return ResponseEntity.ok(featuredRooms);
+    }
+    
     // Thêm thông tin đánh giá vào dữ liệu phòng
     private void enrichWithReviewData(List<RoomResponseDTO> rooms) {
         if (rooms == null || rooms.isEmpty()) {

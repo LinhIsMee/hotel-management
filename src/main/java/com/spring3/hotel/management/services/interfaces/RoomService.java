@@ -29,4 +29,6 @@ public interface RoomService {
     List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate);
     
     List<RoomResponseDTO> getAllActiveRooms();
+    
+    List<RoomResponseDTO> getFeaturedRooms();
 } 

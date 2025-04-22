@@ -436,4 +436,35 @@ public class RoomServiceImpl implements RoomService {
             log.info("Đã cập nhật {} phòng sang trạng thái {}", roomNumbers.size(), status);
         });
     }
+
+    @Override
+    public List<RoomResponseDTO> getFeaturedRooms() {
+        log.info("Lấy danh sách phòng nổi bật");
+        
+        // Lấy tất cả phòng đang hoạt động
+        List<Room> allRooms = roomRepository.findByIsActiveTrue();
+        
+        // Lọc và sắp xếp phòng theo tiêu chí nổi bật:
+        // 1. Phòng có rating cao
+        // 2. Phòng có nhiều đánh giá
+        // 3. Phòng có giá trị cao
+        return allRooms.stream()
+            .map(RoomResponseDTO::fromEntity)
+            .sorted((r1, r2) -> {
+                // Ưu tiên phòng có rating cao
+                if (r1.getAverageRating() != null && r2.getAverageRating() != null) {
+                    int ratingCompare = Double.compare(r2.getAverageRating(), r1.getAverageRating());
+                    if (ratingCompare != 0) return ratingCompare;
+                }
+                
+                // Sau đó xét số lượng đánh giá
+                int reviewCompare = Integer.compare(r2.getTotalReviews(), r1.getTotalReviews());
+                if (reviewCompare != 0) return reviewCompare;
+                
+                // Cuối cùng xét giá phòng
+                return Double.compare(r2.getRoomType().getPrice(), r1.getRoomType().getPrice());
+            })
+            .limit(6) // Giới hạn 6 phòng nổi bật
+            .collect(Collectors.toList());
+    }
 }
