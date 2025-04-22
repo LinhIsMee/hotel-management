@@ -40,6 +40,12 @@ public class Room {
     @Column
     private String notes;
     
+    @Column(name = "average_rating")
+    private Double averageRating = 0.0;
+    
+    @Column(name = "rating_count")
+    private Integer ratingCount = 0;
+    
     @Builder.Default
     @ElementCollection
     @CollectionTable(name = "room_images", joinColumns = @JoinColumn(name = "room_id"))
@@ -53,6 +59,9 @@ public class Room {
         inverseJoinColumns = @JoinColumn(name = "service_id")
     )
     private List<Service> services = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
+    private List<Rating> ratings = new ArrayList<>();
     
     @Column
     private LocalDate createdAt;
@@ -71,5 +80,11 @@ public class Room {
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDate.now();
+    }
+
+    public void updateAverageRating(Integer newRating) {
+        double total = this.averageRating * this.ratingCount + newRating;
+        this.ratingCount++;
+        this.averageRating = total / this.ratingCount;
     }
 }
