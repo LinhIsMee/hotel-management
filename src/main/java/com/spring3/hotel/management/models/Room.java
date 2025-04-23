@@ -90,4 +90,23 @@ public class Room {
         this.ratingCount++;
         this.averageRating = total / this.ratingCount;
     }
+    
+    // Tính lại điểm trung bình từ tất cả đánh giá
+    public void updateAverageRating() {
+        if (ratings == null || ratings.isEmpty()) {
+            this.averageRating = 0.0;
+            this.ratingCount = 0;
+            return;
+        }
+        
+        double total = 0;
+        for (Rating rating : ratings) {
+            if (rating.getStars() != null) {
+                total += rating.getStars();
+            }
+        }
+        
+        this.ratingCount = ratings.size();
+        this.averageRating = total / this.ratingCount;
+    }
 }
