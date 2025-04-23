@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.dto.response;
 
-import com.spring3.hotel.management.enums.ServiceType;
 import com.spring3.hotel.management.models.HotelService;
 import com.spring3.hotel.management.models.Offering;
 import lombok.AllArgsConstructor;

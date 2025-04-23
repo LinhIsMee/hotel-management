@@ -4,7 +4,6 @@ import com.spring3.hotel.management.dto.response.DashboardInfoCountResponse;
 import com.spring3.hotel.management.dto.response.RecentBookingResponse;
 import com.spring3.hotel.management.dto.response.RoomBookingStatsResponse;
 import com.spring3.hotel.management.dto.response.StatisticResponse;
-import com.spring3.hotel.management.models.Statistic;
 
 import java.time.LocalDateTime;
 import java.util.List;

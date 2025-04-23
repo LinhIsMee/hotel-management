@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -95,18 +94,6 @@ public class UserController {
         } catch (Exception e){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi lấy thông tin người dùng: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * API kiểm tra hệ thống
-     */
-    @GetMapping("/test")
-    public String test() {
-        try {
-            return "Welcome";
-        } catch (Exception e){
-            throw new RuntimeException(e);
         }
     }
 

@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
 import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
@@ -11,12 +10,8 @@ import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.services.interfaces.ServiceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 
-import java.io.File;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -150,66 +145,5 @@ public class ServiceServiceImpl implements ServiceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
         
         serviceRepository.delete(service);
-    }
-    
-    @Override
-    public void initServicesFromJson() {
-        try {
-            // Kiểm tra xem đã có dịch vụ nào trong hệ thống chưa
-            if (!serviceRepository.findAll().isEmpty()) {
-                log.info("Đã có dữ liệu dịch vụ trong DB, bỏ qua quá trình khởi tạo");
-                return;
-            }
-            
-            // Đọc dữ liệu từ file JSON
-            log.info("Bắt đầu quá trình khởi tạo dữ liệu dịch vụ từ JSON");
-            File jsonFile = new ClassPathResource("/data/services.json").getFile();
-            JsonNode rootNode = objectMapper.readTree(jsonFile);
-            JsonNode dataNode = rootNode.path("data");
-            
-            if (dataNode.isMissingNode() || !dataNode.isArray()) {
-                log.warn("Không tìm thấy dữ liệu dịch vụ hợp lệ trong file JSON");
-                return;
-            }
-            
-            List<HotelService> services = new ArrayList<>();
-            
-            for (JsonNode node : dataNode) {
-                if (!node.has("name") || !node.has("code") || !node.has("price")) {
-                    log.warn("Bỏ qua dữ liệu dịch vụ không hợp lệ: {}", node);
-                    continue;
-                }
-                
-                // Chuyển đổi type thành ServiceType
-                ServiceType serviceType = ServiceType.OTHERS;
-                if (node.has("type")) {
-                    try {
-                        serviceType = ServiceType.valueOf(node.get("type").asText().toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        log.warn("Loại dịch vụ không hợp lệ: {}, sử dụng giá trị mặc định OTHERS", node.get("type").asText());
-                    }
-                }
-                
-                HotelService service = HotelService.builder()
-                        .name(node.get("name").asText())
-                        .code(node.get("code").asText())
-                        .type(serviceType)
-                        .description(node.has("description") ? node.get("description").asText() : null)
-                        .price(new BigDecimal(node.get("price").asText()))
-                        .isAvailable(node.has("isAvailable") ? node.get("isAvailable").asBoolean() : true)
-                        .build();
-                
-                services.add(service);
-            }
-            
-            if (!services.isEmpty()) {
-                serviceRepository.saveAll(services);
-                log.info("Đã khởi tạo thành công {} dịch vụ từ file JSON", services.size());
-            } else {
-                log.warn("Không có dữ liệu dịch vụ hợp lệ để khởi tạo");
-            }
-        } catch (Exception e) {
-            log.error("Lỗi khi khởi tạo dữ liệu dịch vụ từ JSON: {}", e.getMessage(), e);
-        }
     }
 } 

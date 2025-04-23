@@ -2,7 +2,6 @@ package com.spring3.hotel.management.services.interfaces;
 
 import com.spring3.hotel.management.dto.DiscountDTO;
 import com.spring3.hotel.management.dto.GenerateDiscountRequest;
-import com.spring3.hotel.management.models.Discount;
 
 import java.util.List;
 

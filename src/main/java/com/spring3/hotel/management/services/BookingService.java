@@ -30,7 +30,6 @@ public interface BookingService {
     BookingResponseDTO createBooking(UpsertBookingRequest request); // Cho user thường
     BookingResponseDTO createBooking(UpsertBookingRequest request, String username); // Cho user đã đăng nhập
     BookingResponseDTO createBookingByAdmin(AdminBookingRequest request); // Cho admin
-    BookingResponseDTO createBookingTest(UpsertBookingRequest request); // Cho testing
     
     // Phương thức cập nhật
     BookingResponseDTO updateBooking(UpsertBookingRequest request, Integer id); // Cho user thường

@@ -62,14 +62,6 @@ public class RoomController {
         log.info("Nhận yêu cầu lấy danh sách tất cả phòng đang hoạt động");
         try {
             List<RoomResponseDTO> rooms = roomService.getAllActiveRooms();
-            log.info("Tìm thấy {} phòng từ DB", rooms.size());
-            
-            if (rooms.isEmpty()) {
-                log.info("Gọi API reload-data để khởi tạo dữ liệu ban đầu do danh sách phòng trống");
-                roomService.initRoomsFromJson();
-                rooms = roomService.getAllActiveRooms();
-                log.info("Sau khi khởi tạo lại: {} phòng", rooms.size());
-            }
             
             enrichWithReviewData(rooms);
             log.info("Trả về {} phòng sau khi làm phong phú dữ liệu", rooms.size());
@@ -152,19 +144,6 @@ public class RoomController {
         }
     }
 
-    // Thêm API mới để tái khởi tạo dữ liệu phòng mẫu
-    @GetMapping("/reload-data")
-    public ResponseEntity<String> reloadRoomSampleData() {
-        log.info("Nhận yêu cầu tái khởi tạo dữ liệu phòng mẫu");
-        try {
-            roomService.initRoomsFromJson();
-            return ResponseEntity.ok("Đã tái khởi tạo dữ liệu phòng mẫu thành công");
-        } catch (Exception e) {
-            log.error("Lỗi khi tái khởi tạo dữ liệu phòng mẫu: {}", e.getMessage());
-            return ResponseEntity.status(500).body("Lỗi khi tái khởi tạo dữ liệu: " + e.getMessage());
-        }
-    }
-
     @PutMapping("/batch-update-status")
     public ResponseEntity<?> updateRoomStatusBatch(@RequestBody Map<String, String> roomStatusMap) {
         try {
@@ -198,34 +177,38 @@ public class RoomController {
      */
     @GetMapping("/room-number/{roomNumber}")
     public ResponseEntity<RoomResponseDTO> getRoomByRoomNumber(@PathVariable String roomNumber) {
-        RoomResponseDTO roomResponseDTO = roomService.getRoomByRoomNumber(roomNumber);
-        return ResponseEntity.ok(roomResponseDTO);
+        RoomResponseDTO room = roomService.getRoomByRoomNumber(roomNumber);
+        if (room == null) {
+            return ResponseEntity.notFound().build();
+        }
+        enrichWithReviewData(List.of(room));
+        return ResponseEntity.ok(room);
     }
 
     /**
-     * Tạo mới phòng
+     * Tạo phòng mới (chỉ cho Admin)
      */
     @PostMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RoomResponseDTO> createRoom(@Valid @RequestBody UpsertRoomRequest request) {
-        RoomResponseDTO roomResponseDTO = roomService.createRoom(request);
-        return new ResponseEntity<>(roomResponseDTO, HttpStatus.CREATED);
+        RoomResponseDTO createdRoom = roomService.createRoom(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdRoom);
     }
 
     /**
-     * Cập nhật thông tin phòng
+     * Cập nhật thông tin phòng (chỉ cho Admin)
      */
     @PutMapping("/admin/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RoomResponseDTO> updateRoom(
             @PathVariable Integer id,
             @Valid @RequestBody UpsertRoomRequest request) {
-        RoomResponseDTO roomResponseDTO = roomService.updateRoom(request, id);
-        return ResponseEntity.ok(roomResponseDTO);
+        RoomResponseDTO updatedRoom = roomService.updateRoom(request, id);
+        return ResponseEntity.ok(updatedRoom);
     }
 
     /**
-     * Xóa phòng (soft delete)
+     * Xóa phòng (chỉ cho Admin)
      */
     @DeleteMapping("/admin/{id}")
     @PreAuthorize("hasRole('ADMIN')")

@@ -870,41 +870,6 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public BookingResponseDTO createBookingTest(UpsertBookingRequest request) {
-        try {
-            // Tạo booking
-            BookingResponseDTO bookingResponseDTO = createBooking(request);
-            Integer bookingId = bookingResponseDTO.getId();
-            
-            // Tạo thanh toán (nếu yêu cầu)
-            if ("PAID".equals(request.getPaymentStatus()) || "00".equals(request.getPaymentStatus())) {
-                // Tìm payment đã tạo
-                List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
-                if (!payments.isEmpty()) {
-                    Payment payment = payments.get(0);
-                    // Cập nhật trạng thái thành công
-                    payment.setStatus("00");
-                    payment.setResponseCode("00");
-                    payment.setMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "CASH");
-                    if (request.getPaymentDate() != null) {
-                        payment.setPayDate(request.getPaymentDate().toString());
-                    } else {
-                        payment.setPayDate(LocalDateTime.now().toString());
-                    }
-                    paymentRepository.save(payment);
-                    
-                    // Xác nhận booking
-                    confirmBooking(bookingId);
-                }
-            }
-            
-            return getBookingById(bookingId);
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi tạo booking test: " + e.getMessage());
-        }
-    }
-
-    @Override
     public BookingResponseDTO markBookingAsPaid(Integer bookingId, String paymentMethod) {
         // Kiểm tra booking có tồn tại không
         Booking booking = bookingRepository.findById(bookingId)

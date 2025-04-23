@@ -2,7 +2,6 @@ package com.spring3.hotel.management.controllers;
 
 import com.spring3.hotel.management.dto.request.UpsertRoomTypeRequest;
 import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
-import com.spring3.hotel.management.dto.response.RoomResponseDTO;
 import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import com.spring3.hotel.management.services.interfaces.RoomTypeService;
@@ -82,8 +81,8 @@ public class RoomTypeController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<RoomTypeResponseDTO> deleteRoomType(@PathVariable Integer id) {
-        RoomTypeResponseDTO deletedRoomType = roomTypeService.deleteRoomType(id);
-        return ResponseEntity.ok(deletedRoomType);
+    public ResponseEntity<Void> deleteRoomType(@PathVariable Integer id) {
+        roomTypeService.deleteRoomType(id);
+        return ResponseEntity.noContent().build();
     }
 }

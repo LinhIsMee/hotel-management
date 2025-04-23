@@ -144,14 +144,14 @@ public class ServiceController {
     }
     
     /**
-     * Khởi tạo dữ liệu dịch vụ từ file JSON
+     * API khởi tạo dữ liệu mẫu sẽ được loại bỏ
      */
+    /*
     @PostMapping("/init")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SuccessResponse<Void>> initServicesFromJson() {
         serviceService.initServicesFromJson();
-        return ResponseEntity.ok(
-                new SuccessResponse<>(HttpStatus.OK.value(), "Khởi tạo dữ liệu dịch vụ thành công", null)
-        );
+        return ResponseEntity.ok(new SuccessResponse<>(null, "Dịch vụ đã được khởi tạo thành công"));
     }
+    */
 } 

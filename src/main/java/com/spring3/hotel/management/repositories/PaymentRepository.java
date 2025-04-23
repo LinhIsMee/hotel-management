@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.repositories;
 
-import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

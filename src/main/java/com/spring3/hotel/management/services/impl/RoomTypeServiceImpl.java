@@ -1,7 +1,5 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.request.UpsertRoomTypeRequest;
 import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;
@@ -13,12 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +29,13 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     public RoomTypeResponseDTO getRoomTypeById(Integer id) {
         RoomType roomType = roomTypeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + id));
+        return mapToDTO(roomType);
+    }
+
+    @Override
+    public RoomTypeResponseDTO getRoomTypeByName(String name) {
+        RoomType roomType = roomTypeRepository.findByNameIgnoreCase(name)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với tên: " + name));
         return mapToDTO(roomType);
     }
 
@@ -106,15 +106,13 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     }
 
     @Override
-    public RoomTypeResponseDTO deleteRoomType(Integer id) {
+    public void deleteRoomType(Integer id) {
         RoomType roomType = roomTypeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + id));
         
         // Thực hiện soft delete bằng cách đặt isActive = false
         roomType.setIsActive(false);
-        RoomType deactivatedRoomType = roomTypeRepository.save(roomType);
-        
-        return mapToDTO(deactivatedRoomType);
+        roomTypeRepository.save(roomType);
     }
 
     @Override
@@ -123,77 +121,6 @@ public class RoomTypeServiceImpl implements RoomTypeService {
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
-    }
-
-    @Override
-    public void initRoomTypesFromJson() {
-        try {
-            log.info("Bắt đầu khởi tạo dữ liệu loại phòng từ file JSON...");
-            
-            // Kiểm tra xem đã có dữ liệu trong DB chưa
-            if (roomTypeRepository.count() > 0) {
-                log.info("Dữ liệu loại phòng đã tồn tại trong DB, bỏ qua việc khởi tạo.");
-                return;
-            }
-            
-            // Đọc file JSON
-            File jsonFile = Paths.get("data", "room-types.json").toFile();
-            if (!jsonFile.exists()) {
-                log.warn("Không tìm thấy file dữ liệu loại phòng JSON: {}", jsonFile.getAbsolutePath());
-                return;
-            }
-            
-            JsonNode rootNode = objectMapper.readTree(jsonFile);
-            JsonNode dataNode = rootNode.get("data");
-            
-            if (dataNode == null || !dataNode.isArray() || dataNode.isEmpty()) {
-                log.warn("Không có dữ liệu hợp lệ trong file JSON.");
-                return;
-            }
-            
-            List<RoomType> roomTypes = new ArrayList<>();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            
-            for (JsonNode node : dataNode) {
-                String amenitiesStr = null;
-                if (node.has("amenities") && node.get("amenities").isArray()) {
-                    List<String> amenitiesList = objectMapper.convertValue(
-                            node.get("amenities"),
-                            new TypeReference<List<String>>() {}
-                    );
-                    amenitiesStr = String.join(",", amenitiesList);
-                }
-                
-                LocalDate createdAt = null;
-                if (node.has("createdAt") && !node.get("createdAt").isNull()) {
-                    createdAt = LocalDate.parse(node.get("createdAt").asText(), formatter);
-                }
-                
-                RoomType roomType = RoomType.builder()
-                        .name(node.get("name").asText())
-                        .code(node.get("code").asText())
-                        .description(node.has("description") ? node.get("description").asText() : null)
-                        .pricePerNight(node.get("pricePerNight").asDouble())
-                        .basePrice(node.get("pricePerNight").asDouble())
-                        .maxOccupancy(node.get("maxOccupancy").asInt())
-                        .capacity(node.get("maxOccupancy").asInt())
-                        .amenities(amenitiesStr)
-                        .imageUrl(node.has("imageUrl") ? node.get("imageUrl").asText() : null)
-                        .isActive(node.has("isActive") ? node.get("isActive").asBoolean() : true)
-                        .createdAt(createdAt)
-                        .build();
-                
-                roomTypes.add(roomType);
-            }
-            
-            roomTypeRepository.saveAll(roomTypes);
-            log.info("Đã khởi tạo thành công {} loại phòng từ file JSON.", roomTypes.size());
-            
-        } catch (IOException e) {
-            log.error("Lỗi khi đọc file JSON loại phòng: {}", e.getMessage(), e);
-        } catch (Exception e) {
-            log.error("Lỗi không xác định khi khởi tạo dữ liệu loại phòng: {}", e.getMessage(), e);
-        }
     }
 
     // Phương thức mới để map RoomType sang RoomTypeResponseDTO

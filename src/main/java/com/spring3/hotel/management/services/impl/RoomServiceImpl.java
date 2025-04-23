@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dto.response.RoomResponseDTO;
@@ -19,13 +18,9 @@ import com.spring3.hotel.management.repositories.BookingDetailRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
-import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -160,6 +155,7 @@ public class RoomServiceImpl implements RoomService {
     
     @Override
     public void deleteRoom(Integer id) {
+        log.info("Xóa phòng có ID: {}", id);
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
         
@@ -169,143 +165,6 @@ public class RoomServiceImpl implements RoomService {
         log.info("Đã vô hiệu hóa (soft delete) phòng với ID: {}", id);
     }
     
-    @Override
-    public void initRoomsFromJson() {
-        log.info("Cập nhật lại ảnh cho các phòng hiện có...");
-        
-        try {
-            // Lấy danh sách phòng hiện có
-            List<Room> existingRooms = roomRepository.findAll();
-            if (existingRooms.isEmpty()) {
-                log.warn("Không có phòng nào trong cơ sở dữ liệu để cập nhật.");
-                return;
-            }
-            
-            // Danh sách hình ảnh chất lượng cao từ Unsplash với các tham số tối ưu
-            List<String> optimizedImages = List.of(
-                "https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1566665797739-1674de7a421a?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1587985064135-0366536eab42?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1595576508898-0ad5c879a061?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1566195992011-5f6b21e539aa?q=80&w=1200&auto=format&fit=crop",
-                "https://images.unsplash.com/photo-1591088398332-8a7791972843?q=80&w=1200&auto=format&fit=crop"
-            );
-            
-            // Cập nhật URL hình ảnh cho từng phòng
-            int count = 0;
-            for (Room room : existingRooms) {
-                // Lấy 3 hình ảnh ngẫu nhiên cho mỗi phòng
-                List<String> newImages = getRandomImages(optimizedImages, 3, count);
-                room.setImages(newImages);
-                count += 3;
-                
-                // Cập nhật trạng thái phòng nếu cần
-                if ("AVAILABLE".equals(room.getStatus())) {
-                    room.setStatus("VACANT");
-                }
-            }
-            
-            // Lưu các phòng đã được cập nhật
-            roomRepository.saveAll(existingRooms);
-            log.info("Đã cập nhật thành công URL hình ảnh cho {} phòng hiện có", existingRooms.size());
-        } catch (Exception e) {
-            log.error("Lỗi khi cập nhật hình ảnh phòng: {}", e.getMessage());
-            throw new RuntimeException("Không thể cập nhật hình ảnh cho phòng", e);
-        }
-    }
-    
-    // Hàm hỗ trợ tạo phòng
-    private Room createRoom(String roomNumber, RoomType roomType, String status, String floor, 
-                           Boolean isActive, String notes, List<String> images) {
-        Room room = new Room();
-        room.setRoomNumber(roomNumber);
-        room.setRoomType(roomType);
-        room.setStatus(status);
-        room.setFloor(floor);
-        room.setIsActive(isActive);
-        room.setNotes(notes);
-        room.setImages(images);
-        return room;
-    }
-    
-    // Hàm lấy ngẫu nhiên các hình ảnh
-    private List<String> getRandomImages(List<String> allImages, int count, int offset) {
-        List<String> result = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            int index = (offset + i) % allImages.size();
-            result.add(allImages.get(index));
-        }
-        return result;
-    }
-    
-    private void addDefaultServicesToRooms(List<Room> rooms) {
-        try {
-            // Lấy danh sách các dịch vụ cơ bản từ DB
-            List<HotelService> basicServices = serviceRepository.findByIsAvailable(true);
-            if (basicServices.isEmpty()) {
-                log.warn("Không có dịch vụ nào trong hệ thống để thêm vào phòng.");
-                return;
-            }
-            
-            for (Room room : rooms) {
-                // Dịch vụ miễn phí cơ bản cho tất cả các phòng
-                List<HotelService> roomServices = new ArrayList<>();
-                
-                // Dịch vụ Wifi và TV miễn phí cho tất cả các phòng
-                basicServices.stream()
-                    .filter(service -> service.getName().contains("Wifi") || service.getName().contains("Truyền hình"))
-                    .forEach(roomServices::add);
-                
-                // Thêm dịch vụ dựa trên loại phòng
-                int roomTypeId = room.getRoomType().getId();
-                if (roomTypeId >= 2) { // Từ phòng đôi trở lên
-                    basicServices.stream()
-                        .filter(service -> service.getName().contains("Dọn phòng") || service.getName().contains("Giặt ủi"))
-                        .forEach(roomServices::add);
-                }
-                
-                if (roomTypeId >= 3) { // Từ phòng gia đình trở lên
-                    basicServices.stream()
-                        .filter(service -> service.getName().contains("Bữa sáng"))
-                        .forEach(roomServices::add);
-                }
-                
-                if (roomTypeId >= 4) { // Phòng hạng sang
-                    basicServices.stream()
-                        .filter(service -> service.getName().contains("Spa") || service.getName().contains("Đưa đón"))
-                        .forEach(roomServices::add);
-                }
-                
-                // Bỏ qua việc gán dịch vụ trực tiếp vào phòng để tránh lỗi ImmutableCollections
-                // room.setServices(roomServices);
-                // roomRepository.save(room);
-                
-                // Thay vào đó, lưu từng dịch vụ cho phòng qua bảng trung gian
-                try {
-                    // Sử dụng native query để thêm quan hệ
-                    for (HotelService service : roomServices) {
-                        // Kiểm tra xem dịch vụ đã tồn tại cho phòng chưa
-                        // (Nếu cần, nhưng tạm bỏ qua để đơn giản hóa)
-                        
-                        // Chi tiết cách triển khai sẽ phụ thuộc vào repository - giả sử ở đây là trực tiếp thêm vào bảng trung gian
-                        // Có thể cần tạo một repository mới cho bảng trung gian hoặc custom query trong RoomRepository
-                    }
-                    log.info("Đã thêm dịch vụ cho phòng {}", room.getRoomNumber());
-                } catch (Exception e) {
-                    log.error("Lỗi khi thêm dịch vụ cho phòng {}: {}", room.getRoomNumber(), e.getMessage());
-                }
-            }
-            
-            log.info("Đã bỏ qua việc thêm dịch vụ cho {} phòng do vấn đề với ImmutableCollections.", rooms.size());
-        } catch (Exception e) {
-            log.error("Lỗi khi thêm dịch vụ mặc định cho phòng: {}", e.getMessage(), e);
-        }
-    }
-
     @Override
     public List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate) {
         // Lấy danh sách tất cả phòng

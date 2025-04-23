@@ -26,6 +26,4 @@ public interface ServiceService {
     ServiceResponseDTO updateService(UpsertServiceRequest request, Integer id);
     
     void deleteService(Integer id);
-    
-    void initServicesFromJson();
 } 

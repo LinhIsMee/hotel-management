@@ -2,7 +2,6 @@ package com.spring3.hotel.management.services.impl;
 
 import com.spring3.hotel.management.dto.request.BookingDetailRequest;
 import com.spring3.hotel.management.dto.response.BookingDetailResponse;
-import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.BookingDetail;
 import com.spring3.hotel.management.models.Room;

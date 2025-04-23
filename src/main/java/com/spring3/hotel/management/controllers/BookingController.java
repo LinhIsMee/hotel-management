@@ -2,16 +2,10 @@ package com.spring3.hotel.management.controllers;
 
 import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dto.response.BookingResponseDTO;
-import com.spring3.hotel.management.dto.response.PaymentResponse;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
-import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.User;
-import com.spring3.hotel.management.repositories.BookingRepository;
-import com.spring3.hotel.management.repositories.PaymentRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.BookingService;
-import com.spring3.hotel.management.services.VNPayService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.view.RedirectView;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -40,10 +32,7 @@ import java.util.Map;
 public class BookingController {
 
     private final BookingService bookingService;
-    private final VNPayService vnPayService;
     private final UserRepository userRepository;
-    private final PaymentRepository paymentRepository;
-    private final BookingRepository bookingRepository;
 
     /**
      * Lấy thông tin đặt phòng theo ID
@@ -170,7 +159,7 @@ public class BookingController {
     }
 
     /**
-     * Tạo mới đơn đặt phòng và tạo liên kết thanh toán VNPay
+     * Tạo mới đơn đặt phòng
      */
     @PostMapping("/create")
     @PreAuthorize("hasRole('ROLE_USER')")
@@ -190,112 +179,115 @@ public class BookingController {
         // Tạo booking
         BookingResponseDTO bookingResponseDTO = bookingService.createBooking(request);
         
-        // Tạo liên kết thanh toán VNPay
-        String orderInfo = "Thanh toan dat phong khach san - Ma dat phong: " + bookingResponseDTO.getId();
-        Long amount = bookingResponseDTO.getFinalPrice().longValue();
-        String returnUrl = "http://localhost:9000/api/v1/payments/callback";
-        String ipAddress = "127.0.0.1";
-        
-        PaymentResponse paymentResponse = vnPayService.createPayment(orderInfo, amount, ipAddress, returnUrl);
-        
-        // Trả về thông tin booking và liên kết thanh toán
-        Map<String, Object> response = new HashMap<>();
-        response.put("booking", bookingResponseDTO);
-        response.put("payment", paymentResponse);
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "booking", bookingResponseDTO,
+            "message", "Đặt phòng thành công. Vui lòng tiến hành thanh toán."
+        ));
     }
 
     /**
      * Cập nhật thông tin đặt phòng
-     * (Chỉ cho phép người dùng cập nhật trong trạng thái PENDING)
      */
     @PutMapping("/update/{id}")
     @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<?> updateBooking(
             @PathVariable Integer id,
             @Valid @RequestBody UpsertBookingRequest request) {
-        // Đảm bảo người dùng chỉ có thể cập nhật booking của chính họ
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new RuntimeException("Không tìm thấy người dùng với username: " + username);
-        }
-        
-        // Kiểm tra booking có thuộc về người dùng hiện tại không
-        BookingResponseDTO existingBooking = bookingService.getBookingById(id);
-        if (!existingBooking.getUserId().equals(user.getId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Bạn không có quyền cập nhật booking này"));
-        }
-        
-        // Kiểm tra trạng thái booking
-        if (!"PENDING".equals(existingBooking.getStatus())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Chỉ có thể cập nhật booking có trạng thái PENDING"));
-        }
-        
-        // Cập nhật booking
-        request.setUserId(user.getId());
-        BookingResponseDTO bookingResponseDTO = bookingService.updateBooking(request, id);
-        
-        // Tạo liên kết thanh toán mới nếu có thay đổi giá
-        if (!existingBooking.getFinalPrice().equals(bookingResponseDTO.getFinalPrice())) {
-            String orderInfo = "Thanh toan dat phong khach san - Ma dat phong: " + bookingResponseDTO.getId();
-            Long amount = bookingResponseDTO.getFinalPrice().longValue();
-            String returnUrl = "http://localhost:9000/api/v1/payments/callback";
-            String ipAddress = "127.0.0.1";
+        try {
+            // Xác thực người dùng
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username);
             
-            PaymentResponse paymentResponse = vnPayService.createPayment(orderInfo, amount, ipAddress, returnUrl);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("success", false, "message", "Người dùng không hợp lệ"));
+            }
             
-            Map<String, Object> response = new HashMap<>();
-            response.put("booking", bookingResponseDTO);
-            response.put("payment", paymentResponse);
+            // Kiểm tra booking có thuộc về người dùng không
+            BookingResponseDTO existingBooking = bookingService.getBookingById(id);
+            if (existingBooking == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
+            }
             
-            return ResponseEntity.ok(response);
+            if (!existingBooking.getUserId().equals(user.getId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("success", false, "message", "Bạn không có quyền cập nhật booking này."));
+            }
+            
+            // Chỉ cho phép cập nhật các booking có trạng thái PENDING hoặc CONFIRMED
+            if (!existingBooking.getStatus().equals("PENDING") && !existingBooking.getStatus().equals("CONFIRMED")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of(
+                            "success", false,
+                            "message", "Chỉ có thể cập nhật booking có trạng thái PENDING hoặc CONFIRMED."
+                        ));
+            }
+            
+            // Cập nhật booking
+            request.setUserId(user.getId());
+            BookingResponseDTO updatedBooking = bookingService.updateBooking(request, id);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "booking", updatedBooking,
+                "message", "Cập nhật booking thành công."
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi cập nhật booking {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
         }
-        
-        return ResponseEntity.ok(bookingResponseDTO);
     }
-    
+
     /**
-     * Hủy booking (chỉ cho phép khi trạng thái là PENDING hoặc CONFIRMED)
+     * Hủy đặt phòng
      */
     @PostMapping("/cancel/{id}")
     @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<?> cancelBooking(@PathVariable Integer id) {
-        // Đảm bảo người dùng chỉ có thể hủy booking của chính họ
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new RuntimeException("Không tìm thấy người dùng với username: " + username);
+        try {
+            // Xác thực người dùng
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username);
+            
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("success", false, "message", "Người dùng không hợp lệ"));
+            }
+            
+            // Kiểm tra booking có thuộc về người dùng không
+            BookingResponseDTO existingBooking = bookingService.getBookingById(id);
+            if (existingBooking == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
+            }
+            
+            if (!existingBooking.getUserId().equals(user.getId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("success", false, "message", "Bạn không có quyền hủy booking này."));
+            }
+            
+            // Hủy booking
+            BookingResponseDTO cancelledBooking = bookingService.cancelBooking(id);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "booking", cancelledBooking,
+                "message", "Đã hủy booking thành công."
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi hủy booking {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
         }
-        
-        // Kiểm tra booking có thuộc về người dùng hiện tại không
-        BookingResponseDTO existingBooking = bookingService.getBookingById(id);
-        if (!existingBooking.getUserId().equals(user.getId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", "Bạn không có quyền hủy booking này"));
-        }
-        
-        // Kiểm tra trạng thái booking
-        if (!"PENDING".equals(existingBooking.getStatus()) && !"CONFIRMED".equals(existingBooking.getStatus())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Chỉ có thể hủy booking có trạng thái PENDING hoặc CONFIRMED"));
-        }
-        
-        // Hủy booking
-        BookingResponseDTO bookingResponseDTO = bookingService.cancelBooking(id);
-        return ResponseEntity.ok(bookingResponseDTO);
     }
-    
+
     /**
-     * Xác nhận đơn đặt phòng sau khi thanh toán thành công
-     * (Gọi từ VNPay callback hoặc từ admin)
+     * Xác nhận đặt phòng (chỉ cho admin)
      */
     @PostMapping("/confirm/{id}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
@@ -303,52 +295,56 @@ public class BookingController {
         BookingResponseDTO bookingResponseDTO = bookingService.confirmBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
-    
+
     /**
-     * Kiểm tra trạng thái thanh toán của booking
+     * Kiểm tra trạng thái đặt phòng
      */
     @GetMapping("/check-status/{bookingId}")
     @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<?> checkBookingStatus(@PathVariable Integer bookingId) {
         try {
-            // Lấy thông tin user đang đăng nhập
+            // Xác thực người dùng
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String currentPrincipalName = authentication.getName();
-            User currentUser = userRepository.findByEmail(currentPrincipalName)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin người dùng"));
-
-            // Lấy DTO từ service
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username);
+            
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("success", false, "message", "Người dùng không hợp lệ"));
+            }
+            
+            // Kiểm tra booking có tồn tại không
             BookingResponseDTO booking = bookingService.getBookingById(bookingId);
             
-            if (booking != null && booking.getUserId().equals(currentUser.getId())) {
-                String bookingStatus = booking.getStatus();
-                String paymentStatus = booking.getPaymentStatus();
-                
-                if ("CONFIRMED".equals(bookingStatus) && "PAID".equals(paymentStatus)) { 
-                    return ResponseEntity.ok(Map.of(
-                            "success", true, 
-                            "message", "Đơn đặt phòng đã được xác nhận và thanh toán."
-                    ));
-                } else {
-                    return ResponseEntity.ok(Map.of(
-                            "success", false, 
-                            "message", "Trạng thái booking: " + bookingStatus + ", Trạng thái thanh toán: " + (paymentStatus != null ? paymentStatus : "PENDING")
-                    ));
-                }
-            } else if (booking == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", "Không tìm thấy đơn đặt phòng."));
-            } else {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", "Bạn không có quyền truy cập booking này."));
+            if (booking == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
             }
+            
+            // Kiểm tra nếu booking thuộc về người dùng hiện tại
+            if (!booking.getUserId().equals(user.getId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("success", false, "message", "Bạn không có quyền kiểm tra booking này."));
+            }
+            
+            // Lấy thông tin thanh toán
+            Map<String, Object> paymentInfo = bookingService.getBookingPaymentInfo(bookingId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("booking", booking);
+            response.put("payment", paymentInfo);
+            
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Lỗi kiểm tra trạng thái booking {}: {}", bookingId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("success", false, "message", "Lỗi kiểm tra trạng thái booking: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
         }
     }
-    
+
     /**
-     * API thông tin thanh toán
-     * (Sử dụng để lấy thông tin trước khi thanh toán)
+     * Lấy thông tin thanh toán của booking
      */
     @GetMapping("/{id}/payment-info")
     @PreAuthorize("hasAnyRole('ROLE_USER', 'ROLE_ADMIN')")
@@ -358,33 +354,33 @@ public class BookingController {
     }
     
     /**
-     * Lấy chi tiết booking kèm thông tin thanh toán
+     * Lấy chi tiết booking (bao gồm thông tin phòng, dịch vụ và thanh toán)
      */
     @GetMapping("/detail/{id}")
     @PreAuthorize("hasAnyRole('ROLE_USER', 'ROLE_ADMIN')")
     public ResponseEntity<?> getBookingDetail(@PathVariable Integer id) {
         try {
-            // Kiểm tra quyền truy cập
+            // Xác thực quyền truy cập
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String currentPrincipalName = authentication.getName();
-            User currentUser = userRepository.findByEmail(currentPrincipalName)
+            String username = authentication.getName();
+            User user = userRepository.findByEmail(username)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin người dùng"));
             
-            boolean isAdmin = authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-                    
-            // Lấy thông tin booking DTO
+            // Lấy chi tiết booking
             BookingResponseDTO booking = bookingService.getBookingById(id);
             
             if (booking == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                       .body(Map.of("success", false, "message", "Không tìm thấy booking."));
+                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
             }
             
-            // Kiểm tra quyền truy cập
-            if (!isAdmin && !booking.getUserId().equals(currentUser.getId())) {
+            // Kiểm tra quyền truy cập (admin có thể xem tất cả, người dùng chỉ xem được booking của mình)
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            
+            if (!isAdmin && !booking.getUserId().equals(user.getId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                       .body(Map.of("success", false, "message", "Bạn không có quyền truy cập booking này."));
+                        .body(Map.of("success", false, "message", "Bạn không có quyền truy cập booking này."));
             }
             
             // Lấy thông tin payment
@@ -403,137 +399,6 @@ public class BookingController {
                 "message", "Không thể lấy thông tin đặt phòng: " + e.getMessage()
             ));
         }
-    }
-    
-    /**
-     * API tạo URL thanh toán cho booking đã tồn tại
-     */
-    @PostMapping("/create-payment")
-    @PreAuthorize("hasRole('ROLE_USER')")
-    public ResponseEntity<?> createPaymentUrl(@RequestParam Integer bookingId, 
-                                              @RequestParam(required = false) String bankCode, 
-                                              HttpServletRequest request) {
-        try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String currentPrincipalName = authentication.getName();
-            User currentUser = userRepository.findByEmail(currentPrincipalName)
-                  .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin người dùng"));
-            Integer userId = currentUser.getId();
-
-            // Lấy BookingResponseDTO để kiểm tra và lấy giá tiền
-            BookingResponseDTO bookingResponse = bookingService.getBookingById(bookingId);
-
-            if (bookingResponse == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Không tìm thấy booking với id: " + bookingId);
-            }
-             
-            if (!bookingResponse.getUserId().equals(userId)) { 
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Bạn không có quyền truy cập booking này.");
-            }
-            
-            // Lấy giá tiền 
-            long amount = (bookingResponse.getFinalPrice() != null ? bookingResponse.getFinalPrice().longValue() : bookingResponse.getTotalPrice().longValue());
-            if (amount <= 0) {
-                return ResponseEntity.badRequest().body("Số tiền thanh toán không hợp lệ.");
-            }
-            
-            String orderInfo = "Thanh toan don hang #" + bookingId;
-            String ipAddress = getClientIp(request);
-            String returnUrl = "http://localhost:3000/payment/return";
-
-            // Gọi VNPayService
-            PaymentResponse paymentResponse = vnPayService.createPayment(
-                orderInfo, 
-                amount,
-                ipAddress, 
-                returnUrl, 
-                bookingId
-            );
-            
-            // Tìm booking gốc để cập nhật paymentStatus
-            Booking booking = bookingRepository.findById(bookingId).orElse(null);
-            if (booking != null) {
-                booking.setPaymentStatus("PENDING");
-                bookingRepository.save(booking); 
-            } else {
-                log.warn("Không tìm thấy booking gốc để cập nhật paymentStatus sau khi tạo payment cho bookingId: {}", bookingId);
-            }
-
-            return ResponseEntity.ok(paymentResponse);
-        } catch (Exception e) {
-            log.error("Lỗi tạo URL thanh toán cho booking {}: {}", bookingId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body("Lỗi tạo URL thanh toán: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Xử lý callback từ VNPay
-     */
-    @GetMapping("/payment/vnpay_return")
-    public RedirectView vnpayReturn(@RequestParam Map<String, String> queryParams) {
-        // URL của frontend để chuyển hướng đến
-        String frontendReturnUrlBase = "http://localhost:3000/payment-result";
-        UriComponentsBuilder urlBuilder = UriComponentsBuilder.fromHttpUrl(frontendReturnUrlBase);
-
-        try {
-            log.info("VNPay return data: {}", queryParams);
-            
-            String transactionNo = queryParams.get("vnp_TransactionNo");
-            String responseCode = queryParams.get("vnp_ResponseCode");
-            String orderInfo = queryParams.get("vnp_OrderInfo"); 
-
-            // 1. Kiểm tra chữ ký
-            if (!vnPayService.verifyReturnSignature(queryParams)) { 
-                log.warn("Chữ ký VNPay return không hợp lệ cho transactionNo: {}", transactionNo);
-                urlBuilder.queryParam("success", "false");
-                urlBuilder.queryParam("message", "invalid_signature");
-                return new RedirectView(urlBuilder.toUriString());
-            }
-            
-            log.info("Chữ ký VNPay return hợp lệ cho transactionNo: {}", transactionNo);
-
-            // 2. Lấy bookingId
-            Integer bookingId = null;
-            if (orderInfo != null && orderInfo.contains("#")) {
-                try {
-                    bookingId = Integer.parseInt(orderInfo.substring(orderInfo.lastIndexOf("#") + 1));
-                    urlBuilder.queryParam("bookingId", bookingId);
-                } catch (NumberFormatException e) {
-                    log.error("Không thể parse bookingId từ vnp_OrderInfo: {}", orderInfo);
-                    urlBuilder.queryParam("success", "false");
-                    urlBuilder.queryParam("message", "invalid_order_info");
-                    return new RedirectView(urlBuilder.toUriString());
-                }
-            } else {
-                log.error("Thiếu thông tin bookingId từ vnp_OrderInfo: {}", orderInfo);
-                urlBuilder.queryParam("success", "false");
-                urlBuilder.queryParam("message", "missing_order_info");
-                return new RedirectView(urlBuilder.toUriString());
-            }
-            
-            // 3. Cập nhật trạng thái DB
-            bookingService.updatePaymentAndBookingStatusAfterVNPay(bookingId, transactionNo, responseCode);
-
-            // 4. Xây dựng URL chuyển hướng dựa trên kết quả
-            if ("00".equals(responseCode)) {
-                log.info("VNPay return thành công cho bookingId: {}", bookingId);
-                urlBuilder.queryParam("success", "true");
-                urlBuilder.queryParam("message", "payment_success");
-            } else {
-                log.warn("VNPay return thất bại cho bookingId: {} với mã lỗi: {}", bookingId, responseCode);
-                urlBuilder.queryParam("success", "false");
-                urlBuilder.queryParam("message", "payment_failed");
-                urlBuilder.queryParam("code", responseCode);
-            }
-             
-        } catch (Exception e) {
-            log.error("Lỗi nghiêm trọng xử lý VNPay return: {}", e.getMessage(), e);
-            urlBuilder.queryParam("success", "false");
-            urlBuilder.queryParam("message", "internal_server_error");
-        }
-        
-        // Thực hiện chuyển hướng
-        return new RedirectView(urlBuilder.toUriString());
     }
     
     /**
@@ -570,19 +435,5 @@ public class BookingController {
         );
         
         return ResponseEntity.ok(response);
-    }
-    
-    /**
-     * Helper method để lấy IP của client
-     */
-    private String getClientIp(HttpServletRequest request) {
-        String remoteAddr = "";
-        if (request != null) {
-            remoteAddr = request.getHeader("X-FORWARDED-FOR");
-            if (remoteAddr == null || "".equals(remoteAddr)) {
-                remoteAddr = request.getRemoteAddr();
-            }
-        }
-        return remoteAddr;
     }
 }

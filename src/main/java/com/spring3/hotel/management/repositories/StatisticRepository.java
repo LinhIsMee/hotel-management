@@ -6,7 +6,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Date;
 
 @Repository
 public interface StatisticRepository extends JpaRepository<Statistic, Integer> {

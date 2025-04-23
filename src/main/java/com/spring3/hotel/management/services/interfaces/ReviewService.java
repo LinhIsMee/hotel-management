@@ -1,5 +1,6 @@
 package com.spring3.hotel.management.services.interfaces;
 
+import com.spring3.hotel.management.dto.CreateRatingRequest;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
@@ -52,5 +53,5 @@ public interface ReviewService {
     
     Map<String, Object> getReviewStatistics();
     
-    void initReviewsFromJson();
+    void rateReview(CreateRatingRequest request, Integer reviewId);
 } 

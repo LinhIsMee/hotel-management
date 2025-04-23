@@ -2,7 +2,6 @@ package com.spring3.hotel.management.services.interfaces;
 
 import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dto.response.RoomResponseDTO;
-import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
 import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
 
 import java.time.LocalDate;
@@ -26,8 +25,6 @@ public interface RoomService {
     RoomResponseDTO updateRoom(UpsertRoomRequest request, Integer id);
     
     void deleteRoom(Integer id);
-    
-    void initRoomsFromJson();
     
     List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate);
     
