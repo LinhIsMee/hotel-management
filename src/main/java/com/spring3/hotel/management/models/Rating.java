@@ -40,5 +40,8 @@ public class Rating {
     @PrePersist
     protected void onCreate() {
         createdAt = java.time.LocalDateTime.now();
+        if (room != null) {
+            room.updateAverageRating(this.stars);
+        }
     }
 } 

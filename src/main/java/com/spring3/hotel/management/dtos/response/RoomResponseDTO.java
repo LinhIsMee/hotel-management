@@ -2,7 +2,9 @@ package com.spring3.hotel.management.dtos.response;
 
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.Review;
+import com.spring3.hotel.management.models.Rating;
 import com.spring3.hotel.management.repositories.ReviewRepository;
+import com.spring3.hotel.management.repositories.RatingRepository;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -47,10 +49,16 @@ public class RoomResponseDTO {
     private List<BookingPeriodDTO> bookingPeriods;
     
     private static ReviewRepository reviewRepository;
+    private static RatingRepository ratingRepository;
     
     @Autowired
     public void setReviewRepository(ReviewRepository reviewRepository) {
         RoomResponseDTO.reviewRepository = reviewRepository;
+    }
+    
+    @Autowired
+    public void setRatingRepository(RatingRepository ratingRepository) {
+        RoomResponseDTO.ratingRepository = ratingRepository;
     }
     
     public static RoomResponseDTO fromEntity(Room room) {
@@ -79,21 +87,14 @@ public class RoomResponseDTO {
         int totalReviews = 0;
         List<ReviewResponseDTO> recentReviews = Collections.emptyList();
         
-        if (reviewRepository != null) {
-            List<Review> reviews = reviewRepository.findByRoomNumber(room.getRoomNumber());
-            if (!reviews.isEmpty()) {
-                OptionalDouble avgRating = reviews.stream()
-                        .mapToDouble(Review::getRating)
+        if (ratingRepository != null) {
+            List<Rating> ratings = ratingRepository.findByRoomId(room.getId());
+            if (!ratings.isEmpty()) {
+                OptionalDouble avgRating = ratings.stream()
+                        .mapToDouble(Rating::getStars)
                         .average();
                 averageRating = avgRating.orElse(0.0);
-                totalReviews = reviews.size();
-                
-                // Lấy 3 đánh giá gần nhất
-                recentReviews = reviews.stream()
-                        .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
-                        .limit(3)
-                        .map(ReviewResponseDTO::fromEntity)
-                        .collect(Collectors.toList());
+                totalReviews = ratings.size();
             }
         }
         

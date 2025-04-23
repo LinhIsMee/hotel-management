@@ -83,6 +83,9 @@ public class Room {
     }
 
     public void updateAverageRating(Integer newRating) {
+        if (this.averageRating == null) this.averageRating = 0.0;
+        if (this.ratingCount == null) this.ratingCount = 0;
+        
         double total = this.averageRating * this.ratingCount + newRating;
         this.ratingCount++;
         this.averageRating = total / this.ratingCount;

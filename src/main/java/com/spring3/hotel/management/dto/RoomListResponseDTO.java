@@ -1,21 +1,18 @@
-package com.spring3.hotel.management.dtos.response;
+package com.spring3.hotel.management.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
+
 import java.util.List;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class RoomListResponseDTO {
     private Integer roomId;
     private String roomNumber;
     private String roomType;
     private Double price;
     private List<String> images;
-    private Double averageRating;
-    private Integer totalReviews;
-}
+    private Double averageRating; // Rating trung bình của phòng
+    private Integer totalReviews; // Tổng số đánh giá
+} 

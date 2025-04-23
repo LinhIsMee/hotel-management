@@ -636,10 +636,12 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setRoomId(room.getId());
         dto.setRoomNumber(room.getRoomNumber());
         dto.setRoomType(room.getRoomType().getName());
-        dto.setPrice(room.getRoomType().getPricePerNight()); // Giá cơ bản theo đêm
-        
-        // Lấy danh sách ảnh của phòng
+        dto.setPrice(room.getRoomType().getPricePerNight());
         dto.setImages(room.getImages());
+
+        // Lấy rating trực tiếp từ Room entity
+        dto.setAverageRating(room.getAverageRating());
+        dto.setTotalReviews(room.getRatingCount());
         
         return dto;
     }

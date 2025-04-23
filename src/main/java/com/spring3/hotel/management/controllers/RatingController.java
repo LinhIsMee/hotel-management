@@ -8,17 +8,20 @@ import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.RatingRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
+import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/ratings")
+@Slf4j
 public class RatingController {
 
     @Autowired
@@ -42,9 +45,12 @@ public class RatingController {
 
     // Tạo đánh giá mới
     @PostMapping
+    @Transactional
     public ResponseEntity<RatingDTO> createRating(
             @Valid @RequestBody CreateRatingRequest request,
             Authentication authentication) {
+        
+        log.info("Bắt đầu tạo rating mới cho phòng {}", request.getRoomId());
         
         User user = userRepository.findByUsername(authentication.getName());
         if (user == null) {
@@ -53,6 +59,9 @@ public class RatingController {
         
         Room room = roomRepository.findById(request.getRoomId())
             .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng"));
+
+        log.debug("Thông tin phòng trước khi cập nhật - averageRating: {}, ratingCount: {}", 
+            room.getAverageRating(), room.getRatingCount());
 
         Rating rating = new Rating();
         rating.setStars(request.getStars());
@@ -64,7 +73,12 @@ public class RatingController {
         
         // Cập nhật điểm trung bình của phòng
         room.updateAverageRating(rating.getStars());
-        roomRepository.save(room);
+        room = roomRepository.save(room);
+
+        log.debug("Thông tin phòng sau khi cập nhật - averageRating: {}, ratingCount: {}", 
+            room.getAverageRating(), room.getRatingCount());
+        
+        log.info("Hoàn thành tạo rating cho phòng {}", request.getRoomId());
 
         return ResponseEntity.ok(convertToDTO(rating));
     }
