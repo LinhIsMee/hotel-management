@@ -17,12 +17,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.AccessDeniedException;
 
-import com.spring3.hotel.management.dtos.request.CreateUserRequest;
-import com.spring3.hotel.management.dtos.request.RegisterRequest;
-import com.spring3.hotel.management.dtos.request.UpdateUserRequest;
-import com.spring3.hotel.management.dtos.request.UserRequest;
-import com.spring3.hotel.management.dtos.response.UserProfileResponse;
-import com.spring3.hotel.management.dtos.response.UserResponse;
+import com.spring3.hotel.management.dto.request.CreateUserRequest;
+import com.spring3.hotel.management.dto.request.RegisterRequest;
+import com.spring3.hotel.management.dto.request.UpdateUserRequest;
+import com.spring3.hotel.management.dto.request.UserRequest;
+import com.spring3.hotel.management.dto.response.UserProfileResponse;
+import com.spring3.hotel.management.dto.response.UserResponse;
 import com.spring3.hotel.management.exceptions.BadRequestException;
 import com.spring3.hotel.management.exceptions.DuplicateResourceException;
 import com.spring3.hotel.management.exceptions.NotFoundException;
@@ -98,15 +98,14 @@ public class UserServiceImpl implements UserService {
         
         User savedUser = userRepository.save(user);
         
-        // Tạo response đúng cách
-        UserResponse response = new UserResponse();
-        response.setId(savedUser.getId());
-        response.setUsername(savedUser.getUsername());
-        response.setEmail(savedUser.getEmail());
-        response.setFullName(savedUser.getFullName());
-        response.setRole("ROLE_USER");
-        
-        return response;
+        // Tạo response
+        return UserResponse.builder()
+                .id(savedUser.getId().toString())
+                .username(savedUser.getUsername())
+                .email(savedUser.getEmail())
+                .role("ROLE_USER")
+                .active(true)
+                .build();
     }
 
     @Override
@@ -161,17 +160,14 @@ public class UserServiceImpl implements UserService {
             savedUser = userRepository.save(user);
         }
         
-        UserResponse response = new UserResponse();
-        response.setId(savedUser.getId());
-        response.setUsername(savedUser.getUsername());
-        response.setEmail(savedUser.getEmail());
-        response.setFullName(savedUser.getFullName());
-        
-        if (savedUser.getRole() != null) {
-            response.setRole(savedUser.getRole().getName());
-        }
-        
-        return response;
+        // Tạo response
+        return UserResponse.builder()
+                .id(savedUser.getId().toString())
+                .username(savedUser.getUsername())
+                .email(savedUser.getEmail())
+                .role(savedUser.getRole() != null ? savedUser.getRole().getName() : null)
+                .active(true)
+                .build();
     }
 
     @Override
@@ -181,36 +177,27 @@ public class UserServiceImpl implements UserService {
         String usernameFromAccessToken = userDetail.getUsername();
         User user = userRepository.findByUsername(usernameFromAccessToken);
         
-        UserResponse response = new UserResponse();
-        response.setId(user.getId());
-        response.setUsername(user.getUsername());
-        response.setEmail(user.getEmail());
-        response.setFullName(user.getFullName());
-        
-        if (user.getRole() != null) {
-            response.setRole(user.getRole().getName());
-        }
-        
-        return response;
+        // Tạo response
+        return UserResponse.builder()
+                .id(user.getId().toString())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .role(user.getRole() != null ? user.getRole().getName() : null)
+                .active(true)
+                .build();
     }
 
     @Override
     public List<UserResponse> getAllUser() {
         List<User> users = userRepository.findAll();
         return users.stream()
-            .map(user -> {
-                UserResponse response = new UserResponse();
-                response.setId(user.getId());
-                response.setUsername(user.getUsername());
-                response.setEmail(user.getEmail());
-                response.setFullName(user.getFullName());
-                
-                if (user.getRole() != null) {
-                    response.setRole(user.getRole().getName());
-                }
-                
-                return response;
-            })
+            .map(user -> UserResponse.builder()
+                    .id(user.getId().toString())
+                    .username(user.getUsername())
+                    .email(user.getEmail())
+                    .role(user.getRole() != null ? user.getRole().getName() : null)
+                    .active(true)
+                    .build())
             .collect(Collectors.toList());
     }
 
@@ -449,27 +436,20 @@ public class UserServiceImpl implements UserService {
     }
 
     private UserProfileResponse mapToUserProfileResponse(User user){
-        UserProfileResponse userProfileResponse = new UserProfileResponse();
-        userProfileResponse.setId(user.getId());
-        userProfileResponse.setUsername(user.getUsername());
-        userProfileResponse.setFullName(user.getFullName());
-        userProfileResponse.setEmail(user.getEmail());
-        userProfileResponse.setPhone(user.getPhoneNumber());
-        userProfileResponse.setAddress(user.getAddress());
-        userProfileResponse.setGender(user.getGender());
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss - dd/MM/yyyy");
-        userProfileResponse.setDateOfBirth(String.valueOf(user.getDateOfBirth()));
-        userProfileResponse.setNationalId(user.getNationalId());
-        userProfileResponse.setCreatedAt(user.getCreatedAt().format(formatter));
-        if (user.getUpdatedAt() != null){
-            userProfileResponse.setUpdatedAt(user.getUpdatedAt().format(formatter));
-        }else {
-            userProfileResponse.setUpdatedAt(null);
-        }
-        if (user.getRole() != null) {
-            userProfileResponse.setRole(user.getRole().getName());
-        }
-        return userProfileResponse;
+        // Tạo response sử dụng Builder pattern để tránh lỗi
+        return UserProfileResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .firstName(user.getFullName() != null ? user.getFullName().split(" ")[0] : "")
+                .lastName(user.getFullName() != null ? 
+                        (user.getFullName().contains(" ") ? 
+                         user.getFullName().substring(user.getFullName().indexOf(" ") + 1) : "") : "")
+                .email(user.getEmail())
+                .phone(user.getPhoneNumber())
+                .role(user.getRole() != null ? user.getRole().getName() : null)
+                .enabled(true)
+                .registrationDate(user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate() : null)
+                .build();
     }
 
     private void checkAdminRole() {
@@ -490,5 +470,4 @@ public class UserServiceImpl implements UserService {
         }
         */
     }
-
 }

@@ -2,13 +2,15 @@ package com.spring3.hotel.management.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
-import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
-import com.spring3.hotel.management.dtos.response.BookingPeriodDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
+import com.spring3.hotel.management.dto.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
+import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
+import com.spring3.hotel.management.mappers.RoomMapper;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;
-import com.spring3.hotel.management.models.Service;
+import com.spring3.hotel.management.models.HotelService;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
@@ -49,11 +51,13 @@ public class RoomServiceImpl implements RoomService {
     @Autowired
     private ObjectMapper objectMapper;
     
+    @Autowired
+    private RoomMapper roomMapper;
+    
     @Override
     public List<RoomResponseDTO> getAllRooms() {
-        return roomRepository.findAll()
-                .stream()
-                .map(RoomResponseDTO::fromEntity)
+        return roomRepository.findAll().stream()
+                .map(roomMapper::toDTO)
                 .collect(Collectors.toList());
     }
     
@@ -61,29 +65,28 @@ public class RoomServiceImpl implements RoomService {
     public RoomResponseDTO getRoomById(Integer id) {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
-        return RoomResponseDTO.fromEntity(room);
+        return roomMapper.toDTO(room);
     }
     
     @Override
     public RoomResponseDTO getRoomByRoomNumber(String roomNumber) {
         Room room = roomRepository.findByRoomNumber(roomNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với số phòng: " + roomNumber));
-        return RoomResponseDTO.fromEntity(room);
+        return roomMapper.toDTO(room);
     }
     
     @Override
-    public List<RoomResponseDTO> getRoomsByRoomType(Integer roomTypeId) {
+    public List<RoomByTypeResponseDTO> getRoomsByRoomType(Integer roomTypeId) {
         return roomRepository.findByRoomTypeId(roomTypeId)
                 .stream()
-                .map(RoomResponseDTO::fromEntity)
+                .map(RoomByTypeResponseDTO::fromEntity)
                 .collect(Collectors.toList());
     }
     
     @Override
     public List<RoomResponseDTO> getRoomsByStatus(String status) {
-        return roomRepository.findByStatus(status)
-                .stream()
-                .map(RoomResponseDTO::fromEntity)
+        return roomRepository.findByStatus(status).stream()
+                .map(roomMapper::toDTO)
                 .collect(Collectors.toList());
     }
     
@@ -111,12 +114,12 @@ public class RoomServiceImpl implements RoomService {
         
         // Thêm dịch vụ nếu có
         if (request.getServiceIds() != null && !request.getServiceIds().isEmpty()) {
-            List<Service> services = serviceRepository.findAllById(request.getServiceIds());
+            List<HotelService> services = serviceRepository.findAllById(request.getServiceIds());
             room.setServices(services);
         }
         
         Room savedRoom = roomRepository.save(room);
-        return RoomResponseDTO.fromEntity(savedRoom);
+        return roomMapper.toDTO(savedRoom);
     }
     
     @Override
@@ -155,7 +158,7 @@ public class RoomServiceImpl implements RoomService {
         }
         
         Room updatedRoom = roomRepository.save(existingRoom);
-        return RoomResponseDTO.fromEntity(updatedRoom);
+        return roomMapper.toDTO(updatedRoom);
     }
     
     @Override
@@ -245,7 +248,7 @@ public class RoomServiceImpl implements RoomService {
     private void addDefaultServicesToRooms(List<Room> rooms) {
         try {
             // Lấy danh sách các dịch vụ cơ bản từ DB
-            List<Service> basicServices = serviceRepository.findByIsAvailable(true);
+            List<HotelService> basicServices = serviceRepository.findByIsAvailable(true);
             if (basicServices.isEmpty()) {
                 log.warn("Không có dịch vụ nào trong hệ thống để thêm vào phòng.");
                 return;
@@ -253,7 +256,7 @@ public class RoomServiceImpl implements RoomService {
             
             for (Room room : rooms) {
                 // Dịch vụ miễn phí cơ bản cho tất cả các phòng
-                List<Service> roomServices = new ArrayList<>();
+                List<HotelService> roomServices = new ArrayList<>();
                 
                 // Dịch vụ Wifi và TV miễn phí cho tất cả các phòng
                 basicServices.stream()
@@ -287,7 +290,7 @@ public class RoomServiceImpl implements RoomService {
                 // Thay vào đó, lưu từng dịch vụ cho phòng qua bảng trung gian
                 try {
                     // Sử dụng native query để thêm quan hệ
-                    for (Service service : roomServices) {
+                    for (HotelService service : roomServices) {
                         // Kiểm tra xem dịch vụ đã tồn tại cho phòng chưa
                         // (Nếu cần, nhưng tạm bỏ qua để đơn giản hóa)
                         
@@ -337,7 +340,7 @@ public class RoomServiceImpl implements RoomService {
         // Chuyển đổi sang DTO và thêm thông tin booking
         return availableRooms.stream()
                 .map(room -> {
-                    RoomResponseDTO dto = RoomResponseDTO.fromEntity(room);
+                    RoomResponseDTO dto = roomMapper.toDTO(room);
                     
                     // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
                     LocalDate today = LocalDate.now();
@@ -382,7 +385,7 @@ public class RoomServiceImpl implements RoomService {
         // Chuyển đổi sang DTO với thông tin đặt phòng
         return activeRooms.stream()
                 .map(room -> {
-                    RoomResponseDTO dto = RoomResponseDTO.fromEntity(room);
+                    RoomResponseDTO dto = roomMapper.toDTO(room);
                     
                     // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
                     boolean isBooked = bookedRooms.contains(room);
@@ -448,8 +451,8 @@ public class RoomServiceImpl implements RoomService {
         // 1. Phòng có rating cao
         // 2. Phòng có nhiều đánh giá
         // 3. Phòng có giá trị cao
-        return allRooms.stream()
-            .map(RoomResponseDTO::fromEntity)
+        List<RoomResponseDTO> featuredRooms = allRooms.stream()
+            .map(roomMapper::toDTO)
             .sorted((r1, r2) -> {
                 // Ưu tiên phòng có rating cao
                 if (r1.getAverageRating() != null && r2.getAverageRating() != null) {
@@ -466,5 +469,7 @@ public class RoomServiceImpl implements RoomService {
             })
             .limit(6) // Giới hạn 6 phòng nổi bật
             .collect(Collectors.toList());
+        
+        return featuredRooms;
     }
 }

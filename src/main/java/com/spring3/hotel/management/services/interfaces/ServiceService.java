@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.services.interfaces;
 
-import com.spring3.hotel.management.dtos.request.UpsertServiceRequest;
-import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
 
 import java.util.List;
 

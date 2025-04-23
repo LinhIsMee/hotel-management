@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.repositories;
 
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.models.Booking;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -37,10 +37,10 @@ public class RatingController {
     @GetMapping("/room/{roomId}")
     public ResponseEntity<List<RatingDTO>> getRoomRatings(@PathVariable Integer roomId) {
         List<Rating> ratings = ratingRepository.findByRoomId(roomId);
-        List<RatingDTO> ratingDTOs = ratings.stream()
+        List<RatingDTO> ratingDTO = ratings.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
-        return ResponseEntity.ok(ratingDTOs);
+        return ResponseEntity.ok(ratingDTO);
     }
 
     // Tạo đánh giá mới

@@ -1,9 +1,9 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dtos.response.DashboardInfoCountResponse;
-import com.spring3.hotel.management.dtos.response.RecentBookingResponse;
-import com.spring3.hotel.management.dtos.response.RoomBookingStatsResponse;
-import com.spring3.hotel.management.dtos.response.StatisticResponse;
+import com.spring3.hotel.management.dto.response.DashboardInfoCountResponse;
+import com.spring3.hotel.management.dto.response.RecentBookingResponse;
+import com.spring3.hotel.management.dto.response.RoomBookingStatsResponse;
+import com.spring3.hotel.management.dto.response.StatisticResponse;
 import com.spring3.hotel.management.services.StatisticService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;

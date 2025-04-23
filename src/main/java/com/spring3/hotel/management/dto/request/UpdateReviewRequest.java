@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.dtos.request;
+package com.spring3.hotel.management.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

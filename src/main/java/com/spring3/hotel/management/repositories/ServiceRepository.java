@@ -1,22 +1,24 @@
 package com.spring3.hotel.management.repositories;
 
-import com.spring3.hotel.management.models.Service;
+import com.spring3.hotel.management.enums.ServiceType;
+import com.spring3.hotel.management.models.HotelService;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ServiceRepository extends JpaRepository<Service, Integer> {
+public interface ServiceRepository extends JpaRepository<HotelService, Integer> {
     
-    Optional<Service> findByCode(String code);
+    Optional<HotelService> findByCode(String code);
     
-    List<Service> findByType(String type);
+    List<HotelService> findByType(ServiceType type);
     
-    List<Service> findByNameContainingIgnoreCase(String name);
+    List<HotelService> findByNameContainingIgnoreCase(String name);
     
-    List<Service> findByPriceLessThanEqual(Double price);
+    List<HotelService> findByPriceLessThanEqual(BigDecimal price);
     
-    List<Service> findByIsAvailable(Boolean isAvailable);
+    List<HotelService> findByIsAvailable(Boolean isAvailable);
 } 

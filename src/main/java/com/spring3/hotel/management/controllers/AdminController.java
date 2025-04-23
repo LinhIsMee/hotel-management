@@ -8,7 +8,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import com.spring3.hotel.management.dtos.response.EmployeeResponse;
+import com.spring3.hotel.management.dto.response.EmployeeResponse;
 import com.spring3.hotel.management.models.Department;
 import com.spring3.hotel.management.models.Position;
 import com.spring3.hotel.management.services.EmployeeService;

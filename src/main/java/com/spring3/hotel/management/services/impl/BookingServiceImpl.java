@@ -1,28 +1,31 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
-import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
-import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.request.BookingRoomRequest;
+import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
+import com.spring3.hotel.management.dto.request.AdminBookingRequest;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
+import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
+import com.spring3.hotel.management.mappers.BookingMapper;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,36 +50,73 @@ public class BookingServiceImpl implements BookingService {
     private BookingServiceRepository bookingServiceRepository;
     @Autowired
     private OfferingRepository offeringRepository;
+    @Autowired
+    private ServiceRepository serviceRepository;
+    @Autowired
+    private BookingMapper bookingMapper;
 
     @Override
     public BookingResponseDTO getBookingById(Integer id) {
-        return bookingRepository.findById(id)
-                .map(this::convertToBookingResponseDTO)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
+        
+        BookingResponseDTO dto = bookingMapper.toDTO(booking);
+        
+        // Lấy danh sách chi tiết đặt phòng
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
+        
+        // Chuyển đổi chi tiết phòng
+        List<RoomListResponseDTO> rooms = bookingDetails.stream()
+                .map(bookingMapper::toRoomListResponseDTO)
+                .collect(Collectors.toList());
+        dto.setRooms(rooms);
+        
+        // Lấy danh sách dịch vụ đã đặt
+        List<com.spring3.hotel.management.models.BookingService> bookingServices = 
+                bookingServiceRepository.findByBooking(booking);
+        if (bookingServices != null && !bookingServices.isEmpty()) {
+            List<ServiceResponseDTO> services = bookingServices.stream()
+                    .map(bs -> {
+                        ServiceResponseDTO serviceDTO = new ServiceResponseDTO();
+                        serviceDTO.setId(bs.getOffering().getId());
+                        serviceDTO.setName(bs.getOffering().getName());
+                        serviceDTO.setDescription(bs.getOffering().getDescription());
+                        serviceDTO.setPrice(BigDecimal.valueOf(bs.getOffering().getPrice()));
+                        serviceDTO.setQuantity(bs.getQuantity());
+                        serviceDTO.setTotalPrice(BigDecimal.valueOf(bs.getTotalPrice()));
+                        return serviceDTO;
+                    })
+                    .collect(Collectors.toList());
+            dto.setServices(services);
+        } else {
+            dto.setServices(Collections.emptyList());
+        }
+        
+        return dto;
     }
 
     @Override
     public List<BookingResponseDTO> getBookingsByUserId(Integer userId) {
-        return bookingRepository.findByUserId(userId)
-                .stream()
-                .map(this::convertToBookingResponseDTO)
-                .toList();
+        List<Booking> bookings = bookingRepository.findByUserId(userId);
+        return bookings.stream()
+                .map(booking -> getBookingById(booking.getId()))
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<BookingResponseDTO> getAllBookings() {
-        return bookingRepository.findAll()
-                .stream()
-                .map(this::convertToBookingResponseDTO)
-                .toList();
+        List<Booking> bookings = bookingRepository.findAll();
+        return bookings.stream()
+                .map(booking -> getBookingById(booking.getId()))
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<BookingResponseDTO> getBookingsByStatus(String status) {
-        return bookingRepository.findByStatus(status)
-                .stream()
-                .map(this::convertToBookingResponseDTO)
-                .toList();
+        List<Booking> bookings = bookingRepository.findByStatus(status);
+        return bookings.stream()
+                .map(booking -> getBookingById(booking.getId()))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -693,8 +733,7 @@ public class BookingServiceImpl implements BookingService {
         
         // Format createdAt
         if (finalBooking.getCreatedAt() != null) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
+            dto.setCreatedAt(finalBooking.getCreatedAt());
         }
         
         // Lấy danh sách dịch vụ đã đặt
@@ -704,7 +743,7 @@ public class BookingServiceImpl implements BookingService {
                 Offering offering = bs.getOffering();
                 ServiceResponseDTO serviceDTO = ServiceResponseDTO.fromOffering(offering);
                 serviceDTO.setQuantity(bs.getQuantity());
-                serviceDTO.setTotalPrice(bs.getTotalPrice());
+                serviceDTO.setTotalPrice(BigDecimal.valueOf(bs.getTotalPrice()));
                 return serviceDTO;
             }).collect(Collectors.toList());
             dto.setServices(services);
@@ -964,5 +1003,408 @@ public class BookingServiceImpl implements BookingService {
         paymentRepository.save(payment);
         bookingRepository.save(booking);
          log.info("Đã lưu cập nhật trạng thái cho payment ID {} và booking ID {}", payment.getId(), bookingId);
+    }
+
+    private double calculateTotalPrice(UpsertBookingRequest request, List<Room> rooms, List<HotelService> services) {
+        double totalPrice = 0;
+        long days = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
+        if (days < 1) days = 1;
+
+        // Tính giá phòng và dịch vụ cho từng phòng
+        for (int i = 0; i < rooms.size(); i++) {
+            Room room = rooms.get(i);
+            BookingRoomRequest roomRequest = request.getRooms().get(i);
+            
+            // Giá cơ bản của phòng
+            double roomPrice = room.getRoomType().getPricePerNight() * days;
+            
+            // Phụ thu nếu số người vượt quá số người tối đa của phòng
+            int totalGuests = roomRequest.getAdults() + roomRequest.getChildren();
+            int maxOccupancy = room.getRoomType().getMaxOccupancy();
+            
+            if (totalGuests > maxOccupancy) {
+                // Tính phụ thu cho mỗi người vượt quá
+                int extraGuests = totalGuests - maxOccupancy;
+                double extraCharge = roomPrice * 0.25 * extraGuests; // Phụ thu 25% giá phòng cho mỗi người vượt quá
+                roomPrice += extraCharge;
+            }
+            
+            // Tính giá dịch vụ đi kèm
+            if (roomRequest.getServiceIds() != null) {
+                double servicePrice = services.stream()
+                    .filter(service -> roomRequest.getServiceIds().contains(service.getId()))
+                    .mapToDouble(service -> service.getPrice().doubleValue())
+                    .sum();
+                roomPrice += servicePrice * days; // Giá dịch vụ tính theo ngày
+            }
+            
+            totalPrice += roomPrice;
+        }
+        
+        return totalPrice;
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDTO createBooking(UpsertBookingRequest request, String username) {
+        // Kiểm tra user
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new ResourceNotFoundException("Không tìm thấy người dùng");
+        }
+        
+        // Kiểm tra và lấy thông tin các phòng
+        List<Room> rooms = request.getRooms().stream()
+            .map(roomRequest -> roomRepository.findById(roomRequest.getRoomId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + roomRequest.getRoomId())))
+            .collect(Collectors.toList());
+            
+        // Kiểm tra và lấy thông tin các dịch vụ
+        List<HotelService> services = new ArrayList<>();
+        for (BookingRoomRequest roomRequest : request.getRooms()) {
+            if (roomRequest.getServiceIds() != null && !roomRequest.getServiceIds().isEmpty()) {
+                services.addAll(serviceRepository.findAllById(roomRequest.getServiceIds()));
+            }
+        }
+        
+        // Tính tổng giá
+        double totalPrice = calculateTotalPrice(request, rooms, services);
+        
+        // Áp dụng mã giảm giá nếu có
+        double finalPrice = totalPrice;
+        Discount discount = null;
+        if (request.getDiscountCode() != null) {
+            discount = discountRepository.findByCode(request.getDiscountCode())
+                .orElseThrow(() -> new ResourceNotFoundException("Mã giảm giá không hợp lệ"));
+                
+            if (discount.getDiscountType().equals("PERCENT")) {
+                finalPrice = totalPrice * (1 - discount.getDiscountValue() / 100);
+            } else {
+                finalPrice = totalPrice - discount.getDiscountValue();
+            }
+        }
+        
+        // Tạo booking
+        Booking booking = Booking.builder()
+            .user(user)
+            .checkInDate(request.getCheckInDate())
+            .checkOutDate(request.getCheckOutDate())
+            .totalPrice(totalPrice)
+            .finalPrice(finalPrice)
+            .status("PENDING")
+            .paymentMethod(request.getPaymentMethod())
+            .paymentStatus("UNPAID")
+            .discount(discount)
+            .build();
+            
+        booking = bookingRepository.save(booking);
+        
+        // Tạo booking details
+        for (int i = 0; i < rooms.size(); i++) {
+            Room room = rooms.get(i);
+            BookingRoomRequest roomRequest = request.getRooms().get(i);
+            
+            BookingDetail detail = BookingDetail.builder()
+                .booking(booking)
+                .room(room)
+                .adults(roomRequest.getAdults())
+                .children(roomRequest.getChildren())
+                .build();
+                
+            // Thêm dịch vụ cho booking detail
+            if (roomRequest.getServiceIds() != null) {
+                List<HotelService> roomServices = services.stream()
+                    .filter(service -> roomRequest.getServiceIds().contains(service.getId()))
+                    .collect(Collectors.toList());
+                detail.setServices(roomServices);
+            }
+            
+            bookingDetailRepository.save(detail);
+        }
+        
+        return convertToBookingResponseDTO(booking);
+    }
+
+    private void processBookingRooms(List<BookingRoomRequest> rooms, Booking booking) {
+        for (BookingRoomRequest roomRequest : rooms) {
+            BookingDetail detail = BookingDetail.builder()
+                    .booking(booking)
+                    .room(roomRepository.findById(roomRequest.getRoomId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng")))
+                    .adults(roomRequest.getAdults())
+                    .children(roomRequest.getChildren())
+                    .build();
+
+            if (roomRequest.getServiceIds() != null && !roomRequest.getServiceIds().isEmpty()) {
+                List<HotelService> services = serviceRepository.findAllById(roomRequest.getServiceIds());
+                detail.setServices(services);
+            }
+
+            bookingDetailRepository.save(detail);
+        }
+    }
+
+    @Override
+    public List<BookingResponseDTO> getAllBookings(int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<Booking> bookingsPage = bookingRepository.findAll(pageRequest);
+        
+        return bookingsPage.getContent().stream()
+                .map(this::convertToBookingResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public BookingResponseDTO createBookingByAdmin(AdminBookingRequest request) {
+        Booking booking = new Booking();
+        
+        // Xử lý userId - admin có thể tạo đặt phòng cho bất kỳ người dùng nào
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + request.getUserId()));
+        
+        booking.setUser(user);
+        booking.setCheckInDate(request.getCheckInDate());
+        booking.setCheckOutDate(request.getCheckOutDate());
+        booking.setStatus(request.getStatus());
+        booking.setTotalPrice(request.getTotalPrice());
+        booking.setFinalPrice(request.getFinalPrice());
+        
+        // Xử lý discount nếu có
+        if (request.getDiscountId() != null) {
+            Discount discount = discountRepository.findById(request.getDiscountId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy mã giảm giá với ID: " + request.getDiscountId()));
+            booking.setDiscount(discount);
+        }
+        
+        Booking savedBooking = bookingRepository.save(booking);
+        
+        // Xử lý booking details
+        if (request.getRoomIds() != null) {
+            for (Integer roomId : request.getRoomIds()) {
+                Room room = roomRepository.findById(roomId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + roomId));
+                
+                BookingDetail detail = new BookingDetail();
+                detail.setBooking(savedBooking);
+                detail.setRoom(room);
+                detail.setRoomNumber(room.getRoomNumber());
+                detail.setRoomType(room.getRoomType().getId());
+                detail.setPricePerNight(room.getRoomType().getPricePerNight());
+                
+                if (request.getAdults() != null) {
+                    detail.setAdults(request.getAdults());
+                }
+                
+                if (request.getChildren() != null) {
+                    detail.setChildren(request.getChildren());
+                }
+                
+                // Tính tổng giá cho phòng này
+                long days = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
+                if (days < 1) days = 1;
+                double price = room.getRoomType().getPricePerNight() * days;
+                detail.setPrice(price);
+                
+                bookingDetailRepository.save(detail);
+            }
+        }
+        
+        // Xử lý dịch vụ bổ sung nếu có
+        if (request.getAdditionalServices() != null && !request.getAdditionalServices().isEmpty()) {
+            for (String serviceId : request.getAdditionalServices()) {
+                try {
+                    Integer offeringId = Integer.parseInt(serviceId);
+                    Offering offering = offeringRepository.findById(offeringId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy dịch vụ với id: " + offeringId));
+                    
+                    // Mặc định số lượng là 1 nếu không được chỉ định
+                    int quantity = 1;
+                    double serviceTotalPrice = offering.getPrice() * quantity;
+                    
+                    // Tạo BookingService
+                    com.spring3.hotel.management.models.BookingService bookingService 
+                        = new com.spring3.hotel.management.models.BookingService();
+                    bookingService.setBooking(savedBooking);
+                    bookingService.setOffering(offering);
+                    bookingService.setQuantity(quantity);
+                    bookingService.setTotalPrice(serviceTotalPrice);
+                    bookingServiceRepository.save(bookingService);
+                } catch (Exception e) {
+                    log.error("Lỗi khi thêm dịch vụ vào booking: " + e.getMessage(), e);
+                }
+            }
+        }
+        
+        return convertToBookingResponseDTO(savedBooking);
+    }
+
+    @Override
+    public BookingResponseDTO updateBookingByAdmin(AdminBookingRequest request, Integer id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đặt phòng với ID: " + id));
+        
+        // Cập nhật thông tin cơ bản
+        if (request.getCheckInDate() != null) {
+            booking.setCheckInDate(request.getCheckInDate());
+        }
+        
+        if (request.getCheckOutDate() != null) {
+            booking.setCheckOutDate(request.getCheckOutDate());
+        }
+        
+        if (request.getStatus() != null) {
+            booking.setStatus(request.getStatus());
+        }
+        
+        if (request.getTotalPrice() != null) {
+            booking.setTotalPrice(request.getTotalPrice());
+        }
+        
+        if (request.getFinalPrice() != null) {
+            booking.setFinalPrice(request.getFinalPrice());
+        }
+        
+        // Xử lý discount nếu có
+        if (request.getDiscountId() != null) {
+            Discount discount = discountRepository.findById(request.getDiscountId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy mã giảm giá với ID: " + request.getDiscountId()));
+            booking.setDiscount(discount);
+        } else {
+            booking.setDiscount(null);
+        }
+        
+        // Cập nhật user nếu cần
+        if (request.getUserId() != null) {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + request.getUserId()));
+            booking.setUser(user);
+        }
+        
+        Booking savedBooking = bookingRepository.save(booking);
+        
+        // Xử lý booking details
+        if (request.getRoomIds() != null) {
+            // Xóa tất cả booking details cũ
+            List<BookingDetail> oldDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
+            bookingDetailRepository.deleteAll(oldDetails);
+            
+            // Tạo booking details mới
+            for (Integer roomId : request.getRoomIds()) {
+                Room room = roomRepository.findById(roomId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + roomId));
+                
+                BookingDetail detail = new BookingDetail();
+                detail.setBooking(savedBooking);
+                detail.setRoom(room);
+                detail.setRoomNumber(room.getRoomNumber());
+                detail.setRoomType(room.getRoomType().getId());
+                detail.setPricePerNight(room.getRoomType().getPricePerNight());
+                
+                if (request.getAdults() != null) {
+                    detail.setAdults(request.getAdults());
+                }
+                
+                if (request.getChildren() != null) {
+                    detail.setChildren(request.getChildren());
+                }
+                
+                // Tính tổng giá cho phòng này
+                long days = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
+                if (days < 1) days = 1;
+                double price = room.getRoomType().getPricePerNight() * days;
+                detail.setPrice(price);
+                
+                bookingDetailRepository.save(detail);
+            }
+        }
+        
+        // Xử lý dịch vụ bổ sung nếu có
+        if (request.getAdditionalServices() != null) {
+            // Xóa tất cả booking services cũ
+            List<com.spring3.hotel.management.models.BookingService> oldServices = 
+                    bookingServiceRepository.findByBooking(savedBooking);
+            bookingServiceRepository.deleteAll(oldServices);
+            
+            // Thêm dịch vụ mới
+            if (!request.getAdditionalServices().isEmpty()) {
+                for (String serviceId : request.getAdditionalServices()) {
+                    try {
+                        Integer offeringId = Integer.parseInt(serviceId);
+                        Offering offering = offeringRepository.findById(offeringId)
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy dịch vụ với id: " + offeringId));
+                        
+                        // Mặc định số lượng là 1 nếu không được chỉ định
+                        int quantity = 1;
+                        double serviceTotalPrice = offering.getPrice() * quantity;
+                        
+                        // Tạo BookingService
+                        com.spring3.hotel.management.models.BookingService bookingService 
+                            = new com.spring3.hotel.management.models.BookingService();
+                        bookingService.setBooking(savedBooking);
+                        bookingService.setOffering(offering);
+                        bookingService.setQuantity(quantity);
+                        bookingService.setTotalPrice(serviceTotalPrice);
+                        bookingServiceRepository.save(bookingService);
+                    } catch (Exception e) {
+                        log.error("Lỗi khi thêm dịch vụ vào booking: " + e.getMessage(), e);
+                    }
+                }
+            }
+        }
+        
+        return convertToBookingResponseDTO(savedBooking);
+    }
+
+    @Override
+    public BookingResponseDTO checkInBooking(Integer id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đặt phòng với ID: " + id));
+        
+        // Chỉ cho phép check-in các booking có trạng thái CONFIRMED
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalStateException("Chỉ có thể check-in các đặt phòng có trạng thái CONFIRMED");
+        }
+        
+        booking.setStatus("CHECKED_IN");
+        bookingRepository.save(booking);
+        
+        return convertToBookingResponseDTO(booking);
+    }
+
+    @Override
+    public BookingResponseDTO checkOutBooking(Integer id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đặt phòng với ID: " + id));
+        
+        // Chỉ cho phép check-out các booking có trạng thái CHECKED_IN
+        if (!"CHECKED_IN".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalStateException("Chỉ có thể check-out các đặt phòng có trạng thái CHECKED_IN");
+        }
+        
+        booking.setStatus("COMPLETED");
+        bookingRepository.save(booking);
+        
+        return convertToBookingResponseDTO(booking);
+    }
+
+    @Override
+    public void deleteBooking(Integer id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đặt phòng với ID: " + id));
+        
+        // Xóa các booking details liên quan
+        List<BookingDetail> details = bookingDetailRepository.findAllByBooking_Id(booking.getId());
+        bookingDetailRepository.deleteAll(details);
+        
+        // Xóa booking
+        bookingRepository.delete(booking);
+    }
+
+    @Override
+    public List<BookingResponseDTO> getAllBookingsNoPage() {
+        List<Booking> bookings = bookingRepository.findAll();
+        return bookings.stream()
+                .map(this::convertToBookingResponseDTO)
+                .collect(Collectors.toList());
     }
 }

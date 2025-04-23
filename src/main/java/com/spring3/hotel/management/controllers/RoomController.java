@@ -1,15 +1,21 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
-import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
+import com.spring3.hotel.management.dto.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
+import com.spring3.hotel.management.mappers.ReviewMapper;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import com.spring3.hotel.management.services.impl.RoomServiceImpl;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -29,6 +35,9 @@ public class RoomController {
     
     @Autowired
     private ReviewRepository reviewRepository;
+    
+    @Autowired
+    private ReviewMapper reviewMapper;
     
     // Lấy thông tin một phòng cụ thể
     @GetMapping("/{id}")
@@ -77,11 +86,8 @@ public class RoomController {
     
     // Lấy danh sách phòng theo loại phòng
     @GetMapping("/room-type/{roomTypeId}")
-    public ResponseEntity<List<RoomResponseDTO>> getRoomsByRoomType(@PathVariable Integer roomTypeId) {
-        log.info("Nhận yêu cầu lấy danh sách phòng theo loại phòng ID: {}", roomTypeId);
-        List<RoomResponseDTO> rooms = roomService.getRoomsByRoomType(roomTypeId);
-        enrichWithReviewData(rooms);
-        log.info("Trả về {} phòng thuộc loại phòng ID: {}", rooms.size(), roomTypeId);
+    public ResponseEntity<List<RoomByTypeResponseDTO>> getRoomsByRoomType(@PathVariable Integer roomTypeId) {
+        List<RoomByTypeResponseDTO> rooms = roomService.getRoomsByRoomType(roomTypeId);
         return ResponseEntity.ok(rooms);
     }
     
@@ -131,7 +137,7 @@ public class RoomController {
                     List<ReviewResponseDTO> recentReviews = reviews.stream()
                             .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
                             .limit(3)
-                            .map(ReviewResponseDTO::fromEntity)
+                            .map(reviewMapper::toDTO)
                             .collect(Collectors.toList());
                     room.setRecentReviews(recentReviews);
                 } else {
@@ -177,5 +183,67 @@ public class RoomController {
             return ResponseEntity.internalServerError()
                 .body(Map.of("error", "Có lỗi xảy ra khi cập nhật trạng thái phòng: " + e.getMessage()));
         }
+    }
+    
+    /* === CÁC API DÀNH CHO ADMIN === */
+    
+    /**
+     * Lấy danh sách tất cả phòng (bao gồm cả phòng không hoạt động)
+     */
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<RoomResponseDTO>> getAllRooms() {
+        List<RoomResponseDTO> rooms = roomService.getAllRooms();
+        return ResponseEntity.ok(rooms);
+    }
+
+    /**
+     * Lấy thông tin phòng bằng số phòng
+     */
+    @GetMapping("/room-number/{roomNumber}")
+    public ResponseEntity<RoomResponseDTO> getRoomByRoomNumber(@PathVariable String roomNumber) {
+        RoomResponseDTO roomResponseDTO = roomService.getRoomByRoomNumber(roomNumber);
+        return ResponseEntity.ok(roomResponseDTO);
+    }
+
+    /**
+     * Tạo mới phòng
+     */
+    @PostMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomResponseDTO> createRoom(@Valid @RequestBody UpsertRoomRequest request) {
+        RoomResponseDTO roomResponseDTO = roomService.createRoom(request);
+        return new ResponseEntity<>(roomResponseDTO, HttpStatus.CREATED);
+    }
+
+    /**
+     * Cập nhật thông tin phòng
+     */
+    @PutMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomResponseDTO> updateRoom(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpsertRoomRequest request) {
+        RoomResponseDTO roomResponseDTO = roomService.updateRoom(request, id);
+        return ResponseEntity.ok(roomResponseDTO);
+    }
+
+    /**
+     * Xóa phòng (soft delete)
+     */
+    @DeleteMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteRoom(@PathVariable Integer id) {
+        roomService.deleteRoom(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Lấy danh sách phòng theo trạng thái
+     */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<RoomResponseDTO>> getRoomsByStatus(@PathVariable String status) {
+        List<RoomResponseDTO> rooms = roomService.getRoomsByStatus(status);
+        return ResponseEntity.ok(rooms);
     }
 } 

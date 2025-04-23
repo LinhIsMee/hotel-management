@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.dtos.request;
+package com.spring3.hotel.management.dto.request;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

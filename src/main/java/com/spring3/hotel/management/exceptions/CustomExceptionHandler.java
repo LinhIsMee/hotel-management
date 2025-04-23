@@ -1,6 +1,6 @@
 package com.spring3.hotel.management.exceptions;
 
-import com.spring3.hotel.management.dtos.response.ErrorResponse;
+import com.spring3.hotel.management.dto.response.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;

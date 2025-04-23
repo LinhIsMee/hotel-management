@@ -2,18 +2,20 @@ package com.spring3.hotel.management.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring3.hotel.management.dtos.request.UpsertServiceRequest;
-import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
+import com.spring3.hotel.management.enums.ServiceType;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
-import com.spring3.hotel.management.models.Service;
+import com.spring3.hotel.management.models.HotelService;
 import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.services.interfaces.ServiceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 
 import java.io.File;
-import java.nio.file.Paths;
-import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,24 +41,30 @@ public class ServiceServiceImpl implements ServiceService {
     
     @Override
     public ServiceResponseDTO getServiceById(Integer id) {
-        Service service = serviceRepository.findById(id)
+        HotelService service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
         return ServiceResponseDTO.fromEntity(service);
     }
     
     @Override
     public ServiceResponseDTO getServiceByCode(String code) {
-        Service service = serviceRepository.findByCode(code)
+        HotelService service = serviceRepository.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với mã: " + code));
         return ServiceResponseDTO.fromEntity(service);
     }
     
     @Override
-    public List<ServiceResponseDTO> getServicesByType(String type) {
-        return serviceRepository.findByType(type)
-                .stream()
-                .map(ServiceResponseDTO::fromEntity)
-                .collect(Collectors.toList());
+    public List<ServiceResponseDTO> getServicesByType(String typeStr) {
+        try {
+            ServiceType type = ServiceType.valueOf(typeStr.toUpperCase());
+            return serviceRepository.findByType(type)
+                    .stream()
+                    .map(ServiceResponseDTO::fromEntity)
+                    .collect(Collectors.toList());
+        } catch (IllegalArgumentException e) {
+            log.warn("Loại dịch vụ không hợp lệ: {}", typeStr);
+            return new ArrayList<>();
+        }
     }
     
     @Override
@@ -68,7 +76,8 @@ public class ServiceServiceImpl implements ServiceService {
     }
     
     @Override
-    public List<ServiceResponseDTO> getServicesByMaxPrice(Double price) {
+    public List<ServiceResponseDTO> getServicesByMaxPrice(Double priceDouble) {
+        BigDecimal price = BigDecimal.valueOf(priceDouble);
         return serviceRepository.findByPriceLessThanEqual(price)
                 .stream()
                 .map(ServiceResponseDTO::fromEntity)
@@ -91,23 +100,23 @@ public class ServiceServiceImpl implements ServiceService {
         }
         
         // Tạo mới đối tượng Service
-        Service service = Service.builder()
+        HotelService service = HotelService.builder()
                 .name(request.getName())
                 .code(request.getCode())
                 .type(request.getType())
                 .description(request.getDescription())
                 .price(request.getPrice())
-                .unit(request.getUnit())
                 .isAvailable(request.getIsAvailable())
+                .imageUrl(request.getImageUrl())
                 .build();
         
-        Service savedService = serviceRepository.save(service);
+        HotelService savedService = serviceRepository.save(service);
         return ServiceResponseDTO.fromEntity(savedService);
     }
     
     @Override
     public ServiceResponseDTO updateService(UpsertServiceRequest request, Integer id) {
-        Service existingService = serviceRepository.findById(id)
+        HotelService existingService = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
         
         // Kiểm tra mã dịch vụ đã tồn tại chưa và không phải là dịch vụ hiện tại
@@ -122,19 +131,22 @@ public class ServiceServiceImpl implements ServiceService {
         existingService.setType(request.getType());
         existingService.setDescription(request.getDescription());
         existingService.setPrice(request.getPrice());
-        existingService.setUnit(request.getUnit());
+        
+        if (request.getImageUrl() != null) {
+            existingService.setImageUrl(request.getImageUrl());
+        }
         
         if (request.getIsAvailable() != null) {
             existingService.setIsAvailable(request.getIsAvailable());
         }
         
-        Service updatedService = serviceRepository.save(existingService);
+        HotelService updatedService = serviceRepository.save(existingService);
         return ServiceResponseDTO.fromEntity(updatedService);
     }
     
     @Override
     public void deleteService(Integer id) {
-        Service service = serviceRepository.findById(id)
+        HotelService service = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
         
         serviceRepository.delete(service);
@@ -143,57 +155,61 @@ public class ServiceServiceImpl implements ServiceService {
     @Override
     public void initServicesFromJson() {
         try {
-            log.info("Bắt đầu khởi tạo dữ liệu dịch vụ từ file JSON...");
-            
-            // Kiểm tra xem đã có dữ liệu trong DB chưa
-            if (serviceRepository.count() > 0) {
-                log.info("Dữ liệu dịch vụ đã tồn tại trong DB, bỏ qua việc khởi tạo.");
+            // Kiểm tra xem đã có dịch vụ nào trong hệ thống chưa
+            if (!serviceRepository.findAll().isEmpty()) {
+                log.info("Đã có dữ liệu dịch vụ trong DB, bỏ qua quá trình khởi tạo");
                 return;
             }
             
-            // Đọc file JSON
-            File jsonFile = Paths.get("data", "services.json").toFile();
-            if (!jsonFile.exists()) {
-                log.warn("Không tìm thấy file dữ liệu dịch vụ JSON: {}", jsonFile.getAbsolutePath());
-                return;
-            }
-            
+            // Đọc dữ liệu từ file JSON
+            log.info("Bắt đầu quá trình khởi tạo dữ liệu dịch vụ từ JSON");
+            File jsonFile = new ClassPathResource("/data/services.json").getFile();
             JsonNode rootNode = objectMapper.readTree(jsonFile);
-            JsonNode dataNode = rootNode.get("data");
+            JsonNode dataNode = rootNode.path("data");
             
-            if (dataNode == null || !dataNode.isArray() || dataNode.isEmpty()) {
-                log.warn("Không có dữ liệu hợp lệ trong file JSON.");
+            if (dataNode.isMissingNode() || !dataNode.isArray()) {
+                log.warn("Không tìm thấy dữ liệu dịch vụ hợp lệ trong file JSON");
                 return;
             }
             
-            List<Service> services = new ArrayList<>();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            List<HotelService> services = new ArrayList<>();
             
             for (JsonNode node : dataNode) {
-                LocalDate createdAt = null;
-                if (node.has("createdAt") && !node.get("createdAt").isNull()) {
-                    createdAt = LocalDate.parse(node.get("createdAt").asText(), formatter);
+                if (!node.has("name") || !node.has("code") || !node.has("price")) {
+                    log.warn("Bỏ qua dữ liệu dịch vụ không hợp lệ: {}", node);
+                    continue;
                 }
                 
-                Service service = Service.builder()
+                // Chuyển đổi type thành ServiceType
+                ServiceType serviceType = ServiceType.OTHERS;
+                if (node.has("type")) {
+                    try {
+                        serviceType = ServiceType.valueOf(node.get("type").asText().toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Loại dịch vụ không hợp lệ: {}, sử dụng giá trị mặc định OTHERS", node.get("type").asText());
+                    }
+                }
+                
+                HotelService service = HotelService.builder()
                         .name(node.get("name").asText())
                         .code(node.get("code").asText())
-                        .type(node.get("type").asText())
+                        .type(serviceType)
                         .description(node.has("description") ? node.get("description").asText() : null)
-                        .price(node.get("price").asDouble())
-                        .unit(node.get("unit").asText())
+                        .price(new BigDecimal(node.get("price").asText()))
                         .isAvailable(node.has("isAvailable") ? node.get("isAvailable").asBoolean() : true)
-                        .createdAt(createdAt)
                         .build();
                 
                 services.add(service);
             }
             
-            serviceRepository.saveAll(services);
-            log.info("Đã khởi tạo thành công {} dịch vụ từ file JSON.", services.size());
-            
+            if (!services.isEmpty()) {
+                serviceRepository.saveAll(services);
+                log.info("Đã khởi tạo thành công {} dịch vụ từ file JSON", services.size());
+            } else {
+                log.warn("Không có dữ liệu dịch vụ hợp lệ để khởi tạo");
+            }
         } catch (Exception e) {
-            log.error("Lỗi khi khởi tạo dữ liệu dịch vụ từ file JSON: {}", e.getMessage(), e);
+            log.error("Lỗi khi khởi tạo dữ liệu dịch vụ từ JSON: {}", e.getMessage(), e);
         }
     }
 } 

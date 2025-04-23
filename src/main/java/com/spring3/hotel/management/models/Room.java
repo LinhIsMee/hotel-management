@@ -58,7 +58,7 @@ public class Room {
         joinColumns = @JoinColumn(name = "room_id"),
         inverseJoinColumns = @JoinColumn(name = "service_id")
     )
-    private List<Service> services = new ArrayList<>();
+    private List<HotelService> services = new ArrayList<>();
     
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
     private List<Rating> ratings = new ArrayList<>();

@@ -2,6 +2,8 @@ package com.spring3.hotel.management.models;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Data
@@ -10,6 +12,7 @@ import lombok.*;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @Table(name = "BOOKING_DETAILS")
 public class BookingDetail {
 
@@ -18,11 +21,11 @@ public class BookingDetail {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "booking_id")
+    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
     @ManyToOne
-    @JoinColumn(name = "room_id")
+    @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
     @Column(name = "price_per_night")
@@ -37,6 +40,20 @@ public class BookingDetail {
     @Column(name = "price")
     private Double price;
     
+    @Column(name = "adults")
+    private Integer adults;
+    
+    @Column(name = "children")
+    private Integer children;
+    
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "booking_detail_services",
+        joinColumns = @JoinColumn(name = "booking_detail_id"),
+        inverseJoinColumns = @JoinColumn(name = "service_id")
+    )
+    private List<HotelService> services = new ArrayList<>();
+    
     @Transient
     public String getRoomNumber() {
         return room != null ? room.getRoomNumber() : roomNumber;
@@ -46,5 +63,9 @@ public class BookingDetail {
     public String getRoomType() {
         return room != null && room.getRoomType() != null ? 
                room.getRoomType().getName() : (roomType != null ? roomType.toString() : "Unknown");
+    }
+    
+    public void setServices(List<HotelService> services) {
+        this.services = services != null ? services : new ArrayList<>();
     }
 }

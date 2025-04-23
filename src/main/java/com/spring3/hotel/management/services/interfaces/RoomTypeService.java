@@ -1,12 +1,14 @@
 package com.spring3.hotel.management.services.interfaces;
 
-import com.spring3.hotel.management.dtos.request.UpsertRoomTypeRequest;
-import com.spring3.hotel.management.dtos.response.RoomTypeResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomTypeRequest;
+import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;
 import com.spring3.hotel.management.models.RoomType;
 
 import java.util.List;
 
 public interface RoomTypeService {
+    
+    List<RoomTypeResponseDTO> getAllRoomTypes();
     
     RoomTypeResponseDTO getRoomTypeById(Integer id);
     
@@ -15,8 +17,6 @@ public interface RoomTypeService {
     RoomTypeResponseDTO updateRoomType(UpsertRoomTypeRequest request, Integer id);
     
     RoomTypeResponseDTO deleteRoomType(Integer id);
-    
-    List<RoomTypeResponseDTO> getAllRoomTypes();
     
     void initRoomTypesFromJson();
 } 

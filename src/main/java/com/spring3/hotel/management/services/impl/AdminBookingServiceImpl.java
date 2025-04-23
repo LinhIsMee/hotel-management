@@ -1,9 +1,9 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dtos.request.AdminBookingRequest;
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
-import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.request.AdminBookingRequest;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.AdminBookingService;
@@ -97,16 +97,13 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 paymentsMap.put(b.getId(), b.getPayments());
             }
             
-            // Step 5: Convert to DTOs with all the data
+            // Step 5: Convert to DTO with all the data
             return bookings.stream()
-                    .map(booking -> {
-                        // Attach the separately loaded collections
-                        List<BookingDetail> details = detailsMap.getOrDefault(booking.getId(), new ArrayList<>());
-                        List<Payment> payments = paymentsMap.getOrDefault(booking.getId(), new ArrayList<>());
-                        
-                        // Convert to DTO
-                        return convertToBookingResponseDTOWithCollections(booking, details, payments);
-                    })
+                    .map(booking -> convertToBookingResponseDTOWithCollections(
+                            booking, 
+                            detailsMap.getOrDefault(booking.getId(), new ArrayList<>()),
+                            paymentsMap.getOrDefault(booking.getId(), new ArrayList<>())
+                    ))
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
@@ -359,8 +356,6 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             // 3. Lưu booking cuối cùng sau khi mọi thứ thành công
             log.info("Saving final booking state for ID: {} with paymentStatus: {}", id, bookingToSave.getPaymentStatus());
             Booking savedBooking = bookingRepository.save(bookingToSave);
-            log.info("Successfully saved final booking state for ID: {}", id);
-            
             log.info("Admin update completed successfully for booking ID: {}", id);
             return convertToBookingResponseDTO(savedBooking);
 
@@ -518,16 +513,13 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 paymentsMap.put(b.getId(), b.getPayments());
             }
             
-            // Step 5: Convert to DTOs with all the data
+            // Step 5: Convert to DTO with all the data
             return bookings.stream()
-                    .map(booking -> {
-                        // Attach the separately loaded collections
-                        List<BookingDetail> details = detailsMap.getOrDefault(booking.getId(), new ArrayList<>());
-                        List<Payment> payments = paymentsMap.getOrDefault(booking.getId(), new ArrayList<>());
-                        
-                        // Convert to DTO
-                        return convertToBookingResponseDTOWithCollections(booking, details, payments);
-                    })
+                    .map(booking -> convertToBookingResponseDTOWithCollections(
+                            booking, 
+                            detailsMap.getOrDefault(booking.getId(), new ArrayList<>()), 
+                            paymentsMap.getOrDefault(booking.getId(), new ArrayList<>())
+                    ))
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
@@ -608,10 +600,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
              dto.setPaymentMethod("NONE");
         }
 
-        // Format createdAt (giữ nguyên)
+        // Sửa lỗi setCreatedAt - chuyển String sang LocalDateTime
         if (finalBooking.getCreatedAt() != null) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
+            dto.setCreatedAt(finalBooking.getCreatedAt());
         }
         
         return dto;
@@ -620,9 +611,13 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     private NewBookingResponse convertToNewBookingResponse(Booking booking) {
         NewBookingResponse response = new NewBookingResponse();
         response.setBookingId(booking.getId());
-        response.setPrice(booking.getTotalPrice());
         response.setUserId(booking.getUser().getId());
         response.setFullName(booking.getUser().getFullName());
+        // Sửa lỗi - User model không có avatar field
+        response.setUserAvatar(""); // Để trống vì User không có avatar field
+        response.setTotalAmount(booking.getTotalPrice());
+        response.setBookingDate(booking.getCreatedAt());
+        response.setStatus(booking.getStatus());
         
         // Lấy số lượng phòng đã đặt
         List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
@@ -639,17 +634,19 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setPrice(room.getRoomType().getPricePerNight());
         dto.setImages(room.getImages());
 
-        // Lấy rating trực tiếp từ Room entity
-        dto.setAverageRating(room.getAverageRating());
-        dto.setTotalReviews(room.getRatingCount());
+        // Sửa lỗi - RoomListResponseDTO không có averageRating và totalReviews
+        // dto.setAverageRating(room.getAverageRating());
+        // dto.setTotalReviews(room.getRatingCount());
         
         return dto;
     }
     
-    private BookingResponseDTO convertToBookingResponseDTOOptimized(Booking booking) {
+    // Chỉ giữ lại một phương thức convertToBookingResponseDTOWithCollections để tối ưu code
+    private BookingResponseDTO convertToBookingResponseDTOWithCollections(
+            Booking booking, List<BookingDetail> bookingDetails, List<Payment> payments) {
         final Booking finalBooking = booking;
         BookingResponseDTO dto = new BookingResponseDTO();
-        // ... (set các trường booking cơ bản từ finalBooking)
+        
         dto.setId(finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
         dto.setFullName(finalBooking.getUser().getFullName());
@@ -657,9 +654,6 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setEmail(finalBooking.getUser().getEmail());
         dto.setPhone(finalBooking.getUser().getPhoneNumber());
         
-        List<BookingDetail> bookingDetails = finalBooking.getBookingDetails() != null ? 
-                finalBooking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(finalBooking.getId());
-        
         dto.setRooms(bookingDetails.stream()
                 .map(detail -> {
                     RoomListResponseDTO roomDto = new RoomListResponseDTO();
@@ -684,83 +678,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setCheckOutDate(finalBooking.getCheckOutDate());
         dto.setTotalPrice(finalBooking.getTotalPrice());
 
-        // Final price calculation
-        double finalPrice = finalBooking.getTotalPrice();
-        if (finalBooking.getDiscount() != null) {
-             if ("PERCENT".equals(finalBooking.getDiscount().getDiscountType())) {
-                 finalPrice = finalPrice * (1 - finalBooking.getDiscount().getDiscountValue() / 100);
-             } else if ("FIXED".equals(finalBooking.getDiscount().getDiscountType())) {
-                 finalPrice = finalPrice - finalBooking.getDiscount().getDiscountValue();
-                if (finalPrice < 0) finalPrice = 0;
-            }
-             dto.setDiscountCode(finalBooking.getDiscount().getCode());
-             dto.setDiscountValue(finalBooking.getDiscount().getDiscountValue());
-             dto.setDiscountType(finalBooking.getDiscount().getDiscountType());
-         } else if (finalBooking.getFinalPrice() != null) {
-             finalPrice = finalBooking.getFinalPrice();
-         }
-        dto.setFinalPrice(finalPrice);
-        
-        // Set status and payment status from Booking entity
-        dto.setStatus(finalBooking.getStatus());
-        dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
-
-         // Get payment method from the latest payment record if available
-        List<Payment> payments = finalBooking.getPayments() != null ? 
-                finalBooking.getPayments() : paymentRepository.findAllByBooking_Id(finalBooking.getId());
-        if (!payments.isEmpty()) {
-             Payment latestPayment = payments.get(payments.size() - 1);
-             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
-        } else {
-             dto.setPaymentMethod("NONE");
-        }
-        
-        // Format createdAt (remains)
-        if (finalBooking.getCreatedAt() != null) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
-        }
-        
-        return dto;
-    }
-    
-    private BookingResponseDTO convertToBookingResponseDTOWithCollections(
-            Booking booking, List<BookingDetail> bookingDetails, List<Payment> payments) {
-         final Booking finalBooking = booking;
-        BookingResponseDTO dto = new BookingResponseDTO();
-        // ... (set các trường booking cơ bản từ finalBooking)
-         dto.setId(finalBooking.getId());
-        dto.setUserId(finalBooking.getUser().getId());
-        dto.setFullName(finalBooking.getUser().getFullName());
-        dto.setNationalId(finalBooking.getUser().getNationalId());
-        dto.setEmail(finalBooking.getUser().getEmail());
-        dto.setPhone(finalBooking.getUser().getPhoneNumber());
-        
-        dto.setRooms(bookingDetails.stream()
-                .map(detail -> {
-                    RoomListResponseDTO roomDto = new RoomListResponseDTO();
-                    Room room = detail.getRoom();
-                    roomDto.setRoomId(room.getId());
-                    roomDto.setRoomNumber(room.getRoomNumber());
-                    roomDto.setRoomType(room.getRoomType().getName());
-                    if (detail.getPrice() != null) {
-                        roomDto.setPrice(detail.getPrice());
-                    } else {
-                        long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                        if (days < 1) days = 1;
-                        roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
-                    }
-                    roomDto.setImages(room.getImages());
-                    return roomDto;
-                })
-                .toList());
-        
-        dto.setCheckInDate(finalBooking.getCheckInDate());
-        dto.setCheckOutDate(finalBooking.getCheckOutDate());
-        dto.setTotalPrice(finalBooking.getTotalPrice());
-
-        // Final price calculation
+        // Tính finalPrice
         double finalPrice = finalBooking.getTotalPrice();
          if (finalBooking.getDiscount() != null) {
              if ("PERCENT".equals(finalBooking.getDiscount().getDiscountType())) {
@@ -777,11 +695,11 @@ public class AdminBookingServiceImpl implements AdminBookingService {
          }
         dto.setFinalPrice(finalPrice);
         
-        // Set status and payment status from Booking entity
+        // Trạng thái booking và payment
         dto.setStatus(finalBooking.getStatus());
         dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
 
-        // Get payment method from the latest payment record if available
+        // Lấy payment method
         if (!payments.isEmpty()) {
              Payment latestPayment = payments.get(payments.size() - 1);
              dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
@@ -789,10 +707,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
              dto.setPaymentMethod("NONE");
         }
         
-        // Format createdAt
+        // Sửa lỗi - Sử dụng trực tiếp LocalDateTime thay vì string
         if (finalBooking.getCreatedAt() != null) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
+            dto.setCreatedAt(finalBooking.getCreatedAt());
         }
         
         return dto;

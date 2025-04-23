@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.spring3.hotel.management.dtos.request.CreateEmployeeRequest;
-import com.spring3.hotel.management.dtos.request.UpdateEmployeeRequest;
-import com.spring3.hotel.management.dtos.response.EmployeeResponse;
-import com.spring3.hotel.management.dtos.response.MessageResponse;
+import com.spring3.hotel.management.dto.request.CreateEmployeeRequest;
+import com.spring3.hotel.management.dto.request.UpdateEmployeeRequest;
+import com.spring3.hotel.management.dto.response.EmployeeResponse;
+import com.spring3.hotel.management.dto.response.MessageResponse;
 import com.spring3.hotel.management.models.Department;
 import com.spring3.hotel.management.models.Position;
 import com.spring3.hotel.management.services.EmployeeService;

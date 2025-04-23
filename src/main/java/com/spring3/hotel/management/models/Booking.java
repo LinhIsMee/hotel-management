@@ -15,6 +15,7 @@ import java.util.List;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @Table(name = "BOOKINGS")
 public class Booking {
 
@@ -23,7 +24,7 @@ public class Booking {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "check_in_date", nullable = false)
@@ -38,15 +39,18 @@ public class Booking {
     @Column(name = "final_price")
     private Double finalPrice;
 
-    @ManyToOne
-    @JoinColumn(name = "discount_id")
-    private Discount discount;
-
-    @Column(name = "status", nullable = false)
+    @Column(nullable = false)
     private String status;
 
     @Column(name = "payment_status")
     private String paymentStatus;
+
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
+    @ManyToOne
+    @JoinColumn(name = "discount_id")
+    private Discount discount;
 
     @Column(name = "created_at", columnDefinition = "TIMESTAMP")
     private LocalDateTime createdAt;
@@ -59,6 +63,8 @@ public class Booking {
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
     }
 }

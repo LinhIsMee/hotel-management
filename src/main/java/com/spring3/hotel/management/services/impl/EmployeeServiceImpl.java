@@ -7,9 +7,9 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.spring3.hotel.management.dtos.request.CreateEmployeeRequest;
-import com.spring3.hotel.management.dtos.request.UpdateEmployeeRequest;
-import com.spring3.hotel.management.dtos.response.EmployeeResponse;
+import com.spring3.hotel.management.dto.request.CreateEmployeeRequest;
+import com.spring3.hotel.management.dto.request.UpdateEmployeeRequest;
+import com.spring3.hotel.management.dto.response.EmployeeResponse;
 import com.spring3.hotel.management.models.Department;
 import com.spring3.hotel.management.models.Employee;
 import com.spring3.hotel.management.models.Position;

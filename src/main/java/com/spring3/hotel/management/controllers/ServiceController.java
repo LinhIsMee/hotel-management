@@ -1,8 +1,8 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dtos.request.UpsertServiceRequest;
-import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
-import com.spring3.hotel.management.dtos.response.SuccessResponse;
+import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.response.SuccessResponse;
 import com.spring3.hotel.management.services.interfaces.ServiceService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;

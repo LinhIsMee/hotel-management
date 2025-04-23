@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.dtos.request;
+package com.spring3.hotel.management.dto.request;
 
 import com.spring3.hotel.management.models.Role;
 

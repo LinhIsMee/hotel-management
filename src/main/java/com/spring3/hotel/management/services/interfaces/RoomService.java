@@ -1,10 +1,13 @@
 package com.spring3.hotel.management.services.interfaces;
 
-import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
-import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
+import com.spring3.hotel.management.dto.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
+import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface RoomService {
     
@@ -14,7 +17,7 @@ public interface RoomService {
     
     RoomResponseDTO getRoomByRoomNumber(String roomNumber);
     
-    List<RoomResponseDTO> getRoomsByRoomType(Integer roomTypeId);
+    List<RoomByTypeResponseDTO> getRoomsByRoomType(Integer roomTypeId);
     
     List<RoomResponseDTO> getRoomsByStatus(String status);
     
@@ -29,6 +32,8 @@ public interface RoomService {
     List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate);
     
     List<RoomResponseDTO> getAllActiveRooms();
+    
+    void updateRoomStatusBatch(Map<String, String> roomStatusMap);
     
     List<RoomResponseDTO> getFeaturedRooms();
 } 

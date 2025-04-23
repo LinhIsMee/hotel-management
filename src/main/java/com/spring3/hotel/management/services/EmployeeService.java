@@ -2,9 +2,9 @@ package com.spring3.hotel.management.services;
 
 import java.util.List;
 
-import com.spring3.hotel.management.dtos.request.CreateEmployeeRequest;
-import com.spring3.hotel.management.dtos.request.UpdateEmployeeRequest;
-import com.spring3.hotel.management.dtos.response.EmployeeResponse;
+import com.spring3.hotel.management.dto.request.CreateEmployeeRequest;
+import com.spring3.hotel.management.dto.request.UpdateEmployeeRequest;
+import com.spring3.hotel.management.dto.response.EmployeeResponse;
 import com.spring3.hotel.management.models.Department;
 import com.spring3.hotel.management.models.Position;
 

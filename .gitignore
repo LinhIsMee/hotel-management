@@ -66,4 +66,3 @@ Thumbs.db
 .cursor/rules
 database-export-hotel_management.json
 .gitignore
-.env
