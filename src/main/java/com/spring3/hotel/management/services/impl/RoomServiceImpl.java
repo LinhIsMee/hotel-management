@@ -6,8 +6,8 @@ import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dto.response.RoomResponseDTO;
 import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
 import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
-import com.spring3.hotel.management.mappers.RoomMapper;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.models.HotelService;
@@ -51,13 +51,10 @@ public class RoomServiceImpl implements RoomService {
     @Autowired
     private ObjectMapper objectMapper;
     
-    @Autowired
-    private RoomMapper roomMapper;
-    
     @Override
     public List<RoomResponseDTO> getAllRooms() {
         return roomRepository.findAll().stream()
-                .map(roomMapper::toDTO)
+                .map(this::mapRoomToDTO)
                 .collect(Collectors.toList());
     }
     
@@ -65,14 +62,14 @@ public class RoomServiceImpl implements RoomService {
     public RoomResponseDTO getRoomById(Integer id) {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
-        return roomMapper.toDTO(room);
+        return mapRoomToDTO(room);
     }
     
     @Override
     public RoomResponseDTO getRoomByRoomNumber(String roomNumber) {
         Room room = roomRepository.findByRoomNumber(roomNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với số phòng: " + roomNumber));
-        return roomMapper.toDTO(room);
+        return mapRoomToDTO(room);
     }
     
     @Override
@@ -86,7 +83,7 @@ public class RoomServiceImpl implements RoomService {
     @Override
     public List<RoomResponseDTO> getRoomsByStatus(String status) {
         return roomRepository.findByStatus(status).stream()
-                .map(roomMapper::toDTO)
+                .map(this::mapRoomToDTO)
                 .collect(Collectors.toList());
     }
     
@@ -119,7 +116,7 @@ public class RoomServiceImpl implements RoomService {
         }
         
         Room savedRoom = roomRepository.save(room);
-        return roomMapper.toDTO(savedRoom);
+        return mapRoomToDTO(savedRoom);
     }
     
     @Override
@@ -158,7 +155,7 @@ public class RoomServiceImpl implements RoomService {
         }
         
         Room updatedRoom = roomRepository.save(existingRoom);
-        return roomMapper.toDTO(updatedRoom);
+        return mapRoomToDTO(updatedRoom);
     }
     
     @Override
@@ -340,7 +337,7 @@ public class RoomServiceImpl implements RoomService {
         // Chuyển đổi sang DTO và thêm thông tin booking
         return availableRooms.stream()
                 .map(room -> {
-                    RoomResponseDTO dto = roomMapper.toDTO(room);
+                    RoomResponseDTO dto = mapRoomToDTO(room);
                     
                     // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
                     LocalDate today = LocalDate.now();
@@ -385,7 +382,7 @@ public class RoomServiceImpl implements RoomService {
         // Chuyển đổi sang DTO với thông tin đặt phòng
         return activeRooms.stream()
                 .map(room -> {
-                    RoomResponseDTO dto = roomMapper.toDTO(room);
+                    RoomResponseDTO dto = mapRoomToDTO(room);
                     
                     // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
                     boolean isBooked = bookedRooms.contains(room);
@@ -452,7 +449,7 @@ public class RoomServiceImpl implements RoomService {
         // 2. Phòng có nhiều đánh giá
         // 3. Phòng có giá trị cao
         List<RoomResponseDTO> featuredRooms = allRooms.stream()
-            .map(roomMapper::toDTO)
+            .map(this::mapRoomToDTO)
             .sorted((r1, r2) -> {
                 // Ưu tiên phòng có rating cao
                 if (r1.getAverageRating() != null && r2.getAverageRating() != null) {
@@ -471,5 +468,55 @@ public class RoomServiceImpl implements RoomService {
             .collect(Collectors.toList());
         
         return featuredRooms;
+    }
+    
+    // Phương thức mới để map Room sang RoomResponseDTO
+    private RoomResponseDTO mapRoomToDTO(Room room) {
+        if (room == null) return null;
+        
+        RoomResponseDTO dto = new RoomResponseDTO();
+        dto.setId(room.getId());
+        dto.setRoomNumber(room.getRoomNumber());
+        dto.setFloor(room.getFloor());
+        dto.setStatus(room.getStatus());
+        dto.setIsActive(room.getIsActive());
+        dto.setNotes(room.getNotes());
+        dto.setImages(room.getImages());
+        
+        // Thông tin loại phòng
+        if (room.getRoomType() != null) {
+            dto.setRoomTypeId(room.getRoomType().getId());
+            dto.setRoomTypeName(room.getRoomType().getName());
+            dto.setMaxOccupancy(room.getRoomType().getMaxOccupancy());
+            dto.setPricePerNight(room.getRoomType().getPricePerNight());
+        }
+        
+        // Thông tin dịch vụ
+        if (room.getServices() != null) {
+            dto.setServices(room.getServices().stream()
+                .map(service -> {
+                    ServiceResponseDTO serviceDTO = new ServiceResponseDTO();
+                    serviceDTO.setId(service.getId());
+                    serviceDTO.setName(service.getName());
+                    serviceDTO.setDescription(service.getDescription());
+                    serviceDTO.setPrice(service.getPrice());
+                    return serviceDTO;
+                })
+                .collect(Collectors.toList()));
+        }
+        
+        // Thông tin đánh giá
+        dto.setAverageRating(room.getAverageRating());
+        
+        // Tính tổng số đánh giá
+        if (room.getRatings() != null) {
+            dto.setTotalReviews(room.getRatings().size());
+            dto.setRatingCount(room.getRatingCount());
+        } else {
+            dto.setTotalReviews(0);
+            dto.setRatingCount(0);
+        }
+        
+        return dto;
     }
 }

@@ -4,7 +4,6 @@ import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
 import com.spring3.hotel.management.dto.response.RoomResponseDTO;
 import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
 import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
-import com.spring3.hotel.management.mappers.ReviewMapper;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
@@ -35,9 +34,6 @@ public class RoomController {
     
     @Autowired
     private ReviewRepository reviewRepository;
-    
-    @Autowired
-    private ReviewMapper reviewMapper;
     
     // Lấy thông tin một phòng cụ thể
     @GetMapping("/{id}")
@@ -137,7 +133,7 @@ public class RoomController {
                     List<ReviewResponseDTO> recentReviews = reviews.stream()
                             .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
                             .limit(3)
-                            .map(reviewMapper::toDTO)
+                            .map(ReviewResponseDTO::fromEntity)
                             .collect(Collectors.toList());
                     room.setRecentReviews(recentReviews);
                 } else {

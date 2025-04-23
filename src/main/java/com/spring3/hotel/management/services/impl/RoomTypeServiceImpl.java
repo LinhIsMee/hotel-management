@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.request.UpsertRoomTypeRequest;
 import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
-import com.spring3.hotel.management.mappers.RoomTypeMapper;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
 import com.spring3.hotel.management.services.interfaces.RoomTypeService;
@@ -32,15 +31,12 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     
     @Autowired
     private ObjectMapper objectMapper;
-    
-    @Autowired
-    private RoomTypeMapper roomTypeMapper;
 
     @Override
     public RoomTypeResponseDTO getRoomTypeById(Integer id) {
         RoomType roomType = roomTypeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + id));
-        return roomTypeMapper.toDTO(roomType);
+        return mapToDTO(roomType);
     }
 
     @Override
@@ -55,7 +51,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
             throw new IllegalArgumentException("Mã loại phòng đã tồn tại: " + request.getCode());
         }
         
-        RoomType roomType = roomTypeMapper.toEntity(request);
+        RoomType roomType = mapToEntity(request);
         
         // Set các giá trị mặc định nếu cần
         if (roomType.getIsActive() == null) {
@@ -63,7 +59,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
         }
         
         RoomType savedRoomType = roomTypeRepository.save(roomType);
-        return roomTypeMapper.toDTO(savedRoomType);
+        return mapToDTO(savedRoomType);
     }
 
     @Override
@@ -106,7 +102,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
         }
         
         RoomType updatedRoomType = roomTypeRepository.save(existingRoomType);
-        return roomTypeMapper.toDTO(updatedRoomType);
+        return mapToDTO(updatedRoomType);
     }
 
     @Override
@@ -118,14 +114,14 @@ public class RoomTypeServiceImpl implements RoomTypeService {
         roomType.setIsActive(false);
         RoomType deactivatedRoomType = roomTypeRepository.save(roomType);
         
-        return roomTypeMapper.toDTO(deactivatedRoomType);
+        return mapToDTO(deactivatedRoomType);
     }
 
     @Override
     public List<RoomTypeResponseDTO> getAllRoomTypes() {
         return roomTypeRepository.findAll()
                 .stream()
-                .map(roomTypeMapper::toDTO)
+                .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -198,5 +194,58 @@ public class RoomTypeServiceImpl implements RoomTypeService {
         } catch (Exception e) {
             log.error("Lỗi không xác định khi khởi tạo dữ liệu loại phòng: {}", e.getMessage(), e);
         }
+    }
+
+    // Phương thức mới để map RoomType sang RoomTypeResponseDTO
+    private RoomTypeResponseDTO mapToDTO(RoomType roomType) {
+        if (roomType == null) return null;
+        
+        RoomTypeResponseDTO dto = new RoomTypeResponseDTO();
+        dto.setId(roomType.getId());
+        dto.setName(roomType.getName());
+        dto.setCode(roomType.getCode());
+        dto.setDescription(roomType.getDescription());
+        dto.setPricePerNight(roomType.getPricePerNight());
+        dto.setMaxOccupancy(roomType.getMaxOccupancy());
+        dto.setImageUrl(roomType.getImageUrl());
+        dto.setIsActive(roomType.getIsActive());
+        
+        // Chuyển đổi chuỗi amenities thành danh sách
+        if (roomType.getAmenities() != null && !roomType.getAmenities().isEmpty()) {
+            dto.setAmenities(List.of(roomType.getAmenities().split(",")));
+        }
+        
+        // Chuyển đổi LocalDate sang LocalDateTime nếu cần
+        if (roomType.getCreatedAt() != null) {
+            dto.setCreatedAt(roomType.getCreatedAt().atStartOfDay());
+        }
+        
+        return dto;
+    }
+    
+    // Phương thức mới để map UpsertRoomTypeRequest sang RoomType
+    private RoomType mapToEntity(UpsertRoomTypeRequest request) {
+        if (request == null) return null;
+        
+        RoomType roomType = new RoomType();
+        roomType.setName(request.getName());
+        roomType.setCode(request.getCode());
+        roomType.setDescription(request.getDescription());
+        roomType.setPricePerNight(request.getPricePerNight());
+        roomType.setBasePrice(request.getPricePerNight()); // Set basePrice = pricePerNight
+        roomType.setMaxOccupancy(request.getMaxOccupancy());
+        roomType.setCapacity(request.getMaxOccupancy()); // Set capacity = maxOccupancy
+        roomType.setImageUrl(request.getImageUrl());
+        roomType.setIsActive(request.getIsActive());
+        
+        // Chuyển danh sách amenities thành chuỗi ngăn cách bởi dấu phẩy
+        if (request.getAmenities() != null && !request.getAmenities().isEmpty()) {
+            roomType.setAmenities(String.join(",", request.getAmenities()));
+        }
+        
+        // Set createdAt về ngày hiện tại
+        roomType.setCreatedAt(LocalDate.now());
+        
+        return roomType;
     }
 }

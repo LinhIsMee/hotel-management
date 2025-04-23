@@ -8,7 +8,6 @@ import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
 import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
-import com.spring3.hotel.management.mappers.BookingMapper;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.BookingService;
@@ -52,22 +51,20 @@ public class BookingServiceImpl implements BookingService {
     private OfferingRepository offeringRepository;
     @Autowired
     private ServiceRepository serviceRepository;
-    @Autowired
-    private BookingMapper bookingMapper;
 
     @Override
     public BookingResponseDTO getBookingById(Integer id) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
-        BookingResponseDTO dto = bookingMapper.toDTO(booking);
+        BookingResponseDTO dto = convertToBookingResponseDTO(booking);
         
         // Lấy danh sách chi tiết đặt phòng
         List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
         
         // Chuyển đổi chi tiết phòng
         List<RoomListResponseDTO> rooms = bookingDetails.stream()
-                .map(bookingMapper::toRoomListResponseDTO)
+                .map(this::mapToRoomListResponseDTO)
                 .collect(Collectors.toList());
         dto.setRooms(rooms);
         
@@ -92,6 +89,34 @@ public class BookingServiceImpl implements BookingService {
             dto.setServices(Collections.emptyList());
         }
         
+        return dto;
+    }
+
+    // Phương thức mới để map BookingDetail sang RoomListResponseDTO
+    private RoomListResponseDTO mapToRoomListResponseDTO(BookingDetail bookingDetail) {
+        RoomListResponseDTO dto = new RoomListResponseDTO();
+        Room room = bookingDetail.getRoom();
+        dto.setRoomId(room.getId());
+        dto.setRoomNumber(room.getRoomNumber());
+        dto.setRoomType(room.getRoomType().getName());
+        
+        if (bookingDetail.getPrice() != null) {
+            dto.setPrice(bookingDetail.getPrice());
+        } else {
+            // Tính giá từ pricePerNight nếu có booking
+            if (bookingDetail.getBooking() != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(
+                        bookingDetail.getBooking().getCheckInDate(), 
+                        bookingDetail.getBooking().getCheckOutDate());
+                if (days < 1) days = 1;
+                dto.setPrice(room.getRoomType().getPricePerNight() * days);
+            } else {
+                // Nếu không có booking thì dùng giá cơ bản
+                dto.setPrice(room.getRoomType().getBasePrice());
+            }
+        }
+        
+        dto.setImages(room.getImages());
         return dto;
     }
 
@@ -599,15 +624,7 @@ public class BookingServiceImpl implements BookingService {
         
         // Lấy danh sách phòng từ booking detail
         return bookingDetails.stream()
-                .map(bookingDetail -> {
-                    Room room = bookingDetail.getRoom();
-                    RoomListResponseDTO dto = new RoomListResponseDTO();
-                    dto.setRoomId(room.getId());
-                    dto.setRoomNumber(room.getRoomNumber());
-                    dto.setRoomType(room.getRoomType().getName());
-                    dto.setPrice(room.getRoomType().getBasePrice());
-                    return dto;
-                })
+                .map(this::mapToRoomListResponseDTO)
                 .distinct() // Loại bỏ các phòng trùng lặp
                 .toList();
     }
@@ -677,23 +694,7 @@ public class BookingServiceImpl implements BookingService {
                 finalBooking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(finalBooking.getId());
         
         dto.setRooms(bookingDetails.stream()
-                .map(detail -> {
-            RoomListResponseDTO roomDto = new RoomListResponseDTO();
-                    Room room = detail.getRoom();
-            roomDto.setRoomId(room.getId());
-                    roomDto.setRoomNumber(room.getRoomNumber());
-                    roomDto.setRoomType(room.getRoomType().getName());
-                     if (detail.getPrice() != null) {
-            roomDto.setPrice(detail.getPrice());
-                     } else {
-                         long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                         if (days < 1) days = 1;
-                         roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
-                     }
-            roomDto.setImages(room.getImages());
-                    return roomDto;
-                })
+                .map(this::mapToRoomListResponseDTO)
                 .toList());
         
         dto.setCheckInDate(finalBooking.getCheckInDate());
