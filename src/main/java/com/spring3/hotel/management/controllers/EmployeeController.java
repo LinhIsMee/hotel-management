@@ -1,8 +1,6 @@
 package com.spring3.hotel.management.controllers;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,6 +19,7 @@ import com.spring3.hotel.management.dto.request.CreateEmployeeRequest;
 import com.spring3.hotel.management.dto.request.UpdateEmployeeRequest;
 import com.spring3.hotel.management.dto.response.EmployeeResponse;
 import com.spring3.hotel.management.dto.response.MessageResponse;
+import com.spring3.hotel.management.dto.response.SuccessResponse;
 import com.spring3.hotel.management.models.Department;
 import com.spring3.hotel.management.models.Position;
 import com.spring3.hotel.management.services.EmployeeService;
@@ -34,6 +33,7 @@ public class EmployeeController {
     
     /**
      * Lấy danh sách nhân viên với bộ lọc tùy chọn
+     * Hỗ trợ lọc theo phòng ban, vị trí và trạng thái
      */
     @GetMapping
     public ResponseEntity<?> getAllEmployees(
@@ -42,37 +42,40 @@ public class EmployeeController {
             @RequestParam(required = false) Boolean status) {
         try {
             List<EmployeeResponse> employees;
+            String message = "Lấy danh sách nhân viên thành công";
             
             if (department != null) {
                 // Lọc theo phòng ban
                 try {
                     Department departmentEnum = Department.valueOf(department);
                     employees = employeeService.getEmployeesByDepartment(departmentEnum);
+                    message = "Lấy danh sách nhân viên theo phòng ban thành công";
                 } catch (IllegalArgumentException e) {
                     return ResponseEntity.badRequest()
-                            .body(new MessageResponse("Invalid department: " + department));
+                            .body(new MessageResponse("Phòng ban không hợp lệ: " + department));
                 }
             } else if (position != null) {
                 // Lọc theo vị trí
                 try {
                     Position positionEnum = Position.valueOf(position);
                     employees = employeeService.getEmployeesByPosition(positionEnum);
+                    message = "Lấy danh sách nhân viên theo vị trí thành công";
                 } catch (IllegalArgumentException e) {
                     return ResponseEntity.badRequest()
-                            .body(new MessageResponse("Invalid position: " + position));
+                            .body(new MessageResponse("Vị trí không hợp lệ: " + position));
                 }
             } else if (status != null) {
                 // Lọc theo trạng thái
                 employees = employeeService.getEmployeesByStatus(status);
+                message = "Lấy danh sách nhân viên theo trạng thái thành công";
             } else {
                 // Lấy tất cả
                 employees = employeeService.getAllEmployees();
             }
             
-            Map<String, Object> response = new HashMap<>();
-            response.put("data", employees);
-            
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(
+                new SuccessResponse<>(HttpStatus.OK.value(), message, employees)
+            );
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi lấy danh sách nhân viên: " + e.getMessage()));
@@ -86,7 +89,9 @@ public class EmployeeController {
     public ResponseEntity<?> getEmployeeById(@PathVariable Integer employeeId) {
         try {
             EmployeeResponse employee = employeeService.getEmployeeById(employeeId);
-            return ResponseEntity.ok(employee);
+            return ResponseEntity.ok(
+                new SuccessResponse<>(HttpStatus.OK.value(), "Lấy thông tin nhân viên thành công", employee)
+            );
         } catch (Exception e) {
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.contains("not found")) {
@@ -105,7 +110,8 @@ public class EmployeeController {
     public ResponseEntity<?> createEmployee(@RequestBody CreateEmployeeRequest request) {
         try {
             EmployeeResponse createdEmployee = employeeService.createEmployee(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdEmployee);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>(HttpStatus.CREATED.value(), "Tạo nhân viên mới thành công", createdEmployee));
         } catch (Exception e) {
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.contains("already exists")) {
@@ -130,7 +136,9 @@ public class EmployeeController {
             @RequestBody UpdateEmployeeRequest request) {
         try {
             EmployeeResponse updatedEmployee = employeeService.updateEmployee(employeeId, request);
-            return ResponseEntity.ok(updatedEmployee);
+            return ResponseEntity.ok(
+                new SuccessResponse<>(HttpStatus.OK.value(), "Cập nhật thông tin nhân viên thành công", updatedEmployee)
+            );
         } catch (Exception e) {
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.contains("not found")) {
@@ -157,7 +165,9 @@ public class EmployeeController {
     public ResponseEntity<?> deleteEmployee(@PathVariable Integer employeeId) {
         try {
             employeeService.deleteEmployee(employeeId);
-            return ResponseEntity.ok(new MessageResponse("Xóa nhân viên thành công"));
+            return ResponseEntity.ok(
+                new SuccessResponse<>(HttpStatus.OK.value(), "Xóa nhân viên thành công", null)
+            );
         } catch (Exception e) {
             String errorMessage = e.getMessage();
             if (errorMessage != null && errorMessage.contains("not found")) {
@@ -168,4 +178,4 @@ public class EmployeeController {
                 .body(new MessageResponse("Lỗi khi xóa nhân viên: " + errorMessage));
         }
     }
-} 
+}

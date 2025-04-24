@@ -62,6 +62,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers("/api/v1/user/profile").authenticated()
+                        .requestMatchers("/api/v1/images/upload").authenticated()
+                        .requestMatchers("/api/v1/images/user").authenticated()
+                        .requestMatchers("/api/v1/images/**").permitAll()
                         .anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())

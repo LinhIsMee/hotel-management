@@ -484,48 +484,6 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         bookingRepository.deleteById(id);
     }
 
-    @Override
-    public List<BookingResponseDTO> getAllBookingsNoPage() {
-        try {
-            // Step 1: Get all bookings with user and discount
-            List<Booking> bookings = bookingRepository.findAllWithDetailsNoPage();
-            
-            if (bookings.isEmpty()) {
-                return new ArrayList<>();
-            }
-            
-            // Step 2: Extract booking IDs
-            List<Integer> bookingIds = bookings.stream()
-                    .map(Booking::getId)
-                    .collect(Collectors.toList());
-            
-            // Step 3: Load booking details in a separate query
-            List<Booking> bookingsWithDetails = bookingRepository.findBookingsWithDetails(bookingIds);
-            Map<Integer, List<BookingDetail>> detailsMap = new java.util.HashMap<>();
-            for (Booking b : bookingsWithDetails) {
-                detailsMap.put(b.getId(), b.getBookingDetails());
-            }
-            
-            // Step 4: Load payments in a separate query
-            List<Booking> bookingsWithPayments = bookingRepository.findBookingsWithPayments(bookingIds);
-            Map<Integer, List<Payment>> paymentsMap = new java.util.HashMap<>();
-            for (Booking b : bookingsWithPayments) {
-                paymentsMap.put(b.getId(), b.getPayments());
-            }
-            
-            // Step 5: Convert to DTO with all the data
-            return bookings.stream()
-                    .map(booking -> convertToBookingResponseDTOWithCollections(
-                            booking, 
-                            detailsMap.getOrDefault(booking.getId(), new ArrayList<>()), 
-                            paymentsMap.getOrDefault(booking.getId(), new ArrayList<>())
-                    ))
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
-        }
-    }
-
     // Phương thức hỗ trợ
     private BookingResponseDTO convertToBookingResponseDTO(Booking booking) {
         final Booking finalBooking = booking; // Sử dụng biến final này xuyên suốt

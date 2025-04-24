@@ -5,6 +5,8 @@ import com.spring3.hotel.management.dto.RatingDTO;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
+import com.spring3.hotel.management.dto.response.ApiResponse;
+import com.spring3.hotel.management.dto.response.MessageResponse;
 import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
 import com.spring3.hotel.management.models.Rating;
 import com.spring3.hotel.management.models.Room;
@@ -12,7 +14,7 @@ import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.RatingRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
-import com.spring3.hotel.management.services.interfaces.ReviewService;
+import com.spring3.hotel.management.services.ReviewService;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -90,7 +92,7 @@ public class ReviewController {
     public ResponseEntity<ReviewResponseDTO> updateReview(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateReviewRequest request) {
-        ReviewResponseDTO updatedReview = reviewService.updateReview(id, request);
+        ReviewResponseDTO updatedReview = reviewService.updateReview(request, id);
         return ResponseEntity.ok(updatedReview);
     }
 
@@ -144,12 +146,15 @@ public class ReviewController {
         return ResponseEntity.ok(statistics);
     }
     
-    // === RATING APIs (đã hợp nhất từ RatingController) ===
+    // === RATING APIs (đã tối ưu) ===
     
     /**
      * Lấy xếp hạng theo phòng
+     * Đã gộp vào API /room/{roomId} để tránh trùng lặp
+     * @deprecated Sử dụng API GET /room/{roomId} thay thế
      */
     @GetMapping("/ratings/room/{roomId}")
+    @Deprecated
     public ResponseEntity<List<RatingDTO>> getRoomRatings(@PathVariable Integer roomId) {
         List<Rating> ratings = ratingRepository.findByRoomId(roomId);
         List<RatingDTO> ratingDTOs = ratings.stream()
@@ -160,9 +165,11 @@ public class ReviewController {
 
     /**
      * Tạo xếp hạng mới
+     * @deprecated Sử dụng API POST /reviews thay thế với CreateReviewRequest
      */
     @PostMapping("/ratings")
     @Transactional
+    @Deprecated
     public ResponseEntity<RatingDTO> createRating(
             @Valid @RequestBody CreateRatingRequest request,
             Authentication authentication) {

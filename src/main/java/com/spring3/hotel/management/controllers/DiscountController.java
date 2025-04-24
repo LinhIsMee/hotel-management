@@ -2,10 +2,11 @@ package com.spring3.hotel.management.controllers;
 
 import com.spring3.hotel.management.dto.DiscountDTO;
 import com.spring3.hotel.management.dto.GenerateDiscountRequest;
+import com.spring3.hotel.management.dto.response.ApiResponse;
 import com.spring3.hotel.management.exceptions.DiscountExpiredException;
 import com.spring3.hotel.management.exceptions.DiscountNotFoundException;
 import com.spring3.hotel.management.exceptions.DiscountUsageExceededException;
-import com.spring3.hotel.management.services.interfaces.DiscountService;
+import com.spring3.hotel.management.services.DiscountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,19 +55,6 @@ public class DiscountController {
     }
 
     /**
-     * Lấy thông tin mã giảm giá theo mã code
-     */
-    @GetMapping("/code/{code}")
-    public ResponseEntity<DiscountDTO> getDiscountByCode(@PathVariable String code) {
-        try {
-            DiscountDTO discount = discountService.getDiscountByCode(code);
-            return ResponseEntity.ok(discount);
-        } catch (DiscountNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    /**
      * Tạo mới mã giảm giá
      */
     @PostMapping
@@ -76,25 +64,6 @@ public class DiscountController {
             DiscountDTO createdDiscount = discountService.createDiscount(discountDTO);
             return new ResponseEntity<>(createdDiscount, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
-    }
-    
-    /**
-     * Tạo nhiều mã giảm giá ngẫu nhiên
-     */
-    @PostMapping("/generate")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<Object> generateDiscounts(@RequestBody GenerateDiscountRequest request) {
-        try {
-            List<DiscountDTO> generatedDiscounts = discountService.generateRandomDiscounts(request);
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Đã tạo " + generatedDiscounts.size() + " mã giảm giá ngẫu nhiên");
-            response.put("discounts", generatedDiscounts);
-            return new ResponseEntity<>(response, HttpStatus.CREATED);
-        } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("message", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
@@ -138,55 +107,65 @@ public class DiscountController {
     }
 
     /**
-     * Kiểm tra mã giảm giá có hợp lệ
+     * API tổng hợp để kiểm tra, lấy thông tin và áp dụng mã giảm giá
+     * Thay thế cho các API riêng lẻ: validate, apply, code
      */
-    @GetMapping("/validate/{code}")
-    public ResponseEntity<Boolean> validateDiscount(@PathVariable String code) {
-        boolean isValid = discountService.isDiscountValid(code);
-        return ResponseEntity.ok(isValid);
-    }
-
-    /**
-     * Áp dụng mã giảm giá vào số tiền
-     */
-    @GetMapping("/apply")
-    public ResponseEntity<Object> applyDiscount(
+    @GetMapping("/check")
+    public ResponseEntity<Object> checkDiscount(
             @RequestParam String code,
-            @RequestParam double amount) {
+            @RequestParam(required = false) Double amount) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
         try {
-            double discountedAmount = discountService.applyDiscount(code, amount);
-            Map<String, Object> response = new HashMap<>();
-            response.put("originalAmount", amount);
-            response.put("discountedAmount", discountedAmount);
-            response.put("discountAmount", amount - discountedAmount);
-            response.put("discountCode", code);
+            // Kiểm tra có tồn tại và còn hiệu lực không
+            boolean isValid = discountService.isDiscountValid(code);
+            response.put("valid", isValid);
+            
+            if (isValid) {
+                // Lấy thông tin mã giảm giá
+                DiscountDTO discount = discountService.getDiscountByCode(code);
+                response.put("discount", discount);
+                
+                // Nếu có amount thì tính giá sau khi áp dụng giảm giá
+                if (amount != null) {
+                    double discountedAmount = discountService.applyDiscount(code, amount);
+                    response.put("originalAmount", amount);
+                    response.put("discountedAmount", discountedAmount);
+                    response.put("discountAmount", amount - discountedAmount);
+                }
+            }
+            
             return ResponseEntity.ok(response);
         } catch (DiscountNotFoundException e) {
-            Map<String, Object> response = new HashMap<>();
+            response.put("valid", false);
             response.put("message", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            return ResponseEntity.ok(response);
         } catch (DiscountExpiredException | DiscountUsageExceededException e) {
-            Map<String, Object> response = new HashMap<>();
+            response.put("valid", false);
             response.put("message", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.ok(response);
         }
     }
     
     /**
-     * Tăng số lần sử dụng của mã giảm giá
+     * Đánh dấu mã giảm giá đã được sử dụng
+     * Chỉ dành cho admin/hệ thống
      */
-    @PostMapping("/use/{code}")
+    @PostMapping("/mark-used")
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_STAFF')")
-    public ResponseEntity<Object> useDiscount(@PathVariable String code) {
+    public ResponseEntity<Object> markDiscountAsUsed(@RequestParam String code) {
         try {
             discountService.incrementUsedCount(code);
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Đã cập nhật số lần sử dụng của mã giảm giá: " + code);
+            response.put("success", true);
+            response.put("message", "Đã đánh dấu sử dụng mã giảm giá: " + code);
             return ResponseEntity.ok(response);
         } catch (DiscountNotFoundException e) {
             Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
             response.put("message", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
     }
 }

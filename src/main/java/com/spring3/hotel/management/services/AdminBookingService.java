@@ -13,7 +13,6 @@ public interface AdminBookingService {
     List<NewBookingResponse> getRecentBookings();
     BookingResponseDTO getBookingById(Integer id);
     List<BookingResponseDTO> getAllBookings(int page, int size);
-    List<BookingResponseDTO> getAllBookingsNoPage();
     List<BookingResponseDTO> getBookingsByStatus(String status);
     List<BookingResponseDTO> getBookingsByDateRange(LocalDate startDate, LocalDate endDate);
     List<RoomListResponseDTO> getBookedRoomsByDateRange(LocalDate startDate, LocalDate endDate);

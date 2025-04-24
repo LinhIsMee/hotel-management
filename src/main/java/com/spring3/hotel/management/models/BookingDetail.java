@@ -54,6 +54,9 @@ public class BookingDetail {
     )
     private List<HotelService> services = new ArrayList<>();
     
+    @OneToMany(mappedBy = "detail", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<BookingService> bookingServices = new ArrayList<>();
+    
     @Transient
     public String getRoomNumber() {
         return room != null ? room.getRoomNumber() : roomNumber;

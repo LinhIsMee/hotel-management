@@ -1,5 +1,6 @@
 package com.spring3.hotel.management.controllers;
 
+import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
@@ -12,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -35,38 +35,21 @@ public class BookingController {
     private final UserRepository userRepository;
 
     /**
-     * Lấy thông tin đặt phòng theo ID
-     * - Người dùng chỉ có thể xem các đặt phòng của họ
-     * - Admin có thể xem tất cả đặt phòng
+     * Lấy thông tin đặt phòng theo ID (không cần đăng nhập)
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_USER', 'ROLE_ADMIN')")
     public ResponseEntity<?> getBookingById(@PathVariable Integer id) {
         try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String currentUsername = authentication.getName();
-            User currentUser = userRepository.findByEmail(currentUsername)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin người dùng"));
-
             // Lấy booking
             BookingResponseDTO bookingResponse = bookingService.getBookingById(id);
             
-            // Kiểm tra quyền truy cập
+            // Kiểm tra booking có tồn tại không
             if (bookingResponse == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("success", false, "message", "Không tìm thấy booking."));
             }
             
-            // Admin có thể xem tất cả, user chỉ xem được booking của mình
-            boolean isAdmin = authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-                    
-            if (isAdmin || bookingResponse.getUserId().equals(currentUser.getId())) {
-                return ResponseEntity.ok(bookingResponse);
-            } else {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Bạn không có quyền truy cập booking này."));
-            }
+            return ResponseEntity.ok(bookingResponse);
         } catch (Exception e) {
             log.error("Lỗi lấy booking {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -75,38 +58,102 @@ public class BookingController {
     }
 
     /**
-     * Lấy danh sách booking của người dùng hiện tại
+     * API tổng hợp lấy danh sách đặt phòng với nhiều tiêu chí lọc
+     * Hỗ trợ lọc theo: người dùng, trạng thái, khoảng thời gian, phân trang
      */
-    @GetMapping("/my-bookings")
-    @PreAuthorize("hasRole('ROLE_USER')")
-    public ResponseEntity<List<BookingResponseDTO>> getMyBookings() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new RuntimeException("Không tìm thấy người dùng với username: " + username);
+    @GetMapping
+    public ResponseEntity<?> getBookings(
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "10") int size,
+            @RequestParam(required = false, defaultValue = "false") boolean noPage) {
+        try {
+            List<BookingResponseDTO> bookings;
+            String message = "Lấy danh sách đặt phòng thành công";
+            
+            // Lọc theo userId
+            if (userId != null) {
+                bookings = bookingService.getBookingsByUserId(userId);
+                message = "Lấy danh sách đặt phòng theo người dùng thành công";
+            }
+            // Lọc theo trạng thái
+            else if (status != null && !status.isEmpty()) {
+                bookings = bookingService.getBookingsByStatus(status);
+                message = "Lấy danh sách đặt phòng theo trạng thái thành công";
+            }
+            // Lọc theo khoảng thời gian
+            else if (startDate != null && endDate != null) {
+                bookings = bookingService.getBookingsByDateRange(startDate, endDate);
+                message = "Lấy danh sách đặt phòng theo khoảng thời gian thành công";
+            }
+            // Lấy tất cả đặt phòng
+            else {
+                if (noPage) {
+                    bookings = bookingService.getAllBookings();
+                } else {
+                    bookings = bookingService.getAllBookings(page, size);
+                }
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", message,
+                "bookings", bookings
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi lấy danh sách đặt phòng: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
         }
-        
-        List<BookingResponseDTO> bookings = bookingService.getBookingsByUserId(user.getId());
-        return ResponseEntity.ok(bookings);
     }
     
     /**
-     * Lấy danh sách đặt phòng theo userId (chỉ cho admin)
+     * Lấy danh sách booking của người dùng hiện tại
+     */
+    @GetMapping("/my-bookings")
+    public ResponseEntity<?> getMyBookings() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            User user = userRepository.findByUsername(username);
+            if (user == null) {
+                throw new RuntimeException("Không tìm thấy người dùng với username: " + username);
+            }
+            
+            List<BookingResponseDTO> bookings = bookingService.getBookingsByUserId(user.getId());
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Lấy danh sách đặt phòng của bạn thành công",
+                "bookings", bookings
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi lấy danh sách booking: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Lấy danh sách đặt phòng theo userId
+     * @deprecated Sử dụng API GET ?userId={userId} thay thế
      */
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @Deprecated
     public ResponseEntity<List<BookingResponseDTO>> getBookingsByUserId(@PathVariable Integer userId) {
         List<BookingResponseDTO> bookings = bookingService.getBookingsByUserId(userId);
         return ResponseEntity.ok(bookings);
     }
     
     /**
-     * Lấy tất cả đặt phòng (chỉ cho admin)
+     * Lấy tất cả đặt phòng
+     * @deprecated Sử dụng API GET ?page={page}&size={size} thay thế
      */
     @GetMapping("/all")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @Deprecated
     public ResponseEntity<List<BookingResponseDTO>> getAllBookings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -115,30 +162,33 @@ public class BookingController {
     }
     
     /**
-     * Lấy tất cả đặt phòng (chỉ cho admin) - không phân trang
+     * Lấy tất cả đặt phòng - không phân trang
+     * @deprecated Sử dụng API GET ?noPage=true thay thế
      */
     @GetMapping("/all/no-page")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @Deprecated
     public ResponseEntity<List<BookingResponseDTO>> getAllBookingsNoPage() {
         List<BookingResponseDTO> bookings = bookingService.getAllBookings();
         return ResponseEntity.ok(bookings);
     }
     
     /**
-     * Lấy danh sách đặt phòng theo trạng thái (chỉ cho admin)
+     * Lấy danh sách đặt phòng theo trạng thái
+     * @deprecated Sử dụng API GET ?status={status} thay thế
      */
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @Deprecated
     public ResponseEntity<List<BookingResponseDTO>> getBookingsByStatus(@PathVariable String status) {
         List<BookingResponseDTO> bookings = bookingService.getBookingsByStatus(status);
         return ResponseEntity.ok(bookings);
     }
     
     /**
-     * Lấy danh sách đặt phòng theo khoảng thời gian (chỉ cho admin)
+     * Lấy danh sách đặt phòng theo khoảng thời gian
+     * @deprecated Sử dụng API GET ?startDate={startDate}&endDate={endDate} thay thế
      */
     @GetMapping("/date-range")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @Deprecated
     public ResponseEntity<List<BookingResponseDTO>> getBookingsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -159,75 +209,61 @@ public class BookingController {
     }
 
     /**
-     * Tạo mới đơn đặt phòng
+     * Tạo mới đơn đặt phòng (không cần đăng nhập, dành cho cả user và admin)
+     */
+    @PostMapping("/admin-create")
+    public ResponseEntity<Map<String, Object>> createBookingAdmin(@Valid @RequestBody AdminBookingRequest request) {
+        try {
+            // Tạo booking với thông tin từ request
+            BookingResponseDTO bookingResponseDTO = bookingService.createBookingByAdmin(request);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "booking", bookingResponseDTO,
+                "message", "Đặt phòng thành công."
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi tạo booking: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                        "success", false, 
+                        "message", "Lỗi khi đặt phòng: " + e.getMessage()
+                    ));
+        }
+    }
+
+    /**
+     * Tạo mới đơn đặt phòng (không cần đăng nhập)
      */
     @PostMapping("/create")
-    @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<Map<String, Object>> createBooking(@Valid @RequestBody UpsertBookingRequest request) {
-        // Tự động cập nhật userId từ thông tin người dùng đăng nhập
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new RuntimeException("Không tìm thấy người dùng với username: " + username);
+        try {
+            // Tạo booking với thông tin từ request
+            BookingResponseDTO bookingResponseDTO = bookingService.createBooking(request);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "booking", bookingResponseDTO,
+                "message", "Đặt phòng thành công. Vui lòng tiến hành thanh toán."
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi tạo booking: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                        "success", false, 
+                        "message", "Lỗi khi đặt phòng: " + e.getMessage()
+                    ));
         }
-        
-        request.setUserId(user.getId());
-        request.setStatus("PENDING");
-        
-        // Tạo booking
-        BookingResponseDTO bookingResponseDTO = bookingService.createBooking(request);
-        
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "booking", bookingResponseDTO,
-            "message", "Đặt phòng thành công. Vui lòng tiến hành thanh toán."
-        ));
     }
 
     /**
      * Cập nhật thông tin đặt phòng
      */
     @PutMapping("/update/{id}")
-    @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<?> updateBooking(
             @PathVariable Integer id,
             @Valid @RequestBody UpsertBookingRequest request) {
         try {
-            // Xác thực người dùng
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String username = authentication.getName();
-            User user = userRepository.findByUsername(username);
-            
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("success", false, "message", "Người dùng không hợp lệ"));
-            }
-            
-            // Kiểm tra booking có thuộc về người dùng không
-            BookingResponseDTO existingBooking = bookingService.getBookingById(id);
-            if (existingBooking == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
-            }
-            
-            if (!existingBooking.getUserId().equals(user.getId())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Bạn không có quyền cập nhật booking này."));
-            }
-            
-            // Chỉ cho phép cập nhật các booking có trạng thái PENDING hoặc CONFIRMED
-            if (!existingBooking.getStatus().equals("PENDING") && !existingBooking.getStatus().equals("CONFIRMED")) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of(
-                            "success", false,
-                            "message", "Chỉ có thể cập nhật booking có trạng thái PENDING hoặc CONFIRMED."
-                        ));
-            }
-            
-            // Cập nhật booking
-            request.setUserId(user.getId());
             BookingResponseDTO updatedBooking = bookingService.updateBooking(request, id);
             
             return ResponseEntity.ok(Map.of(
@@ -246,32 +282,8 @@ public class BookingController {
      * Hủy đặt phòng
      */
     @PostMapping("/cancel/{id}")
-    @PreAuthorize("hasRole('ROLE_USER')")
     public ResponseEntity<?> cancelBooking(@PathVariable Integer id) {
         try {
-            // Xác thực người dùng
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String username = authentication.getName();
-            User user = userRepository.findByUsername(username);
-            
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("success", false, "message", "Người dùng không hợp lệ"));
-            }
-            
-            // Kiểm tra booking có thuộc về người dùng không
-            BookingResponseDTO existingBooking = bookingService.getBookingById(id);
-            if (existingBooking == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
-            }
-            
-            if (!existingBooking.getUserId().equals(user.getId())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Bạn không có quyền hủy booking này."));
-            }
-            
-            // Hủy booking
             BookingResponseDTO cancelledBooking = bookingService.cancelBooking(id);
             
             return ResponseEntity.ok(Map.of(
@@ -287,85 +299,21 @@ public class BookingController {
     }
 
     /**
-     * Xác nhận đặt phòng (chỉ cho admin)
+     * Xác nhận đặt phòng
      */
     @PostMapping("/confirm/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<BookingResponseDTO> confirmBooking(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.confirmBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
 
     /**
-     * Kiểm tra trạng thái đặt phòng
-     */
-    @GetMapping("/check-status/{bookingId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
-    public ResponseEntity<?> checkBookingStatus(@PathVariable Integer bookingId) {
-        try {
-            // Xác thực người dùng
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String username = authentication.getName();
-            User user = userRepository.findByUsername(username);
-            
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("success", false, "message", "Người dùng không hợp lệ"));
-            }
-            
-            // Kiểm tra booking có tồn tại không
-            BookingResponseDTO booking = bookingService.getBookingById(bookingId);
-            
-            if (booking == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("success", false, "message", "Không tìm thấy booking."));
-            }
-            
-            // Kiểm tra nếu booking thuộc về người dùng hiện tại
-            if (!booking.getUserId().equals(user.getId())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Bạn không có quyền kiểm tra booking này."));
-            }
-            
-            // Lấy thông tin thanh toán
-            Map<String, Object> paymentInfo = bookingService.getBookingPaymentInfo(bookingId);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("booking", booking);
-            response.put("payment", paymentInfo);
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Lỗi kiểm tra trạng thái booking {}: {}", bookingId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * Lấy thông tin thanh toán của booking
-     */
-    @GetMapping("/{id}/payment-info")
-    @PreAuthorize("hasAnyRole('ROLE_USER', 'ROLE_ADMIN')")
-    public ResponseEntity<Map<String, Object>> getBookingPaymentInfo(@PathVariable("id") Integer bookingId) {
-        Map<String, Object> paymentInfo = bookingService.getBookingPaymentInfo(bookingId);
-        return ResponseEntity.ok(paymentInfo);
-    }
-    
-    /**
      * Lấy chi tiết booking (bao gồm thông tin phòng, dịch vụ và thanh toán)
+     * API này thay thế cho các API trùng lặp: /check-status/{bookingId}, /{id}/payment-info
      */
-    @GetMapping("/detail/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_USER', 'ROLE_ADMIN')")
+    @GetMapping({"/detail/{id}", "/check-status/{id}"})
     public ResponseEntity<?> getBookingDetail(@PathVariable Integer id) {
         try {
-            // Xác thực quyền truy cập
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String username = authentication.getName();
-            User user = userRepository.findByEmail(username)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin người dùng"));
-            
             // Lấy chi tiết booking
             BookingResponseDTO booking = bookingService.getBookingById(id);
             
@@ -374,58 +322,56 @@ public class BookingController {
                         .body(Map.of("success", false, "message", "Không tìm thấy booking."));
             }
             
-            // Kiểm tra quyền truy cập (admin có thể xem tất cả, người dùng chỉ xem được booking của mình)
-            boolean isAdmin = authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-            
-            if (!isAdmin && !booking.getUserId().equals(user.getId())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("success", false, "message", "Bạn không có quyền truy cập booking này."));
-            }
-            
             // Lấy thông tin payment
             Map<String, Object> paymentInfo = bookingService.getBookingPaymentInfo(id);
             
             // Kết hợp thông tin booking và payment
             Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
             result.put("booking", booking);
             result.put("payment", paymentInfo);
             
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("Lỗi lấy chi tiết booking {}: {}", id, e.getMessage(), e);
-            return ResponseEntity.badRequest().body(Map.of(
-                "status", "ERROR",
-                "message", "Không thể lấy thông tin đặt phòng: " + e.getMessage()
-            ));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
         }
     }
     
     /**
-     * API check-in booking (chỉ cho admin)
+     * Lấy thông tin thanh toán của booking
+     * @deprecated Sử dụng API GET /detail/{id} thay thế
+     */
+    @GetMapping("/{id}/payment-info")
+    @Deprecated
+    public ResponseEntity<Map<String, Object>> getBookingPaymentInfo(@PathVariable("id") Integer bookingId) {
+        Map<String, Object> paymentInfo = bookingService.getBookingPaymentInfo(bookingId);
+        return ResponseEntity.ok(paymentInfo);
+    }
+    
+    /**
+     * API check-in booking
      */
     @PostMapping("/check-in/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<BookingResponseDTO> checkInBooking(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.checkInBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
     
     /**
-     * API check-out booking (chỉ cho admin)
+     * API check-out booking
      */
     @PostMapping("/check-out/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<BookingResponseDTO> checkOutBooking(@PathVariable Integer id) {
         BookingResponseDTO bookingResponseDTO = bookingService.checkOutBooking(id);
         return ResponseEntity.ok(bookingResponseDTO);
     }
     
     /**
-     * API xóa booking (chỉ cho admin)
+     * API xóa booking
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> deleteBooking(@PathVariable Integer id) {
         bookingService.deleteBooking(id);
         

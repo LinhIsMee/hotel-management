@@ -3,7 +3,8 @@ package com.spring3.hotel.management.controllers;
 import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
 import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
 import com.spring3.hotel.management.dto.response.SuccessResponse;
-import com.spring3.hotel.management.services.interfaces.ServiceService;
+import com.spring3.hotel.management.services.ServiceService;
+
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/services")
+@RequestMapping("/api/v1/services")
 public class ServiceController {
 
     @Autowired
@@ -56,49 +57,74 @@ public class ServiceController {
     }
     
     /**
-     * Lấy danh sách dịch vụ theo loại
+     * Tìm kiếm và lọc dịch vụ với nhiều tiêu chí
+     * Hỗ trợ lọc theo loại, tên, giá tối đa và trạng thái khả dụng
+     */
+    @GetMapping("/search")
+    public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> searchServices(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Double price,
+            @RequestParam(required = false) Boolean available) {
+        
+        List<ServiceResponseDTO> services;
+        String message = "Tìm kiếm dịch vụ thành công";
+        
+        if (type != null && !type.isEmpty()) {
+            // Lọc theo loại dịch vụ
+            services = serviceService.getServicesByType(type);
+            message = "Lấy danh sách dịch vụ theo loại thành công";
+        } else if (name != null && !name.isEmpty()) {
+            // Tìm kiếm theo tên
+            services = serviceService.getServicesByName(name);
+            message = "Tìm kiếm dịch vụ theo tên thành công";
+        } else if (price != null) {
+            // Lọc theo giá tối đa
+            services = serviceService.getServicesByMaxPrice(price);
+            message = "Lọc dịch vụ theo giá thành công";
+        } else if (available != null && available) {
+            // Lấy dịch vụ khả dụng
+            services = serviceService.getAvailableServices();
+            message = "Lấy danh sách dịch vụ khả dụng thành công";
+        } else {
+            // Lấy tất cả dịch vụ nếu không có tiêu chí lọc
+            services = serviceService.getAllServices();
+            message = "Lấy danh sách tất cả dịch vụ thành công";
+        }
+        
+        return ResponseEntity.ok(
+                new SuccessResponse<>(HttpStatus.OK.value(), message, services)
+        );
+    }
+    
+    /**
+     * Lấy danh sách dịch vụ theo loại (giữ lại để tương thích ngược)
+     * @deprecated API này sẽ bị loại bỏ trong phiên bản tới. Vui lòng sử dụng API GET /search?type={type} thay thế
      */
     @GetMapping("/type/{type}")
+    @Deprecated
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getServicesByType(
             @PathVariable String type) {
         List<ServiceResponseDTO> services = serviceService.getServicesByType(type);
         return ResponseEntity.ok(
-                new SuccessResponse<>(HttpStatus.OK.value(), "Lấy danh sách dịch vụ theo loại thành công", services)
+                new SuccessResponse<>(HttpStatus.OK.value(), 
+                "Lấy danh sách dịch vụ theo loại thành công. API này sẽ bị loại bỏ, vui lòng sử dụng /search?type={type}", 
+                services)
         );
     }
     
     /**
-     * Tìm kiếm dịch vụ theo tên
-     */
-    @GetMapping("/search")
-    public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> searchServicesByName(
-            @RequestParam String name) {
-        List<ServiceResponseDTO> services = serviceService.getServicesByName(name);
-        return ResponseEntity.ok(
-                new SuccessResponse<>(HttpStatus.OK.value(), "Tìm kiếm dịch vụ thành công", services)
-        );
-    }
-    
-    /**
-     * Lọc dịch vụ theo giá tối đa
-     */
-    @GetMapping("/price")
-    public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getServicesByMaxPrice(
-            @RequestParam Double price) {
-        List<ServiceResponseDTO> services = serviceService.getServicesByMaxPrice(price);
-        return ResponseEntity.ok(
-                new SuccessResponse<>(HttpStatus.OK.value(), "Lọc dịch vụ theo giá thành công", services)
-        );
-    }
-    
-    /**
-     * Lấy danh sách dịch vụ đang khả dụng
+     * Lấy danh sách dịch vụ đang khả dụng (giữ lại để tương thích ngược)
+     * @deprecated API này sẽ bị loại bỏ trong phiên bản tới. Vui lòng sử dụng API GET /search?available=true thay thế
      */
     @GetMapping("/available")
+    @Deprecated
     public ResponseEntity<SuccessResponse<List<ServiceResponseDTO>>> getAvailableServices() {
         List<ServiceResponseDTO> services = serviceService.getAvailableServices();
         return ResponseEntity.ok(
-                new SuccessResponse<>(HttpStatus.OK.value(), "Lấy danh sách dịch vụ khả dụng thành công", services)
+                new SuccessResponse<>(HttpStatus.OK.value(), 
+                "Lấy danh sách dịch vụ khả dụng thành công. API này sẽ bị loại bỏ, vui lòng sử dụng /search?available=true", 
+                services)
         );
     }
     
@@ -142,16 +168,4 @@ public class ServiceController {
                 new SuccessResponse<>(HttpStatus.OK.value(), "Xóa dịch vụ thành công", null)
         );
     }
-    
-    /**
-     * API khởi tạo dữ liệu mẫu sẽ được loại bỏ
-     */
-    /*
-    @PostMapping("/init")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<SuccessResponse<Void>> initServicesFromJson() {
-        serviceService.initServicesFromJson();
-        return ResponseEntity.ok(new SuccessResponse<>(null, "Dịch vụ đã được khởi tạo thành công"));
-    }
-    */
-} 
+}

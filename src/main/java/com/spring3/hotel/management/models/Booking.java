@@ -17,7 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Table(name = "BOOKINGS")
-public class Booking {
+public class Booking extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,6 +26,21 @@ public class Booking {
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(name = "customer_name")
+    private String customerName;
+    
+    @Column(name = "customer_phone")
+    private String customerPhone;
+    
+    @Column(name = "customer_email")
+    private String customerEmail;
+    
+    @Column(name = "customer_identity")
+    private String customerIdentity;
+    
+    @Column(length = 500)
+    private String notes;
 
     @Column(name = "check_in_date", nullable = false)
     private LocalDate checkInDate;
@@ -40,7 +55,8 @@ public class Booking {
     private Double finalPrice;
 
     @Column(nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private BookingStatus status = BookingStatus.PENDING;
 
     @Column(name = "payment_status")
     private String paymentStatus;
@@ -51,9 +67,6 @@ public class Booking {
     @ManyToOne
     @JoinColumn(name = "discount_id")
     private Discount discount;
-
-    @Column(name = "created_at", columnDefinition = "TIMESTAMP")
-    private LocalDateTime createdAt;
     
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<BookingDetail> bookingDetails = new ArrayList<>();
@@ -63,8 +76,8 @@ public class Booking {
 
     @PrePersist
     public void prePersist() {
-        if (this.createdAt == null) {
-            this.createdAt = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = BookingStatus.PENDING;
         }
     }
 }

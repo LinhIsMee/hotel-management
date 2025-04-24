@@ -2,12 +2,13 @@ package com.spring3.hotel.management.services.impl;
 
 import com.spring3.hotel.management.dto.DiscountDTO;
 import com.spring3.hotel.management.dto.GenerateDiscountRequest;
+import com.spring3.hotel.management.dto.request.UpsertDiscountRequest;
 import com.spring3.hotel.management.exceptions.DiscountExpiredException;
 import com.spring3.hotel.management.exceptions.DiscountNotFoundException;
 import com.spring3.hotel.management.exceptions.DiscountUsageExceededException;
 import com.spring3.hotel.management.models.Discount;
 import com.spring3.hotel.management.repositories.DiscountRepository;
-import com.spring3.hotel.management.services.interfaces.DiscountService;
+import com.spring3.hotel.management.services.DiscountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

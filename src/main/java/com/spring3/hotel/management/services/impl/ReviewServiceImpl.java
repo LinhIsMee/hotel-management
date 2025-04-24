@@ -1,17 +1,21 @@
 package com.spring3.hotel.management.services.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.CreateRatingRequest;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
 import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
+import com.spring3.hotel.management.exceptions.NotFoundException;
+import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.models.Review.ReviewStatus;
 import com.spring3.hotel.management.repositories.BookingRepository;
 import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
-import com.spring3.hotel.management.services.interfaces.ReviewService;
+import com.spring3.hotel.management.services.ReviewService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -130,6 +134,11 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional
     public ReviewResponseDTO createReview(CreateReviewRequest request) {
         log.info("Bắt đầu tạo đánh giá mới");
+        
+        // Kiểm tra xem đã có đánh giá cho booking này chưa
+        if (reviewRepository.findByBookingId(request.getBookingId()).isPresent()) {
+            throw new IllegalArgumentException("Đơn đặt phòng với mã " + request.getBookingId() + " đã được đánh giá trước đó. Mỗi đơn đặt phòng chỉ được đánh giá một lần.");
+        }
         
         // Tạo review mới dựa trên thông tin từ request
         Review review = new Review();

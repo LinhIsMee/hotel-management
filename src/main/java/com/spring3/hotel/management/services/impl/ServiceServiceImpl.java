@@ -3,11 +3,11 @@ package com.spring3.hotel.management.services.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
 import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
-import com.spring3.hotel.management.enums.ServiceType;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.HotelService;
 import com.spring3.hotel.management.repositories.ServiceRepository;
-import com.spring3.hotel.management.services.interfaces.ServiceService;
+import com.spring3.hotel.management.services.ServiceService;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -49,17 +49,11 @@ public class ServiceServiceImpl implements ServiceService {
     }
     
     @Override
-    public List<ServiceResponseDTO> getServicesByType(String typeStr) {
-        try {
-            ServiceType type = ServiceType.valueOf(typeStr.toUpperCase());
+    public List<ServiceResponseDTO> getServicesByType(String type) {
             return serviceRepository.findByType(type)
                     .stream()
                     .map(ServiceResponseDTO::fromEntity)
                     .collect(Collectors.toList());
-        } catch (IllegalArgumentException e) {
-            log.warn("Loại dịch vụ không hợp lệ: {}", typeStr);
-            return new ArrayList<>();
-        }
     }
     
     @Override
@@ -103,6 +97,7 @@ public class ServiceServiceImpl implements ServiceService {
                 .price(request.getPrice())
                 .isAvailable(request.getIsAvailable())
                 .imageUrl(request.getImageUrl())
+                .unit(request.getUnit())
                 .build();
         
         HotelService savedService = serviceRepository.save(service);
@@ -126,6 +121,7 @@ public class ServiceServiceImpl implements ServiceService {
         existingService.setType(request.getType());
         existingService.setDescription(request.getDescription());
         existingService.setPrice(request.getPrice());
+        existingService.setUnit(request.getUnit());
         
         if (request.getImageUrl() != null) {
             existingService.setImageUrl(request.getImageUrl());

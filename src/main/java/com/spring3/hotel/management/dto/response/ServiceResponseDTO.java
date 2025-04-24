@@ -22,6 +22,7 @@ public class ServiceResponseDTO {
     private BigDecimal price;
     private Boolean isAvailable;
     private String imageUrl;
+    private String unit;
     private Integer quantity;
     private BigDecimal totalPrice;
     
@@ -32,11 +33,12 @@ public class ServiceResponseDTO {
                 .id(service.getId())
                 .name(service.getName())
                 .code(service.getCode())
-                .type(service.getType() != null ? service.getType().name() : null)
+                .type(service.getType())
                 .description(service.getDescription())
                 .price(service.getPrice())
                 .isAvailable(service.getIsAvailable())
                 .imageUrl(service.getImageUrl())
+                .unit(service.getUnit())
                 .build();
     }
     

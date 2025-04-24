@@ -6,7 +6,8 @@ import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
-import com.spring3.hotel.management.services.interfaces.RoomTypeService;
+import com.spring3.hotel.management.services.RoomTypeService;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

@@ -6,7 +6,7 @@ import com.spring3.hotel.management.dto.response.RoomByTypeResponseDTO;
 import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.repositories.ReviewRepository;
-import com.spring3.hotel.management.services.interfaces.RoomService;
+import com.spring3.hotel.management.services.RoomService;
 import com.spring3.hotel.management.services.impl.RoomServiceImpl;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -72,8 +72,66 @@ public class RoomController {
         }
     }
     
+    /**
+     * API tổng hợp lấy danh sách phòng với nhiều tiêu chí lọc
+     * Hỗ trợ lọc theo: loại phòng, số người, phòng nổi bật
+     */
+    @GetMapping("/search")
+    public ResponseEntity<?> searchRooms(
+            @RequestParam(required = false) Integer roomTypeId,
+            @RequestParam(required = false) Integer maxOccupancy,
+            @RequestParam(required = false, defaultValue = "false") Boolean featured) {
+        try {
+            List<RoomResponseDTO> rooms;
+            String message = "Tìm kiếm phòng thành công";
+            
+            // Lọc theo loại phòng
+            if (roomTypeId != null) {
+                List<RoomByTypeResponseDTO> roomsByType = roomService.getRoomsByRoomType(roomTypeId);
+                // Chuyển đổi từ RoomByTypeResponseDTO sang RoomResponseDTO
+                rooms = roomsByType.stream()
+                        .map(room -> roomService.getRoomById(room.getId()))
+                        .collect(Collectors.toList());
+                message = "Lấy danh sách phòng theo loại thành công";
+            }
+            // Lọc theo số người
+            else if (maxOccupancy != null) {
+                log.info("Nhận yêu cầu lấy danh sách phòng theo số người lớn: {}", maxOccupancy);
+                rooms = roomService.getAllRooms().stream()
+                        .filter(room -> room.getMaxOccupancy() >= maxOccupancy)
+                        .collect(Collectors.toList());
+                message = "Lấy danh sách phòng theo số người thành công";
+            }
+            // Lấy phòng nổi bật
+            else if (featured) {
+                log.info("Nhận yêu cầu lấy danh sách phòng nổi bật");
+                rooms = roomService.getFeaturedRooms();
+                message = "Lấy danh sách phòng nổi bật thành công";
+            }
+            // Lấy tất cả phòng nếu không có tiêu chí lọc
+            else {
+                rooms = roomService.getAllActiveRooms();
+                message = "Lấy danh sách tất cả phòng thành công";
+            }
+            
+            enrichWithReviewData(rooms);
+            log.info("Trả về {} phòng sau khi tìm kiếm", rooms.size());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", message,
+                "rooms", rooms
+            ));
+        } catch (Exception e) {
+            log.error("Lỗi khi tìm kiếm phòng: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Lỗi máy chủ nội bộ: " + e.getMessage()));
+        }
+    }
+    
     // Lấy danh sách phòng theo loại phòng
     @GetMapping("/room-type/{roomTypeId}")
+    @Deprecated
     public ResponseEntity<List<RoomByTypeResponseDTO>> getRoomsByRoomType(@PathVariable Integer roomTypeId) {
         List<RoomByTypeResponseDTO> rooms = roomService.getRoomsByRoomType(roomTypeId);
         return ResponseEntity.ok(rooms);
@@ -81,6 +139,7 @@ public class RoomController {
     
     // Lấy danh sách phòng theo số người lớn
     @GetMapping("/occupancy/{maxOccupancy}")
+    @Deprecated
     public ResponseEntity<List<RoomResponseDTO>> getRoomsByMaxOccupancy(@PathVariable Integer maxOccupancy) {
         log.info("Nhận yêu cầu lấy danh sách phòng theo số người lớn: {}", maxOccupancy);
         List<RoomResponseDTO> rooms = roomService.getAllRooms().stream()
@@ -93,6 +152,7 @@ public class RoomController {
     
     // Lấy danh sách phòng nổi bật
     @GetMapping("/featured")
+    @Deprecated
     public ResponseEntity<List<RoomResponseDTO>> getFeaturedRooms() {
         log.info("Nhận yêu cầu lấy danh sách phòng nổi bật");
         List<RoomResponseDTO> featuredRooms = roomService.getFeaturedRooms();
@@ -225,4 +285,4 @@ public class RoomController {
         List<RoomResponseDTO> rooms = roomService.getRoomsByStatus(status);
         return ResponseEntity.ok(rooms);
     }
-} 
+}

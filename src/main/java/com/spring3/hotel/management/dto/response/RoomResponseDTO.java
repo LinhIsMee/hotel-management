@@ -30,4 +30,5 @@ public class RoomResponseDTO {
     private Boolean isBookedNextFiveDays;
     private List<BookingPeriodDTO> bookingPeriods;
     private Integer maxOccupancy;
+    private List<String> amenities;
 } 

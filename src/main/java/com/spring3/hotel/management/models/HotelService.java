@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.models;
 
-import com.spring3.hotel.management.enums.ServiceType;
 import lombok.*;
 
 import jakarta.persistence.*;
@@ -30,8 +29,8 @@ public class HotelService implements Serializable {
     @Column(unique = true)
     private String code;
 
-    @Enumerated(EnumType.STRING)
-    private ServiceType type;
+    @Column
+    private String type;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -40,6 +39,9 @@ public class HotelService implements Serializable {
 
     @Column(name = "is_available")
     private Boolean isAvailable = true;
+
+    @Column
+    private String unit;
 
     @Column
     private String imageUrl;

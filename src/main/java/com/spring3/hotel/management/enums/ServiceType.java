@@ -10,6 +10,9 @@ public enum ServiceType {
     TRANSPORT("Dịch vụ đưa đón"),
     ENTERTAINMENT("Dịch vụ giải trí"),
     CLEANING("Dịch vụ dọn phòng"),
+    HOUSEKEEPING("Dịch vụ vệ sinh phòng"),
+    TOUR("Dịch vụ du lịch"),
+    BUSINESS("Dịch vụ kinh doanh"),
     OTHERS("Dịch vụ khác");
     
     private final String description;

@@ -8,60 +8,61 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/offerings")
+@RequestMapping("/api/v1/offerings")
 public class OfferingController {
 
     @Autowired
     private OfferingService offeringService;
 
-    // Tạo mới một dịch vụ
-    @PostMapping("/create")
+    /**
+     * Lấy tất cả dịch vụ
+     */
+    @GetMapping
+    public ResponseEntity<List<Offering>> getAllOfferings() {
+        List<Offering> offerings = offeringService.getAllServices();
+        return ResponseEntity.ok(offerings);
+    }
+
+    /**
+     * Lấy thông tin dịch vụ theo ID
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<Offering> getOfferingById(@PathVariable Integer id) {
+        Offering offering = offeringService.getServiceById(id);
+        return ResponseEntity.ok(offering);
+    }
+
+    /**
+     * Tạo mới một dịch vụ
+     */
+    @PostMapping
     public ResponseEntity<Offering> createOffering(@RequestBody Offering offering) {
         Offering newOffering = offeringService.createService(offering);
         return new ResponseEntity<>(newOffering, HttpStatus.CREATED);
     }
 
-    // Cập nhật thông tin dịch vụ theo ID
-    @PutMapping("/update/{id}")
+    /**
+     * Cập nhật thông tin dịch vụ theo ID
+     */
+    @PutMapping("/{id}")
     public ResponseEntity<Offering> updateOffering(@PathVariable Integer id, @RequestBody Offering offering) {
         Offering updatedOffering = offeringService.updateService(id, offering);
-        return new ResponseEntity<>(updatedOffering, HttpStatus.OK);
+        return ResponseEntity.ok(updatedOffering);
     }
 
-    // Xóa dịch vụ theo ID
-    @DeleteMapping("/remove/{id}")
-    public ResponseEntity<Void> deleteOffering(@PathVariable Integer id) {
+    /**
+     * Xóa dịch vụ theo ID
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteOffering(@PathVariable Integer id) {
         offeringService.deleteService(id);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-    }
-
-    // Lấy thông tin dịch vụ theo ID
-    @GetMapping("/{id}")
-    public ResponseEntity<Offering> getOfferingById(@PathVariable Integer id) {
-        Offering offering = offeringService.getServiceById(id);
-        return new ResponseEntity<>(offering, HttpStatus.OK);
-    }
-
-    // Lấy danh sách dịch vụ theo tên
-    @GetMapping("/name/{name}")
-    public ResponseEntity<List<Offering>> getOfferingsByName(@PathVariable String name) {
-        List<Offering> offerings = offeringService.getServicesByName(name);
-        return new ResponseEntity<>(offerings, HttpStatus.OK);
-    }
-
-    // Lấy danh sách dịch vụ có giá nhỏ hơn giá cho trước
-    @GetMapping("/price-less-than/{price}")
-    public ResponseEntity<List<Offering>> getOfferingsByPriceLessThan(@PathVariable Double price) {
-        List<Offering> offerings = offeringService.getServicesByPrice(price);
-        return new ResponseEntity<>(offerings, HttpStatus.OK);
-    }
-
-    // Lấy tất cả dịch vụ
-    @GetMapping("/")
-    public ResponseEntity<List<Offering>> getAllOfferings() {
-        List<Offering> offerings = offeringService.getAllServices();
-        return new ResponseEntity<>(offerings, HttpStatus.OK);
+        return ResponseEntity.ok(Map.of(
+            "status", "success",
+            "message", "Đã xóa dịch vụ thành công",
+            "offeringId", id
+        ));
     }
 }

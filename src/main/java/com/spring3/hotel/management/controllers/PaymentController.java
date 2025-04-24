@@ -8,11 +8,14 @@ import com.spring3.hotel.management.models.Discount;
 import com.spring3.hotel.management.models.Payment;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.User;
+import com.spring3.hotel.management.models.HotelService;
+import com.spring3.hotel.management.models.BookingService;
 import com.spring3.hotel.management.repositories.DiscountRepository;
 import com.spring3.hotel.management.repositories.PaymentRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.repositories.BookingRepository;
+import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.services.BookingService;
 import com.spring3.hotel.management.services.VNPayService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -43,51 +47,29 @@ public class PaymentController {
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
     private final DiscountRepository discountRepository;
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private final BookingService bookingService;
 
     /**
-     * API tạo thanh toán đơn giản (không kèm đặt phòng)
+     * API tạo thanh toán thống nhất
+     * Hỗ trợ cả thanh toán đơn giản và thanh toán kèm đặt phòng
      */
     @PostMapping("/create")
-    public ResponseEntity<?> createPayment(@RequestBody Map<String, Object> paymentRequest) {
+    public ResponseEntity<?> createPayment(@RequestBody Map<String, Object> request) {
         try {
-            // Kiểm tra các tham số bắt buộc
-            if (paymentRequest.get("orderInfo") == null || 
-                paymentRequest.get("amount") == null || 
-                paymentRequest.get("ipAddress") == null || 
-                paymentRequest.get("returnUrl") == null) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Thiếu thông tin thanh toán cần thiết"
-                ));
+            // Kiểm tra xem request có phải là thanh toán đặt phòng không
+            if (request.containsKey("checkInDate") && request.containsKey("checkOutDate") && request.containsKey("rooms")) {
+                // Xử lý tạo booking và thanh toán
+                return createBookingPayment(request);
+            } else {
+                // Xử lý thanh toán đơn giản
+                return createSimplePayment(request);
             }
-            
-            // Lấy thông tin từ request body
-            String orderInfo = (String) paymentRequest.get("orderInfo");
-            Long amount = Long.parseLong(paymentRequest.get("amount").toString());
-            String ipAddress = (String) paymentRequest.get("ipAddress");
-            String returnUrl = (String) paymentRequest.get("returnUrl");
-            
-            // Lấy bookingId nếu có
-            Integer bookingId = null;
-            if (paymentRequest.containsKey("bookingId") && paymentRequest.get("bookingId") != null) {
-                bookingId = Integer.parseInt(paymentRequest.get("bookingId").toString());
-            }
-
-            // Tạo payment
-            PaymentResponse paymentResponse = vnPayService.createPayment(
-                orderInfo,
-                amount,
-                ipAddress,
-                returnUrl,
-                bookingId
-            );
-
-            return ResponseEntity.ok(paymentResponse);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
+            log.error("Lỗi khi tạo thanh toán: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "success", false,
                 "message", "Không thể tạo thanh toán: " + e.getMessage()
             ));
@@ -95,142 +77,289 @@ public class PaymentController {
     }
     
     /**
-     * API tạo đặt phòng và thanh toán kết hợp - kiểm tra phòng và tạo đơn hàng cùng với thanh toán
+     * Phương thức xử lý thanh toán đơn giản
      */
-    @PostMapping("/create-booking-payment")
-    public ResponseEntity<?> createBookingPayment(@RequestBody Map<String, Object> request) {
-        try {
-            String ipAddress = request.getOrDefault("ipAddress", "").toString();
-            String returnUrl = request.getOrDefault("returnUrl", "").toString();
-            
-            // Kiểm tra các tham số đầu vào
-            if (request.get("userId") == null || 
-                request.get("checkInDate") == null || 
-                request.get("checkOutDate") == null || 
-                request.get("roomIds") == null) {
-                
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Thiếu thông tin đặt phòng cần thiết"
-                ));
-            }
-            
-            // Lấy thông tin từ request
-            Integer userId = Integer.parseInt(request.get("userId").toString());
-            LocalDate checkInDate = LocalDate.parse(request.get("checkInDate").toString(), dateFormatter);
-            LocalDate checkOutDate = LocalDate.parse(request.get("checkOutDate").toString(), dateFormatter);
-            
-            @SuppressWarnings("unchecked")
-            List<Integer> roomIds = (List<Integer>) request.get("roomIds");
-            
-            String fullName = request.getOrDefault("fullName", "").toString();
-            String nationalId = request.getOrDefault("nationalId", "").toString();
-            String email = request.getOrDefault("email", "").toString();
-            String phone = request.getOrDefault("phone", "").toString();
-            String notes = request.getOrDefault("notes", "").toString();
-            
-            Integer discountId = null;
-            if (request.get("discountId") != null) {
-                discountId = Integer.parseInt(request.get("discountId").toString());
-            }
-            
-            // Xác nhận người dùng tồn tại
-            User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
-            
-            // Kiểm tra xem có phòng nào đã được đặt trong khoảng thời gian này không
-            List<Room> rooms = roomRepository.findAllById(roomIds);
-            
-            if (rooms.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Không tìm thấy phòng nào với ID đã chọn"
-                ));
-            }
-            
-            // Tạo booking trước khi tính toán chi tiết
-            Booking booking = new Booking();
-            booking.setUser(user);
-            booking.setCheckInDate(checkInDate);
-            booking.setCheckOutDate(checkOutDate);
-            booking.setStatus("PENDING");
-            
-            // Tính tổng tiền
-            long days = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
-            if (days <= 0) days = 1;
-            
-            double totalPrice = 0;
-            
-            // Tạo booking details
-            List<BookingDetail> bookingDetails = new ArrayList<>();
-            for (Room room : rooms) {
-                BookingDetail detail = new BookingDetail();
-                detail.setBooking(booking);
-                detail.setRoom(room);
-                detail.setPricePerNight(room.getRoomType().getPricePerNight());
-                
-                double roomPrice = room.getRoomType().getPricePerNight() * days;
-                detail.setPrice(roomPrice);
-                
-                totalPrice += roomPrice;
-                bookingDetails.add(detail);
-            }
-            
-            // Áp dụng giảm giá nếu có
-            if (discountId != null) {
-                Optional<Discount> discountOpt = discountRepository.findById(discountId);
-                if (discountOpt.isPresent()) {
-                    Discount discount = discountOpt.get();
-                    booking.setDiscount(discount);
-                    
-                    if ("PERCENT".equals(discount.getDiscountType())) {
-                        double discountAmount = totalPrice * discount.getDiscountValue() / 100;
-                        totalPrice -= discountAmount;
-                    } else if ("FIXED".equals(discount.getDiscountType())) {
-                        totalPrice -= discount.getDiscountValue();
-                    }
-                    
-                    if (totalPrice < 0) totalPrice = 0;
-                }
-            }
-            
-            booking.setTotalPrice(totalPrice);
-            booking.setFinalPrice(totalPrice);
-            
-            // Lưu booking và các chi tiết booking
-            booking = bookingRepository.save(booking);
-            
-            // Tạo payment
-            PaymentResponse paymentResponse = vnPayService.createPayment(
-                "Thanh toán đặt phòng #" + booking.getId(),
-                (long) (totalPrice * 100), // Đổi sang đơn vị xu
-                ipAddress,
-                returnUrl,
-                booking.getId()
-            );
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "booking", booking,
-                "payment", paymentResponse
-            ));
-        } catch (Exception e) {
+    private ResponseEntity<?> createSimplePayment(Map<String, Object> paymentRequest) {
+        // Kiểm tra các tham số bắt buộc cho thanh toán cơ bản
+        if (paymentRequest.get("orderInfo") == null || 
+            paymentRequest.get("amount") == null || 
+            paymentRequest.get("ipAddress") == null || 
+            paymentRequest.get("returnUrl") == null) {
             return ResponseEntity.badRequest().body(Map.of(
                 "success", false,
-                "message", "Lỗi khi tạo đặt phòng và thanh toán: " + e.getMessage()
+                "message", "Thiếu thông tin thanh toán cần thiết"
             ));
         }
+        
+        // Lấy thông tin từ request body
+        String orderInfo = (String) paymentRequest.get("orderInfo");
+        Long amount = Long.parseLong(paymentRequest.get("amount").toString());
+        String ipAddress = (String) paymentRequest.get("ipAddress");
+        String returnUrl = (String) paymentRequest.get("returnUrl");
+        
+        // Lấy bookingId nếu có
+        Integer bookingId = null;
+        if (paymentRequest.containsKey("bookingId") && paymentRequest.get("bookingId") != null) {
+            bookingId = Integer.parseInt(paymentRequest.get("bookingId").toString());
+        }
+
+        // Tạo payment
+        PaymentResponse paymentResponse = vnPayService.createPayment(
+            orderInfo,
+            amount,
+            ipAddress,
+            returnUrl,
+            bookingId
+        );
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Tạo thanh toán thành công",
+            "data", paymentResponse
+        ));
+    }
+    
+    /**
+     * Phương thức xử lý thanh toán kết hợp với đặt phòng
+     */
+    private ResponseEntity<?> createBookingPayment(Map<String, Object> request) {
+        String ipAddress = request.getOrDefault("ipAddress", "127.0.0.1").toString();
+        String returnUrl = request.getOrDefault("returnUrl", "http://localhost:5173/payment-callback").toString();
+        
+        // Kiểm tra các tham số đầu vào
+        if (request.get("userId") == null || 
+            request.get("checkInDate") == null || 
+            request.get("checkOutDate") == null || 
+            request.get("rooms") == null) {
+            
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Thiếu thông tin đặt phòng cần thiết"
+            ));
+        }
+        
+        // Lấy thông tin từ request
+        Integer userId = Integer.parseInt(request.get("userId").toString());
+        LocalDate checkInDate = LocalDate.parse(request.get("checkInDate").toString(), dateFormatter);
+        LocalDate checkOutDate = LocalDate.parse(request.get("checkOutDate").toString(), dateFormatter);
+        
+        // Lấy danh sách phòng với serviceIds, adults, children từ request
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> roomsData = (List<Map<String, Object>>) request.get("rooms");
+        
+        if (roomsData.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Danh sách phòng không được để trống"
+            ));
+        }
+        
+        // Lấy roomIds từ danh sách phòng
+        List<Integer> roomIds = roomsData.stream()
+                .map(room -> Integer.parseInt(room.get("roomId").toString()))
+                .collect(Collectors.toList());
+        
+        // Lấy thông tin khách hàng
+        String fullName = request.getOrDefault("fullName", "").toString();
+        String nationalId = request.getOrDefault("nationalId", "").toString();
+        String email = request.getOrDefault("email", "").toString();
+        String phone = request.getOrDefault("phone", "").toString();
+        String notes = request.getOrDefault("notes", "").toString();
+        
+        // Lấy thông tin giảm giá
+        Integer discountId = null;
+        if (request.get("discountId") != null) {
+            discountId = Integer.parseInt(request.get("discountId").toString());
+        }
+        
+        // Xác nhận người dùng tồn tại
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+        
+        // Kiểm tra xem có phòng nào đã được đặt trong khoảng thời gian này không
+        List<Room> rooms = roomRepository.findAllById(roomIds);
+        
+        if (rooms.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Không tìm thấy phòng nào với ID đã chọn"
+            ));
+        }
+        
+        // Tạo booking trước khi tính toán chi tiết
+        Booking booking = new Booking();
+        booking.setUser(user);
+        booking.setCheckInDate(checkInDate);
+        booking.setCheckOutDate(checkOutDate);
+        booking.setStatus("PENDING");
+        booking.setNotes(notes);
+        
+        if (!fullName.isEmpty()) booking.setCustomerName(fullName);
+        if (!phone.isEmpty()) booking.setCustomerPhone(phone);
+        if (!email.isEmpty()) booking.setCustomerEmail(email);
+        if (!nationalId.isEmpty()) booking.setCustomerIdentity(nationalId);
+        
+        // Tính tổng tiền
+        long days = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
+        if (days <= 0) days = 1;
+        
+        double totalPrice = 0;
+        
+        // Tạo booking details
+        List<BookingDetail> bookingDetails = new ArrayList<>();
+        
+        // Dùng Map để lưu dữ liệu phòng theo roomId
+        Map<Integer, Map<String, Object>> roomDataMap = new HashMap<>();
+        for (Map<String, Object> roomData : roomsData) {
+            Integer roomId = Integer.parseInt(roomData.get("roomId").toString());
+            roomDataMap.put(roomId, roomData);
+        }
+        
+        for (Room room : rooms) {
+            BookingDetail detail = new BookingDetail();
+            detail.setBooking(booking);
+            detail.setRoom(room);
+            detail.setPricePerNight(room.getRoomType().getPricePerNight());
+            
+            // Lấy thông tin adults và children từ roomDataMap
+            Map<String, Object> roomData = roomDataMap.get(room.getId());
+            if (roomData.containsKey("adults")) {
+                detail.setAdults(Integer.parseInt(roomData.get("adults").toString()));
+            }
+            if (roomData.containsKey("children")) {
+                detail.setChildren(Integer.parseInt(roomData.get("children").toString()));
+            }
+            
+            double roomPrice = room.getRoomType().getPricePerNight() * days;
+            detail.setPrice(roomPrice);
+            
+            totalPrice += roomPrice;
+            bookingDetails.add(detail);
+            
+            // Thêm dịch vụ cho từng phòng nếu có
+            if (roomData.containsKey("serviceIds")) {
+                @SuppressWarnings("unchecked")
+                List<Integer> serviceIds = (List<Integer>) roomData.get("serviceIds");
+                
+                if (serviceIds != null && !serviceIds.isEmpty()) {
+                    List<HotelService> services = serviceRepository.findAllById(serviceIds);
+                    
+                    if (detail.getBookingServices() == null) {
+                        detail.setBookingServices(new ArrayList<>());
+                    }
+                    
+                    for (HotelService service : services) {
+                        BookingService bookingService = new BookingService();
+                        bookingService.setDetail(detail);
+                        bookingService.setService(service);
+                        bookingService.setQuantity(1); // Mặc định số lượng là 1
+                        bookingService.setPrice(service.getPrice().doubleValue());
+                        bookingService.setTotalPrice(service.getPrice().doubleValue());
+                        
+                        detail.getBookingServices().add(bookingService);
+                        totalPrice += service.getPrice().doubleValue();
+                    }
+                }
+            }
+        }
+        
+        // Áp dụng giảm giá nếu có
+        if (discountId != null) {
+            Optional<Discount> discountOpt = discountRepository.findById(discountId);
+            if (discountOpt.isPresent()) {
+                Discount discount = discountOpt.get();
+                booking.setDiscount(discount);
+                
+                if ("PERCENT".equals(discount.getDiscountType())) {
+                    double discountAmount = totalPrice * discount.getDiscountValue() / 100;
+                    totalPrice -= discountAmount;
+                } else if ("FIXED".equals(discount.getDiscountType())) {
+                    totalPrice -= discount.getDiscountValue();
+                }
+                
+                if (totalPrice < 0) totalPrice = 0;
+            }
+        }
+        
+        booking.setTotalPrice(totalPrice);
+        booking.setFinalPrice(totalPrice);
+        booking.setBookingDetails(bookingDetails);
+        
+        // Lưu booking và các chi tiết booking
+        booking = bookingRepository.save(booking);
+        
+        // Tạo payment
+        PaymentResponse paymentResponse = vnPayService.createPayment(
+            "Thanh toán đặt phòng #" + booking.getId(),
+            (long) (totalPrice * 100), // Đổi sang đơn vị xu
+            ipAddress,
+            returnUrl,
+            booking.getId()
+        );
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "booking", booking,
+            "payment", paymentResponse
+        ));
     }
 
     /**
-     * Kiểm tra trạng thái thanh toán
+     * Kiểm tra và đồng bộ trạng thái thanh toán
      */
-    @GetMapping("/check-status/{transactionNo}")
-    public ResponseEntity<?> checkPaymentStatus(@PathVariable String transactionNo) {
+    @GetMapping("/status/{transactionNo}")
+    public ResponseEntity<?> getPaymentStatus(@PathVariable String transactionNo) {
         try {
-            Map<String, Object> result = vnPayService.checkPaymentStatus(transactionNo);
+            // Tìm payment theo transactionNo
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
+            
+            if (!paymentOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Không tìm thấy giao dịch với mã: " + transactionNo
+                ));
+            }
+            
+            Payment payment = paymentOpt.get();
+            
+            // Kiểm tra trạng thái thanh toán từ VNPay
+            Map<String, Object> statusResult = vnPayService.checkPaymentStatus(transactionNo);
+            String vnpStatus = (String) statusResult.getOrDefault("vnp_ResponseCode", "99");
+            
+            // Cập nhật trạng thái thanh toán nếu có thay đổi
+            if (!vnpStatus.equals(payment.getStatus())) {
+                payment.setStatus(vnpStatus);
+                payment.setResponseCode(vnpStatus);
+                payment = paymentRepository.save(payment);
+                
+                // Cập nhật booking nếu có và thanh toán thành công
+                if ("00".equals(vnpStatus) && payment.getBookingId() != null) {
+                    Booking booking = bookingRepository.findById(payment.getBookingId())
+                        .orElse(null);
+                    
+                    if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                        booking.setStatus("CONFIRMED");
+                        bookingRepository.save(booking);
+                        log.info("Đã cập nhật booking ID {} thành CONFIRMED", booking.getId());
+                    }
+                }
+            }
+            
+            Map<String, Object> result = new HashMap<>(statusResult);
+            result.put("success", true);
+            result.put("message", "Thông tin trạng thái thanh toán");
+            result.put("payment", payment);
+            
+            if (payment.getBookingId() != null) {
+                result.put("bookingId", payment.getBookingId());
+                result.put("bookingStatus", bookingRepository.findById(payment.getBookingId())
+                        .map(Booking::getStatus)
+                        .orElse("UNKNOWN"));
+            }
+            
             return ResponseEntity.ok(result);
         } catch (Exception e) {
+            log.error("Lỗi khi kiểm tra trạng thái thanh toán: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of(
                 "success", false,
                 "message", "Lỗi khi kiểm tra trạng thái thanh toán: " + e.getMessage()
@@ -259,74 +388,15 @@ public class PaymentController {
             Payment payment = paymentRepository.findByTransactionNo(transactionNo)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch: " + transactionNo));
             
-            // Kiểm tra nếu không có ResponseCode, thì lấy từ API check status
-            if (!queryParams.containsKey("vnp_ResponseCode")) {
-                Map<String, Object> statusResult = vnPayService.checkPaymentStatus(transactionNo);
-                
-                // Tạo URL với tất cả các thông tin có sẵn
-                StringBuilder redirectUrl = new StringBuilder(frontendCallbackUrl + "?vnp_TxnRef=" + transactionNo);
-                
-                // Thêm tất cả thông tin vào URL
-                for (Map.Entry<String, Object> entry : statusResult.entrySet()) {
-                    String key = entry.getKey();
-                    Object value = entry.getValue();
-                    if (value != null) {
-                        String strValue = value.toString();
-                        if (value instanceof String) {
-                            strValue = URLEncoder.encode(strValue, StandardCharsets.UTF_8);
-                        }
-                        redirectUrl.append("&").append(key).append("=").append(strValue);
-                    }
-                }
-                
-                HttpHeaders headers = new HttpHeaders();
-                headers.setLocation(URI.create(redirectUrl.toString()));
-                return new ResponseEntity<>(headers, HttpStatus.FOUND);
-            }
-            
             // Xử lý callback từ VNPay
             Map<String, Object> result = vnPayService.processPaymentCallback(queryParams);
             
-            // Tạo URL với tất cả các thông tin từ kết quả
-            StringBuilder redirectUrl = new StringBuilder(frontendCallbackUrl + "?vnp_TxnRef=" + transactionNo);
-            
-            // Thêm tất cả thông tin vào URL
-            for (Map.Entry<String, Object> entry : result.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-                if (value != null) {
-                    String strValue = value.toString();
-                    // Bỏ qua các trường vnp_ nếu chúng đã có trong tên
-                    if (!key.startsWith("vnp_") || !result.containsKey(key.substring(4))) {
-                        if (value instanceof String) {
-                            strValue = URLEncoder.encode(strValue, StandardCharsets.UTF_8);
-                        }
-                        redirectUrl.append("&").append(key).append("=").append(strValue);
-                    }
-                }
-            }
-            
-            // Đảm bảo có các trường cần thiết
-            if (!result.containsKey("success") && result.containsKey("vnp_ResponseCode")) {
-                redirectUrl.append("&success=").append("00".equals(result.get("vnp_ResponseCode")));
-            }
-            
-            if (!result.containsKey("pending") && result.containsKey("vnp_ResponseCode")) {
-                String responseCode = (String) result.get("vnp_ResponseCode");
-                boolean pending = "01".equals(responseCode) || "04".equals(responseCode) || 
-                        "05".equals(responseCode) || "06".equals(responseCode);
-                redirectUrl.append("&pending=").append(pending);
-            }
-            
-            if (!result.containsKey("message") && result.containsKey("vnp_ResponseCode")) {
-                String message = result.get("vnp_ResponseCode").equals("00") ? 
-                    "Giao dịch thanh toán thành công" : "Giao dịch chưa hoàn tất";
-                redirectUrl.append("&message=").append(URLEncoder.encode(message, StandardCharsets.UTF_8));
-            }
+            // Tạo URL redirect với các thông tin cần thiết
+            String redirectUrl = buildRedirectUrl(frontendCallbackUrl, transactionNo, result);
             
             // Redirect về frontend
             HttpHeaders headers = new HttpHeaders();
-            headers.setLocation(URI.create(redirectUrl.toString()));
+            headers.setLocation(URI.create(redirectUrl));
             return new ResponseEntity<>(headers, HttpStatus.FOUND);
         } catch (Exception e) {
             e.printStackTrace();
@@ -338,6 +408,49 @@ public class PaymentController {
             headers.setLocation(URI.create(redirectUrl));
             return new ResponseEntity<>(headers, HttpStatus.FOUND);
         }
+    }
+
+    /**
+     * Tạo URL redirect cho callback
+     */
+    private String buildRedirectUrl(String baseUrl, String transactionNo, Map<String, Object> data) {
+        StringBuilder redirectUrl = new StringBuilder(baseUrl + "?vnp_TxnRef=" + transactionNo);
+        
+        // Thêm tất cả thông tin vào URL
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value != null) {
+                String strValue = value.toString();
+                // Bỏ qua các trường vnp_ nếu chúng đã có trong tên
+                if (!key.startsWith("vnp_") || !data.containsKey(key.substring(4))) {
+                    if (value instanceof String) {
+                        strValue = URLEncoder.encode(strValue, StandardCharsets.UTF_8);
+                    }
+                    redirectUrl.append("&").append(key).append("=").append(strValue);
+                }
+            }
+        }
+        
+        // Đảm bảo có các trường cần thiết
+        if (!data.containsKey("success") && data.containsKey("vnp_ResponseCode")) {
+            redirectUrl.append("&success=").append("00".equals(data.get("vnp_ResponseCode")));
+        }
+        
+        if (!data.containsKey("pending") && data.containsKey("vnp_ResponseCode")) {
+            String responseCode = (String) data.get("vnp_ResponseCode");
+            boolean pending = "01".equals(responseCode) || "04".equals(responseCode) || 
+                    "05".equals(responseCode) || "06".equals(responseCode);
+            redirectUrl.append("&pending=").append(pending);
+        }
+        
+        if (!data.containsKey("message") && data.containsKey("vnp_ResponseCode")) {
+            String message = data.get("vnp_ResponseCode").equals("00") ? 
+                "Giao dịch thanh toán thành công" : "Giao dịch chưa hoàn tất";
+            redirectUrl.append("&message=").append(URLEncoder.encode(message, StandardCharsets.UTF_8));
+        }
+        
+        return redirectUrl.toString();
     }
 
     /**
@@ -404,71 +517,6 @@ public class PaymentController {
                 "success", false,
                 "message", "Lỗi khi cập nhật trạng thái thanh toán: " + e.getMessage()
             ));
-        }
-    }
-
-    /**
-     * Đồng bộ trạng thái thanh toán với cổng VNPAY
-     */
-    @GetMapping("/sync-status/{transactionNo}")
-    public ResponseEntity<?> syncPaymentStatus(@PathVariable String transactionNo) {
-        try {
-            log.info("API sync-status được gọi với transactionNo: {}", transactionNo);
-            
-            // Tìm payment theo transactionNo
-            Optional<Payment> paymentOpt = paymentRepository.findByTransactionNo(transactionNo);
-            
-            if (!paymentOpt.isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Không tìm thấy giao dịch với mã: " + transactionNo
-                ));
-            }
-            
-            Payment payment = paymentOpt.get();
-            
-            // Kiểm tra trạng thái thanh toán từ VNPay
-            Map<String, Object> statusResult = vnPayService.checkPaymentStatus(transactionNo);
-            String vnpStatus = (String) statusResult.getOrDefault("vnp_ResponseCode", "99");
-            
-            // Cập nhật trạng thái thanh toán
-            payment.setStatus(vnpStatus);
-            payment.setResponseCode(vnpStatus);
-            payment = paymentRepository.save(payment);
-            
-            // Cập nhật booking nếu có và thanh toán thành công
-            if ("00".equals(vnpStatus) && payment.getBookingId() != null) {
-                Booking booking = bookingRepository.findById(payment.getBookingId())
-                    .orElse(null);
-                
-                if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
-                booking.setStatus("CONFIRMED");
-                bookingRepository.save(booking);
-                    log.info("Đã cập nhật booking ID {} thành CONFIRMED", booking.getId());
-                }
-            }
-            
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", true);
-            result.put("message", "Đã đồng bộ trạng thái thanh toán và booking");
-            result.put("transactionNo", transactionNo);
-            result.put("payment_status", payment.getStatus());
-            
-            if (payment.getBookingId() != null) {
-                result.put("bookingId", payment.getBookingId());
-                result.put("booking_status", "00".equals(vnpStatus) ? "CONFIRMED" : "PENDING");
-            }
-            
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("Lỗi trong API sync-status: {}", e.getMessage(), e);
-            
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("success", false);
-            errorResult.put("message", "Không thể đồng bộ trạng thái: " + e.getMessage());
-            errorResult.put("transactionNo", transactionNo);
-            
-            return ResponseEntity.badRequest().body(errorResult);
         }
     }
 
@@ -597,4 +645,4 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(errorResult);
         }
     }
-} 
+}

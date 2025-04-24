@@ -6,6 +6,8 @@ import lombok.*;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Data
@@ -16,7 +18,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Table(name = "ROOM_TYPES")
-public class RoomType {
+public class RoomType extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,17 +58,19 @@ public class RoomType {
     @Column(nullable = false)
     private Boolean isActive = true;
     
-    @Column(name = "amenities", columnDefinition = "TEXT")
-    private String amenities;
+    @ElementCollection
+    @CollectionTable(name = "room_type_amenities", joinColumns = @JoinColumn(name = "room_type_id"))
+    @Column(name = "amenity")
+    private List<String> amenities = new ArrayList<>();
     
-    @Column(name = "created_at")
-    private LocalDate createdAt;
+    @Transient
+    public String getAmenitiesAsString() {
+        if (amenities == null || amenities.isEmpty()) return "";
+        return String.join(",", amenities);
+    }
     
     @PrePersist
     public void prePersist() {
-        if (this.createdAt == null) {
-            this.createdAt = LocalDate.now();
-        }
         if (this.isActive == null) {
             this.isActive = true;
         }

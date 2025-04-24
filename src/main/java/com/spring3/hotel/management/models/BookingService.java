@@ -10,6 +10,7 @@ import lombok.*;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @Table(name = "BOOKING_SERVICES")
 public class BookingService {
     @Id
@@ -17,15 +18,18 @@ public class BookingService {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "booking_id")
-    private Booking booking;
+    @JoinColumn(name = "booking_detail_id")
+    private BookingDetail detail;
 
     @ManyToOne
     @JoinColumn(name = "service_id")
-    private Offering offering;
+    private HotelService service;
 
     @Column(name = "quantity")
     private int quantity;
+    
+    @Column(name = "price")
+    private double price;
 
     @Column(name = "total_price")
     private double totalPrice;

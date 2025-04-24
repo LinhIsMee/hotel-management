@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.services.interfaces;
+package com.spring3.hotel.management.services;
 
 import com.spring3.hotel.management.dto.request.UpsertRoomTypeRequest;
 import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;

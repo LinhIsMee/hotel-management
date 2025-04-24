@@ -15,8 +15,12 @@ import com.spring3.hotel.management.services.EmployeeService;
 
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Controller quản lý các trang giao diện quản trị
+ * Lưu ý: Controller này trả về các view template, không phải API REST
+ */
 @Controller
-@RequestMapping("/admin")
+@RequestMapping("/api/v1/admin")
 @Slf4j
 public class AdminController {
     
@@ -25,6 +29,7 @@ public class AdminController {
     
     /**
      * Hiển thị trang quản lý nhân viên
+     * Trang này hiển thị danh sách nhân viên và các tùy chọn lọc
      */
     @GetMapping("/employees")
     public String employeesPage(Model model) {
@@ -40,4 +45,4 @@ public class AdminController {
             return "admin/error";
         }
     }
-} 
+}

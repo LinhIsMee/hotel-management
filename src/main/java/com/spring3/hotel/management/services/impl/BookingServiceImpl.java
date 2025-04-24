@@ -130,9 +130,9 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<BookingResponseDTO> getAllBookings() {
-        List<Booking> bookings = bookingRepository.findAll();
+        List<Booking> bookings = bookingRepository.findAllWithDetailsNoPage();
         return bookings.stream()
-                .map(booking -> getBookingById(booking.getId()))
+                .map(this::convertToBookingResponseDTO)
                 .collect(Collectors.toList());
     }
 
@@ -1364,13 +1364,5 @@ public class BookingServiceImpl implements BookingService {
         
         // Xóa booking
         bookingRepository.delete(booking);
-    }
-
-    @Override
-    public List<BookingResponseDTO> getAllBookingsNoPage() {
-        List<Booking> bookings = bookingRepository.findAll();
-        return bookings.stream()
-                .map(this::convertToBookingResponseDTO)
-                .collect(Collectors.toList());
     }
 }

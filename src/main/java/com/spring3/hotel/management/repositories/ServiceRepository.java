@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.repositories;
 
-import com.spring3.hotel.management.enums.ServiceType;
 import com.spring3.hotel.management.models.HotelService;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -14,7 +13,7 @@ public interface ServiceRepository extends JpaRepository<HotelService, Integer> 
     
     Optional<HotelService> findByCode(String code);
     
-    List<HotelService> findByType(ServiceType type);
+    List<HotelService> findByType(String type);
     
     List<HotelService> findByNameContainingIgnoreCase(String name);
     

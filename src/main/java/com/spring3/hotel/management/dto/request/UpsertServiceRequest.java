@@ -1,6 +1,5 @@
 package com.spring3.hotel.management.dto.request;
 
-import com.spring3.hotel.management.enums.ServiceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -23,8 +22,8 @@ public class UpsertServiceRequest {
     @NotBlank(message = "Mã dịch vụ không được để trống")
     private String code;
     
-    @NotNull(message = "Loại dịch vụ không được để trống")
-    private ServiceType type;
+    @NotBlank(message = "Loại dịch vụ không được để trống")
+    private String type;
     
     private String description;
     
@@ -35,4 +34,7 @@ public class UpsertServiceRequest {
     private Boolean isAvailable;
     
     private String imageUrl;
+    
+    @NotBlank(message = "Đơn vị không được để trống")
+    private String unit;
 } 

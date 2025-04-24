@@ -1,6 +1,9 @@
 package com.spring3.hotel.management.services.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.spring3.hotel.management.dto.request.AssignRoomRequest;
+import com.spring3.hotel.management.dto.request.CreateRoomRequest;
+import com.spring3.hotel.management.dto.request.UpdateRoomRequest;
 import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.dto.response.RoomResponseDTO;
 import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
@@ -14,10 +17,15 @@ import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
 import com.spring3.hotel.management.repositories.ServiceRepository;
+import com.spring3.hotel.management.services.RoomService;
 import com.spring3.hotel.management.repositories.BookingDetailRepository;
-import com.spring3.hotel.management.services.interfaces.RoomService;
+
 import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -46,11 +54,24 @@ public class RoomServiceImpl implements RoomService {
     @Autowired
     private ObjectMapper objectMapper;
     
+    @Autowired
+    private ModelMapper modelMapper;
+    
     @Override
     public List<RoomResponseDTO> getAllRooms() {
         return roomRepository.findAll().stream()
                 .map(this::mapRoomToDTO)
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public Page<RoomResponseDTO> getAllRooms(Pageable pageable) {
+        Page<Room> roomPage = roomRepository.findAll(pageable);
+        List<RoomResponseDTO> roomDTOs = roomPage.getContent().stream()
+                .map(this::mapRoomToDTO)
+                .collect(Collectors.toList());
+                
+        return new PageImpl<>(roomDTOs, pageable, roomPage.getTotalElements());
     }
     
     @Override
@@ -76,6 +97,14 @@ public class RoomServiceImpl implements RoomService {
     }
     
     @Override
+    public List<RoomResponseDTO> getRoomsByType(Integer roomTypeId) {
+        return roomRepository.findByRoomTypeId(roomTypeId)
+                .stream()
+                .map(this::mapRoomToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
     public List<RoomResponseDTO> getRoomsByStatus(String status) {
         return roomRepository.findByStatus(status).stream()
                 .map(this::mapRoomToDTO)
@@ -83,7 +112,7 @@ public class RoomServiceImpl implements RoomService {
     }
     
     @Override
-    public RoomResponseDTO createRoom(UpsertRoomRequest request) {
+    public RoomResponseDTO createRoom(CreateRoomRequest request) {
         // Kiểm tra phòng đã tồn tại chưa
         if (roomRepository.findByRoomNumber(request.getRoomNumber()).isPresent()) {
             throw new IllegalArgumentException("Số phòng đã tồn tại: " + request.getRoomNumber());
@@ -112,6 +141,44 @@ public class RoomServiceImpl implements RoomService {
         
         Room savedRoom = roomRepository.save(room);
         return mapRoomToDTO(savedRoom);
+    }
+    
+    @Override
+    public RoomResponseDTO updateRoom(Integer id, UpdateRoomRequest request) {
+        Room existingRoom = roomRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phòng với ID: " + id));
+        
+        // Kiểm tra nếu số phòng thay đổi và số phòng mới đã tồn tại
+        if (!existingRoom.getRoomNumber().equals(request.getRoomNumber()) &&
+                roomRepository.findByRoomNumber(request.getRoomNumber()).isPresent()) {
+            throw new IllegalArgumentException("Số phòng đã tồn tại: " + request.getRoomNumber());
+        }
+        
+        // Lấy loại phòng
+        RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại phòng với ID: " + request.getRoomTypeId()));
+        
+        // Cập nhật thông tin
+        existingRoom.setRoomNumber(request.getRoomNumber());
+        existingRoom.setRoomType(roomType);
+        existingRoom.setStatus(request.getStatus());
+        existingRoom.setFloor(request.getFloor());
+        existingRoom.setIsActive(request.getIsActive());
+        existingRoom.setNotes(request.getNotes());
+        
+        // Cập nhật dịch vụ nếu có
+        if (request.getServiceIds() != null) {
+            List<HotelService> services = serviceRepository.findAllById(request.getServiceIds());
+            existingRoom.setServices(services);
+        }
+        
+        // Cập nhật hình ảnh nếu có
+        if (request.getImages() != null) {
+            existingRoom.setImages(request.getImages());
+        }
+        
+        Room updatedRoom = roomRepository.save(existingRoom);
+        return mapRoomToDTO(updatedRoom);
     }
     
     @Override
@@ -167,9 +234,30 @@ public class RoomServiceImpl implements RoomService {
     
     @Override
     public List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate) {
+        return getAvailableRooms(checkInDate, checkOutDate, null, null);
+    }
+    
+    @Override
+    public List<RoomResponseDTO> getAvailableRooms(LocalDate checkInDate, LocalDate checkOutDate, Integer roomTypeId, Integer guestCount) {
         // Lấy danh sách tất cả phòng
         List<Room> allRooms = roomRepository.findAll();
         log.info("Tìm thấy tổng cộng {} phòng trong hệ thống", allRooms.size());
+        
+        // Lọc theo loại phòng nếu có
+        if (roomTypeId != null) {
+            allRooms = allRooms.stream()
+                    .filter(room -> room.getRoomType().getId().equals(roomTypeId))
+                    .collect(Collectors.toList());
+            log.info("Sau khi lọc theo loại phòng {}, còn lại {} phòng", roomTypeId, allRooms.size());
+        }
+        
+        // Lọc theo số lượng khách nếu có
+        if (guestCount != null && guestCount > 0) {
+            allRooms = allRooms.stream()
+                    .filter(room -> room.getRoomType().getMaxOccupancy() >= guestCount)
+                    .collect(Collectors.toList());
+            log.info("Sau khi lọc theo số lượng khách {}, còn lại {} phòng", guestCount, allRooms.size());
+        }
         
         // Lấy danh sách phòng đã được đặt trong khoảng thời gian
         List<Room> bookedRooms = roomRepository.findBookedRoomsBetweenDates(checkInDate, checkOutDate);
@@ -197,30 +285,7 @@ public class RoomServiceImpl implements RoomService {
         return availableRooms.stream()
                 .map(room -> {
                     RoomResponseDTO dto = mapRoomToDTO(room);
-                    
-                    // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
-                    LocalDate today = LocalDate.now();
-                    LocalDate fiveDaysLater = today.plusDays(5);
-                    List<Room> nextFiveDaysBookings = roomRepository.findBookedRoomsBetweenDates(today, fiveDaysLater);
-                    boolean isBooked = nextFiveDaysBookings.contains(room);
-                    dto.setIsBookedNextFiveDays(isBooked);
-                    
-                    // Thêm thông tin về các khoảng thời gian đã đặt
-                    if (isBooked) {
-                        List<BookingPeriodDTO> bookingPeriods = bookingDetailRepository.findByRoomIdAndDateRange(
-                                room.getId(), today, fiveDaysLater)
-                                .stream()
-                                .map(detail -> {
-                                    Booking booking = detail.getBooking();
-                                    return BookingPeriodDTO.builder()
-                                            .checkInDate(booking.getCheckInDate())
-                                            .checkOutDate(booking.getCheckOutDate())
-                                            .build();
-                                })
-                                .collect(Collectors.toList());
-                        dto.setBookingPeriods(bookingPeriods);
-                    }
-                    
+                    enrichWithBookingData(dto, room);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -228,41 +293,14 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public List<RoomResponseDTO> getAllActiveRooms() {
-        // Lấy ngày hiện tại và 5 ngày tới
-        LocalDate today = LocalDate.now();
-        LocalDate fiveDaysLater = today.plusDays(5);
-        
         // Lấy danh sách phòng đang hoạt động
         List<Room> activeRooms = roomRepository.findByIsActiveTrue();
-        
-        // Lấy danh sách phòng đã đặt trong 5 ngày tới
-        List<Room> bookedRooms = roomRepository.findBookedRoomsBetweenDates(today, fiveDaysLater);
         
         // Chuyển đổi sang DTO với thông tin đặt phòng
         return activeRooms.stream()
                 .map(room -> {
                     RoomResponseDTO dto = mapRoomToDTO(room);
-                    
-                    // Kiểm tra xem phòng có được đặt trong 5 ngày tới không
-                    boolean isBooked = bookedRooms.contains(room);
-                    dto.setIsBookedNextFiveDays(isBooked);
-                    
-                    // Thêm thông tin về các khoảng thời gian đã đặt
-                    if (isBooked) {
-                        List<BookingPeriodDTO> bookingPeriods = bookingDetailRepository.findByRoomIdAndDateRange(
-                                room.getId(), today, fiveDaysLater)
-                                .stream()
-                                .map(detail -> {
-                                    Booking booking = detail.getBooking();
-                                    return BookingPeriodDTO.builder()
-                                            .checkInDate(booking.getCheckInDate())
-                                            .checkOutDate(booking.getCheckOutDate())
-                                            .build();
-                                })
-                                .collect(Collectors.toList());
-                        dto.setBookingPeriods(bookingPeriods);
-                    }
-                    
+                    enrichWithBookingData(dto, room);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -329,25 +367,59 @@ public class RoomServiceImpl implements RoomService {
         return featuredRooms;
     }
     
-    // Phương thức mới để map Room sang RoomResponseDTO
+    @Override
+    public void assignRoom(AssignRoomRequest request) {
+        // Triển khai phương thức để gán phòng cho đặt phòng
+        log.info("Gán phòng {} cho đặt phòng {}", request.getRoomId(), request.getBookingId());
+        
+        // Thực hiện logic gán phòng ở đây
+        // ...
+    }
+    
+    // Phương thức để thêm thông tin booking vào DTO
+    private void enrichWithBookingData(RoomResponseDTO dto, Room room) {
+        LocalDate today = LocalDate.now();
+        LocalDate fiveDaysLater = today.plusDays(5);
+        
+        List<Room> nextFiveDaysBookings = roomRepository.findBookedRoomsBetweenDates(today, fiveDaysLater);
+        boolean isBooked = nextFiveDaysBookings.contains(room);
+        dto.setIsBookedNextFiveDays(isBooked);
+        
+        // Thêm thông tin về các khoảng thời gian đã đặt
+        if (isBooked) {
+            List<BookingPeriodDTO> bookingPeriods = bookingDetailRepository.findByRoomIdAndDateRange(
+                    room.getId(), today, fiveDaysLater)
+                    .stream()
+                    .map(detail -> {
+                        Booking booking = detail.getBooking();
+                        return BookingPeriodDTO.builder()
+                                .checkInDate(booking.getCheckInDate())
+                                .checkOutDate(booking.getCheckOutDate())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+            dto.setBookingPeriods(bookingPeriods);
+        }
+    }
+    
+    // Phương thức tối ưu để map Room sang RoomResponseDTO
     private RoomResponseDTO mapRoomToDTO(Room room) {
         if (room == null) return null;
         
-        RoomResponseDTO dto = new RoomResponseDTO();
-        dto.setId(room.getId());
-        dto.setRoomNumber(room.getRoomNumber());
-        dto.setFloor(room.getFloor());
-        dto.setStatus(room.getStatus());
-        dto.setIsActive(room.getIsActive());
-        dto.setNotes(room.getNotes());
-        dto.setImages(room.getImages());
+        // Sử dụng ModelMapper để map các trường cơ bản
+        RoomResponseDTO dto = modelMapper.map(room, RoomResponseDTO.class);
         
-        // Thông tin loại phòng
+        // Thêm thông tin loại phòng cụ thể
         if (room.getRoomType() != null) {
             dto.setRoomTypeId(room.getRoomType().getId());
             dto.setRoomTypeName(room.getRoomType().getName());
             dto.setMaxOccupancy(room.getRoomType().getMaxOccupancy());
             dto.setPricePerNight(room.getRoomType().getPricePerNight());
+            
+            // Thêm tiện nghi (amenities) từ loại phòng
+            if (room.getRoomType().getAmenities() != null && !room.getRoomType().getAmenities().isEmpty()) {
+                dto.setAmenities(List.of(room.getRoomType().getAmenities().split(",")));
+            }
         }
         
         // Thông tin dịch vụ
@@ -365,9 +437,6 @@ public class RoomServiceImpl implements RoomService {
         }
         
         // Thông tin đánh giá
-        dto.setAverageRating(room.getAverageRating());
-        
-        // Tính tổng số đánh giá
         if (room.getRatings() != null) {
             dto.setTotalReviews(room.getRatings().size());
             dto.setRatingCount(room.getRatingCount());
