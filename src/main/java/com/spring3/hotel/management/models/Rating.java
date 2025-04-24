@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Rating {
+public class Rating extends Auditable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,13 +33,8 @@ public class Rating {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // Thời gian đánh giá
-    @Column(nullable = false)
-    private java.time.LocalDateTime createdAt;
-
     @PrePersist
     protected void onCreate() {
-        createdAt = java.time.LocalDateTime.now();
         if (room != null) {
             room.updateAverageRating(this.stars);
         }

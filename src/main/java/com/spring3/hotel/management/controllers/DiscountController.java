@@ -1,11 +1,13 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dto.DiscountDTO;
-import com.spring3.hotel.management.dto.GenerateDiscountRequest;
+import com.spring3.hotel.management.dto.response.DiscountDTO;
+import com.spring3.hotel.management.dto.request.GenerateDiscountRequest;
+import com.spring3.hotel.management.dto.request.UpsertDiscountRequest;
 import com.spring3.hotel.management.dto.response.ApiResponse;
 import com.spring3.hotel.management.exceptions.DiscountExpiredException;
 import com.spring3.hotel.management.exceptions.DiscountNotFoundException;
 import com.spring3.hotel.management.exceptions.DiscountUsageExceededException;
+import com.spring3.hotel.management.models.Discount;
 import com.spring3.hotel.management.services.DiscountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/discounts")
@@ -30,7 +33,11 @@ public class DiscountController {
      */
     @GetMapping
     public ResponseEntity<List<DiscountDTO>> getAllDiscounts() {
-        return ResponseEntity.ok(discountService.getAllDiscounts());
+        List<Discount> discounts = discountService.getAllDiscounts();
+        List<DiscountDTO> discountDTOs = discounts.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(discountDTOs);
     }
 
     /**
@@ -38,7 +45,11 @@ public class DiscountController {
      */
     @GetMapping("/active")
     public ResponseEntity<List<DiscountDTO>> getActiveDiscounts() {
-        return ResponseEntity.ok(discountService.getActiveDiscounts());
+        List<Discount> discounts = discountService.getActiveDiscounts();
+        List<DiscountDTO> discountDTOs = discounts.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(discountDTOs);
     }
 
     /**
@@ -47,8 +58,9 @@ public class DiscountController {
     @GetMapping("/{id}")
     public ResponseEntity<DiscountDTO> getDiscountById(@PathVariable Integer id) {
         try {
-            DiscountDTO discount = discountService.getDiscountById(id);
-            return ResponseEntity.ok(discount);
+            Discount discount = discountService.getDiscountById(id);
+            DiscountDTO discountDTO = convertToDTO(discount);
+            return ResponseEntity.ok(discountDTO);
         } catch (DiscountNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
@@ -59,10 +71,11 @@ public class DiscountController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<Object> createDiscount(@RequestBody DiscountDTO discountDTO) {
+    public ResponseEntity<Object> createDiscount(@RequestBody UpsertDiscountRequest request) {
         try {
-            DiscountDTO createdDiscount = discountService.createDiscount(discountDTO);
-            return new ResponseEntity<>(createdDiscount, HttpStatus.CREATED);
+            Discount createdDiscount = discountService.createDiscount(request);
+            DiscountDTO discountDTO = convertToDTO(createdDiscount);
+            return new ResponseEntity<>(discountDTO, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
             Map<String, Object> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -75,10 +88,11 @@ public class DiscountController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<Object> updateDiscount(@PathVariable Integer id, @RequestBody DiscountDTO discountDTO) {
+    public ResponseEntity<Object> updateDiscount(@PathVariable Integer id, @RequestBody UpsertDiscountRequest request) {
         try {
-            DiscountDTO updatedDiscount = discountService.updateDiscount(id, discountDTO);
-            return ResponseEntity.ok(updatedDiscount);
+            Discount updatedDiscount = discountService.updateDiscount(request, id);
+            DiscountDTO discountDTO = convertToDTO(updatedDiscount);
+            return ResponseEntity.ok(discountDTO);
         } catch (DiscountNotFoundException e) {
             Map<String, Object> response = new HashMap<>();
             response.put("message", e.getMessage());
@@ -97,7 +111,7 @@ public class DiscountController {
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Object> deleteDiscount(@PathVariable Integer id) {
         try {
-            discountService.deleteDiscount(id);
+            Discount discount = discountService.deleteDiscount(id);
             return ResponseEntity.noContent().build();
         } catch (DiscountNotFoundException e) {
             Map<String, Object> response = new HashMap<>();
@@ -108,7 +122,6 @@ public class DiscountController {
 
     /**
      * API tổng hợp để kiểm tra, lấy thông tin và áp dụng mã giảm giá
-     * Thay thế cho các API riêng lẻ: validate, apply, code
      */
     @GetMapping("/check")
     public ResponseEntity<Object> checkDiscount(
@@ -124,8 +137,9 @@ public class DiscountController {
             
             if (isValid) {
                 // Lấy thông tin mã giảm giá
-                DiscountDTO discount = discountService.getDiscountByCode(code);
-                response.put("discount", discount);
+                Discount discount = discountService.getDiscountByCode(code);
+                DiscountDTO discountDTO = convertToDTO(discount);
+                response.put("discount", discountDTO);
                 
                 // Nếu có amount thì tính giá sau khi áp dụng giảm giá
                 if (amount != null) {
@@ -150,7 +164,6 @@ public class DiscountController {
     
     /**
      * Đánh dấu mã giảm giá đã được sử dụng
-     * Chỉ dành cho admin/hệ thống
      */
     @PostMapping("/mark-used")
     @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_STAFF')")
@@ -167,5 +180,26 @@ public class DiscountController {
             response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
+    }
+    
+    /**
+     * Chuyển đổi Discount thành DiscountDTO
+     */
+    private DiscountDTO convertToDTO(Discount discount) {
+        DiscountDTO dto = new DiscountDTO();
+        dto.setId(discount.getId());
+        dto.setCode(discount.getCode());
+        dto.setDiscountType(discount.getDiscountType());
+        dto.setDiscountValue(discount.getDiscountValue());
+        dto.setValidFrom(discount.getValidFrom());
+        dto.setValidTo(discount.getValidTo());
+        dto.setMaxUses(discount.getMaxUses());
+        dto.setUsedCount(discount.getUsedCount());
+        
+        // Kiểm tra tính hợp lệ
+        boolean isValid = discountService.isDiscountValid(discount.getCode());
+        dto.setValid(isValid);
+        
+        return dto;
     }
 }

@@ -2,7 +2,7 @@ package com.spring3.hotel.management.services.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring3.hotel.management.dto.CreateRatingRequest;
+import com.spring3.hotel.management.dto.request.CreateRatingRequest;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
@@ -282,5 +282,16 @@ public class ReviewServiceImpl implements ReviewService {
                 .roomType(review.getRoomType())
                 .bookingId(review.getBookingId())
                 .build();
+    }
+
+    @Override
+    public void initReviewsFromJson() {
+        log.info("Khởi tạo dữ liệu đánh giá từ JSON");
+        try {
+            // TODO: Triển khai logic đọc dữ liệu từ file JSON
+            log.info("Chức năng khởi tạo dữ liệu đánh giá từ JSON chưa được triển khai");
+        } catch (Exception e) {
+            log.error("Lỗi khi khởi tạo dữ liệu đánh giá từ JSON: {}", e.getMessage());
+        }
     }
 }

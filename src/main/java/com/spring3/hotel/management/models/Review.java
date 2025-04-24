@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Review {
+public class Review extends Auditable {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,12 +72,6 @@ public class Review {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReviewStatus status;
-    
-    @CreationTimestamp
-    private LocalDateTime createdAt;
-    
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
     
     public enum ReviewStatus {
         PENDING, REPLIED, HIDDEN

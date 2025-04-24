@@ -15,7 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Table(name = "rooms")
-public class Room {
+public class Room extends Auditable {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -63,23 +63,11 @@ public class Room {
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
     private List<Rating> ratings = new ArrayList<>();
     
-    @Column
-    private LocalDate createdAt;
-    
-    @Column
-    private LocalDate updatedAt;
-    
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDate.now();
         if(this.status == null) {
             this.status = "VACANT";
         }
-    }
-    
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDate.now();
     }
 
     public void updateAverageRating(Integer newRating) {

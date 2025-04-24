@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.dto.DiscountDTO;
-import com.spring3.hotel.management.dto.GenerateDiscountRequest;
+import com.spring3.hotel.management.dto.response.DiscountDTO;
+import com.spring3.hotel.management.dto.request.GenerateDiscountRequest;
 import com.spring3.hotel.management.dto.request.UpsertDiscountRequest;
 import com.spring3.hotel.management.models.Discount;
 

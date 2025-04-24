@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dto.DiscountDTO;
-import com.spring3.hotel.management.dto.GenerateDiscountRequest;
+import com.spring3.hotel.management.dto.response.DiscountDTO;
+import com.spring3.hotel.management.dto.request.GenerateDiscountRequest;
 import com.spring3.hotel.management.dto.request.UpsertDiscountRequest;
 import com.spring3.hotel.management.exceptions.DiscountExpiredException;
 import com.spring3.hotel.management.exceptions.DiscountNotFoundException;
@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -24,49 +25,55 @@ public class DiscountServiceImpl implements DiscountService {
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int CODE_LENGTH = 8;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Autowired
     private DiscountRepository discountRepository;
 
     @Override
-    public List<DiscountDTO> getAllDiscounts() {
+    public List<Discount> getAllDiscounts() {
         return discountRepository.findAll().stream()
                 .filter(Discount::isActive)
-                .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public DiscountDTO getDiscountById(Integer id) {
+    public Discount getDiscountById(Integer id) {
         Optional<Discount> discount = discountRepository.findById(id);
         if (discount.isEmpty() || !discount.get().isActive()) {
             throw new DiscountNotFoundException(id);
         }
-        return convertToDTO(discount.get());
+        return discount.get();
     }
 
     @Override
-    public DiscountDTO getDiscountByCode(String code) {
+    public Discount getDiscountByCode(String code) {
         Optional<Discount> discount = discountRepository.findByCode(code);
         if (discount.isEmpty() || !discount.get().isActive()) {
             throw new DiscountNotFoundException(code, "code");
         }
-        return convertToDTO(discount.get());
+        return discount.get();
     }
 
     @Override
-    public DiscountDTO createDiscount(DiscountDTO discountDTO) {
-        if (discountRepository.existsByCode(discountDTO.getCode())) {
-            throw new IllegalArgumentException("Mã giảm giá '" + discountDTO.getCode() + "' đã tồn tại");
-        }
+    public Discount createDiscount(UpsertDiscountRequest request) {
+        String code = generateUniqueCode(8);
         
-        Discount discount = convertToEntity(discountDTO);
-        discount = discountRepository.save(discount);
-        return convertToDTO(discount);
+        Discount discount = new Discount();
+        discount.setCode(code);
+        discount.setDiscountType(request.getDiscountType());
+        discount.setDiscountValue(request.getDiscountValue());
+        discount.setValidFrom(LocalDate.parse(request.getValidFrom(), DATE_FORMATTER));
+        discount.setValidTo(LocalDate.parse(request.getValidTo(), DATE_FORMATTER));
+        discount.setMaxUses(request.getMaxUsage());
+        discount.setUsedCount(0);
+        discount.setActive(true);
+        
+        return discountRepository.save(discount);
     }
 
     @Override
-    public DiscountDTO updateDiscount(Integer id, DiscountDTO discountDTO) {
+    public Discount updateDiscount(UpsertDiscountRequest request, Integer id) {
         Optional<Discount> existingDiscountOpt = discountRepository.findById(id);
         
         if (existingDiscountOpt.isEmpty()) {
@@ -75,34 +82,25 @@ public class DiscountServiceImpl implements DiscountService {
         
         Discount existingDiscount = existingDiscountOpt.get();
         
-        // Kiểm tra nếu code bị thay đổi và code mới đã tồn tại
-        if (!existingDiscount.getCode().equals(discountDTO.getCode()) && 
-            discountRepository.existsByCode(discountDTO.getCode())) {
-            throw new IllegalArgumentException("Mã giảm giá '" + discountDTO.getCode() + "' đã tồn tại");
-        }
-        
         // Cập nhật thông tin
-        existingDiscount.setCode(discountDTO.getCode());
-        existingDiscount.setDiscountType(discountDTO.getDiscountType());
-        existingDiscount.setDiscountValue(discountDTO.getDiscountValue());
-        existingDiscount.setValidFrom(discountDTO.getValidFrom());
-        existingDiscount.setValidTo(discountDTO.getValidTo());
-        existingDiscount.setMaxUses(discountDTO.getMaxUses());
-        existingDiscount.setUsedCount(discountDTO.getUsedCount());
+        existingDiscount.setDiscountType(request.getDiscountType());
+        existingDiscount.setDiscountValue(request.getDiscountValue());
+        existingDiscount.setValidFrom(LocalDate.parse(request.getValidFrom(), DATE_FORMATTER));
+        existingDiscount.setValidTo(LocalDate.parse(request.getValidTo(), DATE_FORMATTER));
+        existingDiscount.setMaxUses(request.getMaxUsage());
         
-        existingDiscount = discountRepository.save(existingDiscount);
-        return convertToDTO(existingDiscount);
+        return discountRepository.save(existingDiscount);
     }
 
     @Override
-    public void deleteDiscount(Integer id) {
+    public Discount deleteDiscount(Integer id) {
         Optional<Discount> discountOpt = discountRepository.findById(id);
         if (discountOpt.isEmpty()) {
             throw new DiscountNotFoundException(id);
         }
         Discount discount = discountOpt.get();
         discount.setActive(false);
-        discountRepository.save(discount);
+        return discountRepository.save(discount);
     }
 
     @Override
@@ -152,7 +150,7 @@ public class DiscountServiceImpl implements DiscountService {
         
         // Áp dụng giảm giá
         if ("PERCENT".equals(discount.getDiscountType())) {
-            return amount * (1 - discount.getDiscountValue());
+            return amount * (1 - discount.getDiscountValue() / 100.0);
         } else if ("FIXED".equals(discount.getDiscountType())) {
             return Math.max(0, amount - discount.getDiscountValue());
         }
@@ -174,11 +172,10 @@ public class DiscountServiceImpl implements DiscountService {
     }
 
     @Override
-    public List<DiscountDTO> getActiveDiscounts() {
+    public List<Discount> getActiveDiscounts() {
         LocalDate today = LocalDate.now();
         return discountRepository.findActiveDiscounts(today).stream()
                 .filter(Discount::isActive)
-                .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -229,7 +226,28 @@ public class DiscountServiceImpl implements DiscountService {
         return generatedDiscounts;
     }
     
-    // Phương thức chuyển đổi từ Entity sang DTO
+    /**
+     * Tạo mã giảm giá ngẫu nhiên và duy nhất
+     */
+    private String generateUniqueCode(int length) {
+        Random random = new Random();
+        String code;
+        
+        do {
+            StringBuilder codeBuilder = new StringBuilder();
+            for (int i = 0; i < length; i++) {
+                int randomIndex = random.nextInt(CHARACTERS.length());
+                codeBuilder.append(CHARACTERS.charAt(randomIndex));
+            }
+            code = codeBuilder.toString();
+        } while (discountRepository.existsByCode(code));
+        
+        return code;
+    }
+    
+    /**
+     * Chuyển đổi từ Entity sang DTO
+     */
     private DiscountDTO convertToDTO(Discount discount) {
         DiscountDTO dto = new DiscountDTO();
         dto.setId(discount.getId());
@@ -250,7 +268,9 @@ public class DiscountServiceImpl implements DiscountService {
         return dto;
     }
     
-    // Phương thức chuyển đổi từ DTO sang Entity
+    /**
+     * Chuyển đổi từ DTO sang Entity
+     */
     private Discount convertToEntity(DiscountDTO dto) {
         Discount discount = new Discount();
         discount.setId(dto.getId());
@@ -261,6 +281,7 @@ public class DiscountServiceImpl implements DiscountService {
         discount.setValidTo(dto.getValidTo());
         discount.setMaxUses(dto.getMaxUses());
         discount.setUsedCount(dto.getUsedCount());
+        discount.setActive(true);
         return discount;
     }
 }

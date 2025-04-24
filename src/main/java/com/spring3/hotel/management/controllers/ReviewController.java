@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dto.CreateRatingRequest;
-import com.spring3.hotel.management.dto.RatingDTO;
+import com.spring3.hotel.management.dto.request.CreateRatingRequest;
+import com.spring3.hotel.management.dto.response.RatingDTO;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;

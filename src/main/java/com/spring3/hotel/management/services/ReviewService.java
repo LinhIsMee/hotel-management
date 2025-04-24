@@ -1,6 +1,6 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.dto.CreateRatingRequest;
+import com.spring3.hotel.management.dto.request.CreateRatingRequest;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
@@ -38,6 +38,7 @@ public interface ReviewService {
     // Thêm, sửa, xóa đánh giá
     ReviewResponseDTO createReview(CreateReviewRequest request);
     ReviewResponseDTO updateReview(UpdateReviewRequest request, Integer id);
+    ReviewResponseDTO updateReview(Integer id, UpdateReviewRequest request);
     ReviewResponseDTO deleteReview(Integer id);
     ReviewResponseDTO replyToReview(Integer id, ReplyReviewRequest request);
     
