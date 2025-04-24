@@ -1,67 +1,25 @@
 package com.spring3.hotel.management.models;
 
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-import jakarta.persistence.*;
-import java.io.Serializable;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-
-/**
- * Đổi tên từ Service sang HotelService để tránh xung đột
- */
 @Entity
-@Table(name = "services")
-@Getter
-@Setter
-@AllArgsConstructor
+@Data
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
-public class HotelService implements Serializable {
+@Table(name = "services")
+public class HotelService {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(nullable = false)
+    @NotNull(message = "Tên dịch vụ không được để trống")
     private String name;
 
-    @Column(unique = true)
-    private String code;
-
-    @Column
-    private String type;
-
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
-    private BigDecimal price;
-
-    @Column(name = "is_available")
-    private Boolean isAvailable = true;
-
-    @Column
-    private String unit;
-
-    @Column
-    private String imageUrl;
-
-    @ManyToMany(mappedBy = "services")
-    private List<Room> rooms;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    @Column(nullable = false)
+    @NotNull(message = "Giá dịch vụ không được để trống")
+    private Double price;
 } 

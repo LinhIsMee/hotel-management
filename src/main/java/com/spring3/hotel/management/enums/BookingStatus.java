@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.models;
+package com.spring3.hotel.management.enums;
 
 /**
  * Trạng thái đặt phòng trong hệ thống

@@ -1,36 +1,31 @@
 package com.spring3.hotel.management.models;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-
 
 @Entity
 @Data
-@Getter
-@Setter
-@ToString
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "USERS")
-public class User extends Auditable {
-
+@Builder
+@Table(name = "users")
+public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID")
     private Integer id;
 
-    @Column(name = "username", nullable = false, unique = true)
+    @Column(nullable = false, unique = true)
+    @NotNull(message = "Tên đăng nhập không được để trống")
     private String username;
 
-    @JsonIgnore
-    @Column(name = "password_hash", nullable = false)
+    @Column(nullable = false)
+    @NotNull(message = "Mật khẩu không được để trống")
     private String password;
 
-    @Column(name = "email", unique = true)
+    @Column(unique = true)
+    @Email(message = "Email không đúng định dạng")
     private String email;
 
     @Column(name = "full_name")
@@ -38,16 +33,8 @@ public class User extends Auditable {
 
     @Column(name = "phone_number")
     private String phoneNumber;
-    private String gender;
 
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
-    private String address;
-
-    @Column(name = "national_id", unique = true)
-    private String nationalId;
-
-    @ManyToOne
-    @JoinColumn(name = "role_id")
-    private Role role;
+    @Column(nullable = false)
+    @NotNull(message = "Vai trò không được để trống")
+    private String role; // CUSTOMER, STAFF, ADMIN
 } 

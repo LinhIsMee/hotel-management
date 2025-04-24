@@ -1,6 +1,9 @@
 package com.spring3.hotel.management.models;
 
+import com.spring3.hotel.management.enums.PaymentMethod;
+import com.spring3.hotel.management.enums.PaymentStatus;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -20,13 +23,15 @@ public class Payment {
     private String transactionNo;
 
     @Column(name = "amount")
+    @NotNull(message = "Số tiền thanh toán không được để trống")
     private Long amount;
 
     @Column(name = "order_info")
     private String orderInfo;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private String status;
+    private PaymentStatus status;
 
     @Column(name = "response_code")
     private String responseCode;
@@ -46,8 +51,9 @@ public class Payment {
     @Column(name = "tmn_code")
     private String tmnCode;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "method")
-    private String method;
+    private PaymentMethod method;
 
     @ManyToOne
     @JoinColumn(name = "booking_id")

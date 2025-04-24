@@ -1,74 +1,41 @@
 package com.spring3.hotel.management.models;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import java.util.List;
-import java.util.ArrayList;
 
 @Entity
 @Data
-@Getter
-@Setter
-@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "BOOKING_DETAILS")
+@Table(name = "booking_details")
 public class BookingDetail {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @ManyToOne
     @JoinColumn(name = "booking_id", nullable = false)
+    @NotNull(message = "Đặt phòng không được để trống")
     private Booking booking;
 
     @ManyToOne
     @JoinColumn(name = "room_id", nullable = false)
+    @NotNull(message = "Phòng không được để trống")
     private Room room;
 
     @Column(name = "price_per_night")
+    @NotNull(message = "Giá theo đêm không được để trống")
     private Double pricePerNight;
-    
-    @Column(name = "room_number")
-    private String roomNumber;
-    
-    @Column(name = "room_type")
-    private Integer roomType;
-    
-    @Column(name = "price")
-    private Double price;
-    
-    @Column(name = "adults")
+
+    @Column
     private Integer adults;
-    
-    @Column(name = "children")
+
+    @Column
     private Integer children;
-    
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "booking_detail_services",
-        joinColumns = @JoinColumn(name = "booking_detail_id"),
-        inverseJoinColumns = @JoinColumn(name = "service_id")
-    )
-    private List<HotelService> services = new ArrayList<>();
-    
-    @OneToMany(mappedBy = "detail", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<BookingService> bookingServices = new ArrayList<>();
-    
-    @Transient
-    public String getRoomNumber() {
-        return room != null ? room.getRoomNumber() : roomNumber;
-    }
-    
-    @Transient
-    public String getRoomType() {
-        return room != null && room.getRoomType() != null ? 
-               room.getRoomType().getName() : (roomType != null ? roomType.toString() : "Unknown");
-    }
-    
-    public void setServices(List<HotelService> services) {
-        this.services = services != null ? services : new ArrayList<>();
-    }
+
+    @ManyToOne
+    @JoinColumn(name = "service_id")
+    private HotelService service; // Dịch vụ tuỳ chọn
 }
