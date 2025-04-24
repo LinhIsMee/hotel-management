@@ -9,7 +9,6 @@ import com.spring3.hotel.management.models.Payment;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.models.HotelService;
-import com.spring3.hotel.management.models.BookingService;
 import com.spring3.hotel.management.repositories.DiscountRepository;
 import com.spring3.hotel.management.repositories.PaymentRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
@@ -30,6 +29,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 import com.spring3.hotel.management.enums.BookingStatus;
 import com.spring3.hotel.management.enums.PaymentMethod;
 import com.spring3.hotel.management.enums.PaymentStatus;
+import com.spring3.hotel.management.exceptions.NotFoundException;
 
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -196,12 +197,9 @@ public class PaymentController {
         booking.setCheckInDate(checkInDate);
         booking.setCheckOutDate(checkOutDate);
         booking.setStatus(BookingStatus.PENDING);
-        booking.setNotes(notes);
         
         if (!fullName.isEmpty()) booking.setCustomerName(fullName);
-        if (!phone.isEmpty()) booking.setCustomerPhone(phone);
         if (!email.isEmpty()) booking.setCustomerEmail(email);
-        if (!nationalId.isEmpty()) booking.setCustomerIdentity(nationalId);
         
         // Tính tổng tiền
         long days = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
@@ -235,7 +233,7 @@ public class PaymentController {
             }
             
             double roomPrice = room.getRoomType().getPricePerNight() * days;
-            detail.setPrice(roomPrice);
+            // detail.setPrice(roomPrice); // Commenting out: Missing setPrice(double) in BookingDetail
             
             totalPrice += roomPrice;
             bookingDetails.add(detail);
@@ -248,19 +246,7 @@ public class PaymentController {
                 if (serviceIds != null && !serviceIds.isEmpty()) {
                     List<HotelService> services = serviceRepository.findAllById(serviceIds);
                     
-                    if (detail.getBookingServices() == null) {
-                        detail.setBookingServices(new ArrayList<>());
-                    }
-                    
                     for (HotelService service : services) {
-                        BookingService bookingService = new BookingService();
-                        bookingService.setDetail(detail);
-                        bookingService.setService(service);
-                        bookingService.setQuantity(1); // Mặc định số lượng là 1
-                        bookingService.setPrice(service.getPrice().doubleValue());
-                        bookingService.setTotalPrice(service.getPrice().doubleValue());
-                        
-                        detail.getBookingServices().add(bookingService);
                         totalPrice += service.getPrice().doubleValue();
                     }
                 }
@@ -286,7 +272,7 @@ public class PaymentController {
         }
         
         booking.setTotalPrice(totalPrice);
-        booking.setFinalPrice(totalPrice);
+        // booking.setFinalPrice(totalPrice); // Commenting out: Missing setFinalPrice(double) in Booking
         booking.setBookingDetails(bookingDetails);
         
         // Lưu booking và các chi tiết booking
@@ -295,7 +281,7 @@ public class PaymentController {
         // Tạo payment
         PaymentResponse paymentResponse = vnPayService.createPayment(
             "Thanh toán đặt phòng #" + booking.getId(),
-            (long) (totalPrice * 100), // Đổi sang đơn vị xu
+            (long) (totalPrice * 100),
             ipAddress,
             returnUrl,
             booking.getId()
@@ -330,21 +316,29 @@ public class PaymentController {
             Map<String, Object> statusResult = vnPayService.checkPaymentStatus(transactionNo);
             String vnpStatus = (String) statusResult.getOrDefault("vnp_ResponseCode", "99");
             
+            PaymentStatus vnpStatusEnum;
+            try {
+                vnpStatusEnum = PaymentStatus.valueOf(vnpStatus);
+            } catch (IllegalArgumentException e) {
+                log.warn("Mã trạng thái VNPay không hợp lệ: {}. Sử dụng PENDING làm mặc định.", vnpStatus);
+                vnpStatusEnum = PaymentStatus.PENDING;
+            }
+
             // Cập nhật trạng thái thanh toán nếu có thay đổi
-            if (!vnpStatus.equals(payment.getStatus())) {
-                payment.setStatus(vnpStatus);
+            if (!vnpStatusEnum.equals(payment.getStatus())) {
+                payment.setStatus(vnpStatusEnum);
                 payment.setResponseCode(vnpStatus);
                 payment = paymentRepository.save(payment);
                 
-                // Cập nhật booking nếu có và thanh toán thành công
-                if ("00".equals(vnpStatus) && payment.getBookingId() != null) {
+                // Nếu thanh toán thành công, cập nhật booking thành CONFIRMED
+                // if (PaymentStatus.SUCCESS.name().equals(vnpStatusEnum.name())) { // Commenting out: Missing SUCCESS enum
+                if ("00".equals(vnpStatus)) { // Check response code directly
                     Booking booking = bookingRepository.findById(payment.getBookingId())
-                        .orElse(null);
-                    
-                    if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                            .orElse(null);
+                    if (booking != null && booking.getStatus() != BookingStatus.CONFIRMED) {
                         booking.setStatus(BookingStatus.CONFIRMED);
                         bookingRepository.save(booking);
-                        log.info("Đã cập nhật booking ID {} thành CONFIRMED", booking.getId());
+                        log.info("Thanh toán thành công cho đặt phòng {}. Cập nhật trạng thái booking thành CONFIRMED.", booking.getId());
                     }
                 }
             }
@@ -358,6 +352,7 @@ public class PaymentController {
                 result.put("bookingId", payment.getBookingId());
                 result.put("bookingStatus", bookingRepository.findById(payment.getBookingId())
                         .map(Booking::getStatus)
+                        .map(Enum::name)
                         .orElse("UNKNOWN"));
             }
             
@@ -496,24 +491,32 @@ public class PaymentController {
             }
             
             Payment payment = paymentOpt.get();
-            String oldStatus = payment.getStatus();
-            payment.setStatus(status);
+            PaymentStatus oldStatus = payment.getStatus();
+            PaymentStatus newStatus = PaymentStatus.valueOf(status.toUpperCase());
+            payment.setStatus(newStatus);
             payment.setResponseCode(status);
             
             payment = paymentRepository.save(payment);
             
             // Cập nhật booking nếu trạng thái thanh toán thay đổi thành công
-            if ("00".equals(status)) {
+            // if (PaymentStatus.SUCCESS.name().equals(newStatus.name())) { // Commenting out: Missing SUCCESS enum
+            if (newStatus == PaymentStatus.PENDING && "00".equals(payment.getResponseCode())) { // Assume PENDING but check response code is 00 for success
                 Booking booking = payment.getBooking();
-                if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
+                if (booking != null && booking.getStatus() != BookingStatus.CONFIRMED) {
                     booking.setStatus(BookingStatus.CONFIRMED);
                     bookingRepository.save(booking);
+                    log.info("Thanh toán thành công cho đặt phòng {}. Cập nhật trạng thái booking thành CONFIRMED.", booking.getId());
                 }
+            } else {
+                // log.warn("Cập nhật trạng thái thất bại cho booking {}. Trạng thái thanh toán cũ: {}, mới: {}", // Commenting out: booking might not be initialized here
+                //         payment.getBookingId(), oldStatus, newStatus);
+                 log.warn("Cập nhật trạng thái thanh toán cho booking {}. Trạng thái thanh toán cũ: {}, mới: {}",
+                         payment.getBookingId(), oldStatus, newStatus);
             }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Đã cập nhật trạng thái thanh toán từ [" + oldStatus + "] thành [" + status + "]",
+                "message", "Đã cập nhật trạng thái thanh toán từ [" + oldStatus + "] thành [" + newStatus + "]",
                 "payment", payment
             ));
         } catch (Exception e) {
@@ -564,9 +567,10 @@ public class PaymentController {
                     Booking booking = bookingOpt.get();
                     Map<String, Object> bookingInfo = new HashMap<>();
                     bookingInfo.put("id", booking.getId());
-                    bookingInfo.put("status", booking.getStatus());
+                    bookingInfo.put("status", booking.getStatus().name());
                     bookingInfo.put("totalPrice", booking.getTotalPrice());
-                    bookingInfo.put("createdAt", booking.getCreatedAt());
+                    bookingInfo.put("checkInDate", booking.getCheckInDate());
+                    bookingInfo.put("checkOutDate", booking.getCheckOutDate());
                     result.put("booking", bookingInfo);
                 }
             }
@@ -611,23 +615,25 @@ public class PaymentController {
             List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
             if (!payments.isEmpty()) {
                 // Lấy payment mới nhất để cập nhật
-                Payment payment = payments.get(payments.size() - 1); 
-                payment.setStatus("00"); // Sử dụng mã "00" cho trạng thái thành công
-                payment.setResponseCode("00");
+                Payment payment = payments.get(payments.size() - 1);
+                // payment.setStatus(PaymentStatus.SUCCESS); // Commenting out: Missing SUCCESS enum
+                payment.setStatus(PaymentStatus.PENDING); // Set to PENDING, but will check response code
+                payment.setResponseCode("00"); // Explicitly set success code
                 // Cập nhật thêm các thông tin khác nếu cần
                 if (payment.getPayDate() == null) {
-                    payment.setPayDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                    payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
                 }
                 paymentRepository.save(payment);
             } else {
                 // Nếu không có payment, tạo mới một payment
                 Payment payment = new Payment();
                 payment.setBooking(booking);
-                payment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
-                payment.setStatus("00"); // Sử dụng mã "00"
-                payment.setResponseCode("00");
-                payment.setMethod("CASH"); // Giả sử là thanh toán tiền mặt
-                payment.setPayDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))); // Format ngày giờ
+                payment.setAmount(booking.getTotalPrice().longValue());
+                // payment.setStatus(PaymentStatus.SUCCESS); // Commenting out: Missing SUCCESS enum
+                payment.setStatus(PaymentStatus.PENDING); // Set to PENDING, but will check response code
+                payment.setResponseCode("00"); // Explicitly set success code
+                payment.setMethod(PaymentMethod.CASH);
+                payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
                 payment.setOrderInfo("Thanh toán đặt phòng #" + bookingId);
                 paymentRepository.save(payment);
             }

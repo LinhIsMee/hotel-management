@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.repositories;
 
 import com.spring3.hotel.management.models.Review;
-import com.spring3.hotel.management.models.Review.ReviewStatus;
+import com.spring3.hotel.management.enums.ReviewStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

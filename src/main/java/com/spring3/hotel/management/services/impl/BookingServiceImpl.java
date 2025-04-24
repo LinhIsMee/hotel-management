@@ -1,8 +1,11 @@
 package com.spring3.hotel.management.services.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.spring3.hotel.management.dto.request.AdminBookingRequest;
+import com.spring3.hotel.management.dto.request.BookingDetailRequest;
 import com.spring3.hotel.management.dto.request.BookingRoomRequest;
 import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
-import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
@@ -11,24 +14,35 @@ import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.BookingService;
+import com.spring3.hotel.management.services.impl.BookingServiceImpl;
+import jakarta.persistence.EntityNotFoundException;
+import com.spring3.hotel.management.enums.BookingStatus;
+import com.spring3.hotel.management.enums.PaymentMethod;
+import com.spring3.hotel.management.enums.PaymentStatus;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
-
-import com.spring3.hotel.management.enums.BookingStatus;
-import com.spring3.hotel.management.enums.RoomStatus;
 
 @Service
 @Slf4j
@@ -49,10 +63,6 @@ public class BookingServiceImpl implements BookingService {
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
     @Autowired
-    private BookingServiceRepository bookingServiceRepository;
-    @Autowired
-    private OfferingRepository offeringRepository;
-    @Autowired
     private ServiceRepository serviceRepository;
 
     @Override
@@ -65,11 +75,13 @@ public class BookingServiceImpl implements BookingService {
         // Lấy danh sách chi tiết đặt phòng
         List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
         
-        // Chuyển đổi chi tiết phòng
-        List<RoomListResponseDTO> rooms = bookingDetails.stream()
-                .map(this::mapToRoomListResponseDTO)
-                .collect(Collectors.toList());
-        dto.setRooms(rooms);
+        if (bookingDetails != null) {
+            dto.setRooms(bookingDetails.stream()
+                    .map(this::mapToRoomListResponseDTO)
+                    .collect(Collectors.toList()));
+        } else {
+            dto.setRooms(Collections.emptyList());
+        }
         
         // Lấy danh sách dịch vụ đã đặt
         List<com.spring3.hotel.management.models.BookingService> bookingServices = 
@@ -103,23 +115,23 @@ public class BookingServiceImpl implements BookingService {
         dto.setRoomNumber(room.getRoomNumber());
         dto.setRoomType(room.getRoomType().getName());
         
-        if (bookingDetail.getPrice() != null) {
-            dto.setPrice(bookingDetail.getPrice());
-        } else {
-            // Tính giá từ pricePerNight nếu có booking
-            if (bookingDetail.getBooking() != null) {
-                long days = java.time.temporal.ChronoUnit.DAYS.between(
-                        bookingDetail.getBooking().getCheckInDate(), 
-                        bookingDetail.getBooking().getCheckOutDate());
-                if (days < 1) days = 1;
-                dto.setPrice(room.getRoomType().getPricePerNight() * days);
-            } else {
-                // Nếu không có booking thì dùng giá cơ bản
-                dto.setPrice(room.getRoomType().getBasePrice());
-            }
-        }
+        // if (bookingDetail.getPrice() != null) {
+        //     dto.setPrice(bookingDetail.getPrice());
+        // } else {
+        //     // Tính giá từ pricePerNight nếu có booking
+        //     if (bookingDetail.getBooking() != null) {
+        //         long days = java.time.temporal.ChronoUnit.DAYS.between(
+        //                 bookingDetail.getBooking().getCheckInDate(), 
+        //                 bookingDetail.getBooking().getCheckOutDate());
+        //         if (days < 1) days = 1;
+        //         dto.setPrice(room.getRoomType().getPricePerNight() * days);
+        //     } else {
+        //         // Nếu không có booking thì dùng giá cơ bản
+        //         dto.setPrice(room.getRoomType().getPricePerNight());
+        //     }
+        // }
         
-        dto.setImages(room.getImages());
+        // dto.setImages(room.getImages());
         return dto;
     }
 
@@ -141,7 +153,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<BookingResponseDTO> getBookingsByStatus(String status) {
-        List<Booking> bookings = bookingRepository.findByStatus(status);
+        BookingStatus bookingStatus = BookingStatus.valueOf(status.toUpperCase());
+        List<Booking> bookings = bookingRepository.findByStatus(bookingStatus);
         return bookings.stream()
                 .map(booking -> getBookingById(booking.getId()))
                 .collect(Collectors.toList());
@@ -191,7 +204,7 @@ public class BookingServiceImpl implements BookingService {
             for (Integer roomId : request.getRoomIds()) {
                 Room room = roomRepository.findById(roomId)
                     .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
-                totalPrice += room.getRoomType().getBasePrice() * stayDuration;
+                totalPrice += room.getRoomType().getPricePerNight() * stayDuration;
             }
             booking.setTotalPrice(totalPrice);
         } else {
@@ -230,9 +243,22 @@ public class BookingServiceImpl implements BookingService {
         // Tạo payment với trạng thái từ request
         Payment payment = new Payment();
         payment.setBooking(booking);
-        payment.setAmount(booking.getFinalPrice().longValue());
-        payment.setStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "UNPAID");
-        payment.setMethod(request.getPaymentMethod());
+        payment.setAmount(booking.getTotalPrice().longValue());
+        try {
+            payment.setStatus(request.getPaymentStatus() != null ? PaymentStatus.valueOf(request.getPaymentStatus().toUpperCase()) : PaymentStatus.PENDING);
+            if (request.getPaymentStatus() == null) {
+                log.debug("PaymentStatus not provided, defaulting to PENDING.");
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid PaymentStatus: {}. Defaulting to PENDING", request.getPaymentStatus());
+            payment.setStatus(PaymentStatus.PENDING);
+        }
+        try {
+            payment.setMethod(request.getPaymentMethod() != null ? PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase()) : null);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid PaymentMethod: {}. Setting to null", request.getPaymentMethod());
+            payment.setMethod(null);
+        }
         if (request.getPaymentDate() != null) {
             payment.setPayDate(request.getPaymentDate().toString());
         }
@@ -252,13 +278,13 @@ public class BookingServiceImpl implements BookingService {
             roomRepository.save(room);
             
             // Tính giá phòng theo số ngày ở
-            double roomPrice = room.getRoomType().getBasePrice() * stayDuration;
+            double roomPrice = room.getRoomType().getPricePerNight() * stayDuration;
             totalPriceCalculated += roomPrice;
             
             BookingDetail bookingDetail = new BookingDetail();
             bookingDetail.setBooking(booking);
             bookingDetail.setRoom(room);
-            bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+            bookingDetail.setPricePerNight(room.getRoomType().getPricePerNight());
             bookingDetail.setPrice(roomPrice);
             bookingDetailRepository.save(bookingDetail);
         }
@@ -480,13 +506,13 @@ public class BookingServiceImpl implements BookingService {
                 roomRepository.save(room);
                 
                 // Tính giá phòng theo số ngày ở
-                double roomPrice = room.getRoomType().getBasePrice() * stayDuration;
+                double roomPrice = room.getRoomType().getPricePerNight() * stayDuration;
                 totalPriceCalculated += roomPrice;
                 
                 BookingDetail bookingDetail = new BookingDetail();
                 bookingDetail.setBooking(booking);
                 bookingDetail.setRoom(room);
-                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                bookingDetail.setPricePerNight(room.getRoomType().getPricePerNight());
                 bookingDetail.setPrice(roomPrice);
                 bookingDetailRepository.save(bookingDetail);
             }
@@ -501,7 +527,7 @@ public class BookingServiceImpl implements BookingService {
                 List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
                 if (!payments.isEmpty()) {
                     Payment paymentRecord = payments.get(0);
-                    paymentRecord.setAmount(savedBooking.getTotalPrice().longValue());
+                    paymentRecord.setAmount(savedBooking.getFinalPrice().longValue());
                     paymentRepository.save(paymentRecord);
                 }
                 
@@ -658,8 +684,10 @@ public class BookingServiceImpl implements BookingService {
         NewBookingResponse newBookingResponse = new NewBookingResponse();
         newBookingResponse.setBookingId(booking.getId());
         newBookingResponse.setUserId(user.getId());
-        newBookingResponse.setFullName(user.getFullName());
+        newBookingResponse.setFullName(user.getFirstName() + " " + user.getLastName());
         newBookingResponse.setRoomCount(bookingDetails.size());
+        newBookingResponse.setEmail(user.getEmail());
+        newBookingResponse.setPhone(user.getPhoneNumber());
         return newBookingResponse;
     }
 
@@ -688,7 +716,7 @@ public class BookingServiceImpl implements BookingService {
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
-        dto.setFullName(finalBooking.getUser().getFullName());
+        dto.setFullName(finalBooking.getUser().getFirstName() + " " + finalBooking.getUser().getLastName());
         dto.setNationalId(finalBooking.getUser().getNationalId());
         dto.setEmail(finalBooking.getUser().getEmail());
         dto.setPhone(finalBooking.getUser().getPhoneNumber());
@@ -696,9 +724,13 @@ public class BookingServiceImpl implements BookingService {
         List<BookingDetail> bookingDetails = finalBooking.getBookingDetails() != null ? 
                 finalBooking.getBookingDetails() : bookingDetailRepository.findAllByBooking_Id(finalBooking.getId());
         
-        dto.setRooms(bookingDetails.stream()
-                .map(this::mapToRoomListResponseDTO)
-                .toList());
+        if (bookingDetails != null) {
+            dto.setRooms(bookingDetails.stream()
+                    .map(this::mapToRoomListResponseDTO)
+                    .collect(Collectors.toList()));
+        } else {
+            dto.setRooms(Collections.emptyList());
+        }
         
         dto.setCheckInDate(finalBooking.getCheckInDate());
         dto.setCheckOutDate(finalBooking.getCheckOutDate());
@@ -722,17 +754,18 @@ public class BookingServiceImpl implements BookingService {
         dto.setFinalPrice(finalPrice);
 
         // Set status and payment status from Booking entity
-        dto.setStatus(finalBooking.getStatus());
+        dto.setStatus(finalBooking.getStatus() != null ? finalBooking.getStatus().name() : null);
         dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
 
         // Get payment method from the latest payment record if available
-        List<Payment> payments = finalBooking.getPayments() != null ? 
-                finalBooking.getPayments() : paymentRepository.findAllByBooking_Id(finalBooking.getId());
+        List<Payment> payments = paymentRepository.findByBookingIdOrderByCreatedAtDesc(finalBooking.getId());
         if (!payments.isEmpty()) {
-             Payment latestPayment = payments.get(payments.size() - 1);
-             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
+             Payment latestPayment = payments.get(0);
+             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod().name() : "UNKNOWN");
+             dto.setPaymentStatus(latestPayment.getStatus() != null ? latestPayment.getStatus().name() : "UNKNOWN");
         } else {
              dto.setPaymentMethod("NONE");
+             dto.setPaymentStatus("PENDING");
         }
         
         // Format createdAt
@@ -817,20 +850,19 @@ public class BookingServiceImpl implements BookingService {
             result.put("bankCode", payment.getBankCode() != null ? payment.getBankCode() : "");
             
             // Các trường thông tin bổ sung
-            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNPAID";
-            boolean success = "00".equals(transactionStatus);
-            boolean pending = "01".equals(transactionStatus) || "04".equals(transactionStatus) || 
-                    "05".equals(transactionStatus) || "06".equals(transactionStatus);
+            String transactionStatus = payment.getStatus() != null ? payment.getStatus() : "UNKNOWN";
+            boolean success = PaymentStatus.SUCCESS.equals(transactionStatus);
+            boolean pending = PaymentStatus.PENDING.equals(transactionStatus);
             
-            result.put("success", success);
-            result.put("pending", pending);
+            result.put("isSuccess", success);
+            result.put("isPending", pending);
             
             // Định dạng số tiền
+            String formattedAmount = "N/A";
             if (payment.getAmount() != null) {
-                result.put("formattedAmount", String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫");
-            } else {
-                result.put("formattedAmount", "0 ₫");
+                formattedAmount = String.format("%,d", payment.getAmount()).replace(",", ".") + " ₫";
             }
+            result.put("formattedAmount", formattedAmount);
             
             // Định dạng ngày giờ thanh toán
             if (payment.getPayDate() != null && payment.getPayDate().length() >= 14) {
@@ -855,8 +887,8 @@ public class BookingServiceImpl implements BookingService {
             result.put("transactionNo", "");
             result.put("amount", booking.getTotalPrice().longValue());
             result.put("bankCode", "");
-            result.put("success", false);
-            result.put("pending", false);
+            result.put("isSuccess", false);
+            result.put("isPending", false);
             result.put("formattedAmount", String.format("%,d", booking.getTotalPrice().longValue()).replace(",", ".") + " ₫");
             result.put("formattedPaymentTime", "");
         }
@@ -890,20 +922,30 @@ public class BookingServiceImpl implements BookingService {
         if (!payments.isEmpty()) {
             payment = payments.get(0);
             // Cập nhật trạng thái thanh toán
-            payment.setStatus("00"); // 00: Thành công
+            payment.setStatus(PaymentStatus.SUCCESS);
             payment.setResponseCode("00");
-            payment.setMethod(paymentMethod != null ? paymentMethod : "CASH");
+            try {
+                payment.setMethod(paymentMethod != null ? PaymentMethod.valueOf(paymentMethod.toUpperCase()) : PaymentMethod.CASH);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid payment method: {}. Defaulting to CASH.", paymentMethod);
+                payment.setMethod(PaymentMethod.CASH);
+            }
             payment.setAmount(booking.getFinalPrice().longValue());
-            payment.setPayDate(LocalDateTime.now().toString());
+            payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
         } else {
             // Tạo mới payment
             payment = new Payment();
             payment.setBooking(booking);
             payment.setAmount(booking.getFinalPrice().longValue());
-            payment.setStatus("00");
+            payment.setStatus(PaymentStatus.SUCCESS);
             payment.setResponseCode("00");
-            payment.setMethod(paymentMethod != null ? paymentMethod : "CASH");
-            payment.setPayDate(LocalDateTime.now().toString());
+            try {
+                payment.setMethod(paymentMethod != null ? PaymentMethod.valueOf(paymentMethod.toUpperCase()) : PaymentMethod.CASH);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid payment method: {}. Defaulting to CASH.", paymentMethod);
+                payment.setMethod(PaymentMethod.CASH);
+            }
+            payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
             payment.setOrderInfo("Thanh toán đặt phòng #" + bookingId);
         }
         
@@ -958,12 +1000,12 @@ public class BookingServiceImpl implements BookingService {
 
         // 4. Cập nhật trạng thái Payment và Booking dựa trên responseCode
         if ("00".equals(responseCode)) {
-            payment.setStatus("00"); 
+            payment.setStatus(PaymentStatus.SUCCESS); 
             booking.setPaymentStatus("PAID");
             booking.setStatus(BookingStatus.CONFIRMED); 
              log.info("Cập nhật bookingId {} thành PAID và CONFIRMED.", bookingId);
         } else {
-            payment.setStatus(responseCode); 
+            payment.setStatus(PaymentStatus.FAILED); 
             booking.setPaymentStatus("FAILED"); 
              log.warn("Thanh toán thất bại cho bookingId {} với mã lỗi: {}. Cập nhật paymentStatus thành FAILED.", bookingId, responseCode);
         }
@@ -1064,6 +1106,7 @@ public class BookingServiceImpl implements BookingService {
             .paymentMethod(request.getPaymentMethod())
             .paymentStatus("UNPAID")
             .discount(discount)
+            .notes(request.getNotes())
             .build();
             
         booking = bookingRepository.save(booking);
@@ -1156,8 +1199,6 @@ public class BookingServiceImpl implements BookingService {
                 BookingDetail detail = new BookingDetail();
                 detail.setBooking(savedBooking);
                 detail.setRoom(room);
-                detail.setRoomNumber(room.getRoomNumber());
-                detail.setRoomType(room.getRoomType().getId());
                 detail.setPricePerNight(room.getRoomType().getPricePerNight());
                 
                 if (request.getAdults() != null) {
@@ -1265,8 +1306,6 @@ public class BookingServiceImpl implements BookingService {
                 BookingDetail detail = new BookingDetail();
                 detail.setBooking(savedBooking);
                 detail.setRoom(room);
-                detail.setRoomNumber(room.getRoomNumber());
-                detail.setRoomType(room.getRoomType().getId());
                 detail.setPricePerNight(room.getRoomType().getPricePerNight());
                 
                 if (request.getAdults() != null) {

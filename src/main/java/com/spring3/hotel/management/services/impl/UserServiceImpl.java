@@ -25,7 +25,6 @@ import com.spring3.hotel.management.exceptions.BadRequestException;
 import com.spring3.hotel.management.exceptions.DuplicateResourceException;
 import com.spring3.hotel.management.exceptions.NotFoundException;
 import com.spring3.hotel.management.models.User;
-import com.spring3.hotel.management.repositories.RefreshTokenRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.EmailService;
 import com.spring3.hotel.management.services.UserService;
@@ -39,9 +38,6 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     UserRepository userRepository;
-    
-    @Autowired
-    RefreshTokenRepository refreshTokenRepository;
     
     @Autowired(required = false)
     EmailService emailService;
@@ -67,7 +63,8 @@ public class UserServiceImpl implements UserService {
         user.setUsername(registerRequest.getUsername());
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         user.setEmail(registerRequest.getEmail());
-        user.setFullName(registerRequest.getFullName());
+        user.setFirstName(registerRequest.getFirstName());
+        user.setLastName(registerRequest.getLastName());
         user.setPhoneNumber(registerRequest.getPhoneNumber());
         
         // Set default role to "CUSTOMER" (String)
@@ -108,7 +105,8 @@ public class UserServiceImpl implements UserService {
                 oldUser.setPassword(user.getPassword());
                 oldUser.setUsername(user.getUsername());
                 oldUser.setEmail(user.getEmail());
-                oldUser.setFullName(user.getFullName());
+                oldUser.setFirstName(user.getFirstName());
+                oldUser.setLastName(user.getLastName());
                 oldUser.setPhoneNumber(user.getPhoneNumber()); // Thêm cập nhật SĐT
                 oldUser.setRole(user.getRole()); // Cập nhật role
                 savedUser = userRepository.save(oldUser);
@@ -212,7 +210,8 @@ public class UserServiceImpl implements UserService {
         log.info("Found user: {}", user);
 
         // Chỉ cập nhật các trường có trong request và User model
-        if (request.getFullName() != null) user.setFullName(request.getFullName());
+        if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
+        if (request.getLastName() != null) user.setLastName(request.getLastName());
         if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());
 
         // Cập nhật email nếu có và kiểm tra trùng lặp
@@ -247,7 +246,8 @@ public class UserServiceImpl implements UserService {
 
          User user = new User();
          user.setUsername(request.getUsername());
-         user.setFullName(request.getFullName());
+         user.setFirstName(request.getFirstName());
+         user.setLastName(request.getLastName());
          user.setEmail(request.getEmail());
          user.setPhoneNumber(request.getPhone());
          user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -288,9 +288,6 @@ public class UserServiceImpl implements UserService {
          User user = userRepository.findById(userId)
              .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
 
-         // Xóa refresh token nếu có
-         refreshTokenRepository.deleteByUser(user);
-
          userRepository.delete(user);
          log.info("User with ID: {} deleted successfully", userId);
     }
@@ -299,10 +296,13 @@ public class UserServiceImpl implements UserService {
         UserProfileResponse response = new UserProfileResponse();
         response.setId(user.getId());
         response.setUsername(user.getUsername());
-        response.setFullName(user.getFullName());
+        response.setFirstName(user.getFirstName());
+        response.setLastName(user.getLastName());
         response.setEmail(user.getEmail());
         response.setPhone(user.getPhoneNumber());
         response.setRole(user.getRole()); // Lấy role kiểu String
+        response.setEnabled(true); // Giả sử enabled
+        response.setRegistrationDate(LocalDate.now()); // Cần lấy ngày đăng ký thực tế từ user nếu có
         return response;
     }
 }

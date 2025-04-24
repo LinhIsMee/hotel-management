@@ -46,7 +46,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .orElseThrow(() -> new RuntimeException("Room not found"));
         bookingDetail.setBooking(booking);
         bookingDetail.setRoom(room);
-        bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+        // bookingDetail.setPricePerNight(room.getRoomType().getBasePrice()); // Commenting out: Missing getBasePrice
+        bookingDetail.setPricePerNight(room.getRoomType().getPricePerNight()); // Use price per night
         bookingDetailRepository.save(bookingDetail);
         return convertToBookingDetailResponse(bookingDetail);
     }
@@ -72,7 +73,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .orElseThrow(() -> new RuntimeException("Room not found"));
         bookingDetail.setBooking(booking);
         bookingDetail.setRoom(room);
-        bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+        // bookingDetail.setPricePerNight(room.getRoomType().getBasePrice()); // Commenting out: Missing getBasePrice
+        bookingDetail.setPricePerNight(room.getRoomType().getPricePerNight()); // Use price per night
         bookingDetailRepository.save(bookingDetail);
         return convertToBookingDetailResponse(bookingDetail);
     }

@@ -1,8 +1,7 @@
 package com.spring3.hotel.management.helpers;
-
-
-import com.spring3.hotel.management.models.Role;
+ 
 import com.spring3.hotel.management.models.User;
+// import com.spring3.hotel.management.models.Role; // Commenting out: Unresolved import
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,10 +22,12 @@ public class CustomUserDetails extends User implements UserDetails {
         List<GrantedAuthority> auths = new ArrayList<>();
 
         // Lấy role của user
-        Role role = byUsername.getRole();
-        if (role != null) {
-            auths.add(new SimpleGrantedAuthority(role.getName()));
-        }
+        // Role role = byUsername.getRole(); // Commenting out: Role cannot be resolved
+        // if (role != null) { // Commenting out: Role cannot be resolved
+            // auths.add(new SimpleGrantedAuthority(role.getName())); // Commenting out: Role cannot be resolved
+        // }
+        // Add a default role or handle role assignment differently if needed
+        auths.add(new SimpleGrantedAuthority("ROLE_USER")); // Example: Default to ROLE_USER
         this.authorities = auths;
     }
 

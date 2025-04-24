@@ -33,10 +33,6 @@ public interface UserService {
 
     String getUserRoleByUsername(String username);
     
-    boolean processForgotPassword(String email);
-    
-    boolean resetPassword(String token, String newPassword);
-    
     boolean changePassword(String oldPassword, String newPassword);
     
     void deleteUser(Integer userId);

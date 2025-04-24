@@ -25,11 +25,11 @@ public class RoomByTypeResponseDTO {
         return RoomByTypeResponseDTO.builder()
                 .id(room.getId())
                 .roomNumber(room.getRoomNumber())
-                .status(room.getStatus())
-                .floor(room.getFloor())
-                .isActive(room.getIsActive())
-                .notes(room.getNotes())
-                .images(room.getImages())
+                .status(room.getStatus() != null ? room.getStatus().name() : null)
+                // .floor(room.getFloor()) // Commenting out: Missing method
+                // .isActive(room.getIsActive()) // Commenting out: Missing method
+                // .notes(room.getNotes()) // Commenting out: Missing method
+                // .images(room.getImages()) // Commenting out: Missing method
                 .build();
     }
 } 

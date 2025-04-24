@@ -1,17 +1,11 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dto.request.CreateRatingRequest;
-import com.spring3.hotel.management.dto.response.RatingDTO;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
-import com.spring3.hotel.management.dto.response.ApiResponse;
-import com.spring3.hotel.management.dto.response.MessageResponse;
-import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
-import com.spring3.hotel.management.models.Rating;
+import com.spring3.hotel.management.dto.response.   ReviewResponseDTO;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.User;
-import com.spring3.hotel.management.repositories.RatingRepository;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.ReviewService;
@@ -42,9 +36,6 @@ public class ReviewController {
     @Autowired
     private ReviewService reviewService;
     
-    @Autowired
-    private RatingRepository ratingRepository;
-
     @Autowired
     private RoomRepository roomRepository;
 
@@ -144,76 +135,6 @@ public class ReviewController {
     public ResponseEntity<Map<String, Object>> getReviewStatistics() {
         Map<String, Object> statistics = reviewService.getReviewStatistics();
         return ResponseEntity.ok(statistics);
-    }
-    
-    // === RATING APIs (đã tối ưu) ===
-    
-    /**
-     * Lấy xếp hạng theo phòng
-     * Đã gộp vào API /room/{roomId} để tránh trùng lặp
-     * @deprecated Sử dụng API GET /room/{roomId} thay thế
-     */
-    @GetMapping("/ratings/room/{roomId}")
-    @Deprecated
-    public ResponseEntity<List<RatingDTO>> getRoomRatings(@PathVariable Integer roomId) {
-        List<Rating> ratings = ratingRepository.findByRoomId(roomId);
-        List<RatingDTO> ratingDTOs = ratings.stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(ratingDTOs);
-    }
-
-    /**
-     * Tạo xếp hạng mới
-     * @deprecated Sử dụng API POST /reviews thay thế với CreateReviewRequest
-     */
-    @PostMapping("/ratings")
-    @Transactional
-    @Deprecated
-    public ResponseEntity<RatingDTO> createRating(
-            @Valid @RequestBody CreateRatingRequest request,
-            Authentication authentication) {
-        
-        log.info("Bắt đầu tạo xếp hạng mới cho phòng {}", request.getRoomId());
-        
-        User user = userRepository.findByUsername(authentication.getName());
-        if (user == null) {
-            throw new RuntimeException("Không tìm thấy người dùng");
-        }
-        
-        Room room = roomRepository.findById(request.getRoomId())
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng"));
-
-        Rating rating = new Rating();
-        rating.setStars(request.getStars());
-        rating.setComment(request.getComment());
-        rating.setRoom(room);
-        rating.setUser(user);
-
-        rating = ratingRepository.save(rating);
-        
-        // Cập nhật điểm trung bình của phòng
-        room.updateAverageRating(rating.getStars());
-        room = roomRepository.save(room);
-        
-        log.info("Hoàn thành tạo xếp hạng cho phòng {}", request.getRoomId());
-
-        return ResponseEntity.ok(convertToDTO(rating));
-    }
-
-    /**
-     * Chuyển đổi Rating thành RatingDTO
-     */
-    private RatingDTO convertToDTO(Rating rating) {
-        return RatingDTO.builder()
-            .id(rating.getId())
-            .stars(rating.getStars())
-            .comment(rating.getComment())
-            .roomId(rating.getRoom().getId())
-            .userId(rating.getUser().getId())
-            .userName(rating.getUser().getFullName())
-            .createdAt(rating.getCreatedAt())
-            .build();
     }
     
     // === API bổ sung ===

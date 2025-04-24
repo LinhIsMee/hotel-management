@@ -10,11 +10,14 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 public class UpdateUserRequest {
-    private String fullName;
+    // private String fullName; // Bỏ fullName
+    private String firstName; // Thêm firstName
+    private String lastName; // Thêm lastName
     private String email;
-    private String address;
-    private String phone;
-    private String gender;
-    private String dateOfBirth;
-    private String nationalId;
+    // private String address; // Bỏ nếu không cần
+    private String phoneNumber; // Đổi tên phone thành phoneNumber
+    // private String gender; // Bỏ nếu không cần
+    // private String dateOfBirth; // Bỏ nếu không cần
+    // private String nationalId; // Bỏ nếu không cần
+    private String role; // Thêm role kiểu String
 }

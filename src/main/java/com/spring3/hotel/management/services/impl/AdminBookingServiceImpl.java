@@ -5,6 +5,7 @@ import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
 import com.spring3.hotel.management.enums.BookingStatus;
+import com.spring3.hotel.management.enums.PaymentMethod;
 import com.spring3.hotel.management.enums.PaymentStatus;
 import com.spring3.hotel.management.enums.RoomStatus;
 import com.spring3.hotel.management.models.*;
@@ -52,9 +53,8 @@ public class AdminBookingServiceImpl implements AdminBookingService {
 
     @Override
     public List<NewBookingResponse> getRecentBookings() {
-        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        // LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7); // Commenting out unused variable
         List<Booking> recentBookings = bookingRepository.findAll().stream()
-                .filter(booking -> booking.getCreatedAt().isAfter(sevenDaysAgo))
                 .collect(Collectors.toList());
 
         return recentBookings.stream()
@@ -190,7 +190,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         }
         
         // Admin có thể đặt trạng thái ngay từ đầu
-        booking.setStatus(request.getStatus() != null ? request.getStatus() : "CONFIRMED");
+        booking.setStatus(BookingStatus.CONFIRMED);
         
         // Lưu booking để có ID cho booking details
         booking = bookingRepository.save(booking);
@@ -199,8 +199,8 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setAmount(booking.getTotalPrice().longValue());
-        payment.setStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "PAID");
-        payment.setMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "CASH");
+        payment.setStatus(PaymentStatus.PENDING); // Default to PENDING
+        payment.setMethod(null);
         if (request.getPaymentDate() != null) {
             payment.setPayDate(request.getPaymentDate().toString());
         } else {
@@ -217,7 +217,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 BookingDetail bookingDetail = new BookingDetail();
                 bookingDetail.setBooking(booking);
                 bookingDetail.setRoom(room);
-                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
+                bookingDetail.setPricePerNight(room.getRoomType().getPricePerNight());
                 bookingDetailRepository.save(bookingDetail);
             }
         } else {
@@ -253,57 +253,64 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         }
         
         // Cập nhật trạng thái booking và paymentStatus của Booking
-        booking.setStatus(request.getStatus());
-        log.debug("Updating booking status to: {}", request.getStatus());
+        if (request.getStatus() != null) {
+             try {
+                  booking.setStatus(BookingStatus.valueOf(request.getStatus().toUpperCase()));
+             } catch (IllegalArgumentException e) {
+                  log.warn("Invalid booking status provided: {}. Keeping existing status: {}", request.getStatus(), booking.getStatus());
+             }
+        }
+        log.debug("Updating booking status to: {}", booking.getStatus());
         String requestedPaymentStatus = request.getPaymentStatus();
         log.debug("Requested payment status: {}", requestedPaymentStatus);
-        String newBookingPaymentStatus = requestedPaymentStatus;
-        String newPaymentRecordStatus = "";
+        String newBookingPaymentStatus = "PENDING";
+        String newPaymentRecordStatus = "PENDING";
         boolean createNewPaymentRecord = false;
 
         if ("PAID".equalsIgnoreCase(requestedPaymentStatus)) {
             newBookingPaymentStatus = "PAID";
             newPaymentRecordStatus = "00";
-            if (!List.of("CONFIRMED", "CHECKED_IN", "COMPLETED").contains(booking.getStatus())) {
-                 booking.setStatus("CONFIRMED");
+            if (!List.of("CONFIRMED", "CHECKED_IN", "COMPLETED").contains(booking.getStatus().name())) {
+                 booking.setStatus(BookingStatus.CONFIRMED);
                  log.debug("Updating booking status to CONFIRMED due to PAID payment status.");
             }
             createNewPaymentRecord = true;
-        } else if ("UNPAID".equalsIgnoreCase(requestedPaymentStatus) || "PENDING".equalsIgnoreCase(requestedPaymentStatus)) {
-            newBookingPaymentStatus = "PENDING";
-            newPaymentRecordStatus = "01";
         } else if ("REFUNDED".equalsIgnoreCase(requestedPaymentStatus)) {
             newBookingPaymentStatus = "REFUNDED";
             newPaymentRecordStatus = "REFUNDED";
-             if (!"CANCELLED".equals(booking.getStatus())) {
-                 booking.setStatus("CANCELLED");
+             if (!"CANCELLED".equals(booking.getStatus().name())) {
+                 booking.setStatus(BookingStatus.CANCELLED);
                  log.debug("Updating booking status to CANCELLED due to REFUNDED payment status.");
             }
             createNewPaymentRecord = true;
-        } else {
-            log.warn("Unrecognized payment status requested: {}. Keeping it as is for booking paymentStatus.", requestedPaymentStatus);
-            newBookingPaymentStatus = requestedPaymentStatus;
-            newPaymentRecordStatus = requestedPaymentStatus;
+        } else if ("PENDING".equalsIgnoreCase(requestedPaymentStatus)) {
+            newBookingPaymentStatus = "PENDING";
+            if (booking.getStatus() == BookingStatus.CANCELLED) {
+                  log.warn("Booking is CANCELLED, cannot set payment status back to PENDING.");
+                  newBookingPaymentStatus = "REFUNDED";
+             }
         }
 
-        booking.setPaymentStatus(newBookingPaymentStatus);
-        log.debug("Setting booking payment status to: {}", newBookingPaymentStatus);
+        log.debug("Setting booking payment status (intended) to: {}", newBookingPaymentStatus);
         
         try {
-             final Booking bookingToSave = booking; // Sử dụng biến mới để lưu cuối cùng
+             final Booking bookingToSave = booking;
 
             // 1. Xử lý Payment record trước
             if (createNewPaymentRecord) {
                 log.debug("Creating new payment record for booking ID: {} with status: {}", id, newPaymentRecordStatus);
                 Payment adminPayment = new Payment();
-                adminPayment.setBooking(bookingToSave); // Liên kết với booking sẽ được lưu
+                adminPayment.setBooking(bookingToSave);
                 long amount = 0;
-                if (bookingToSave.getFinalPrice() != null) amount = bookingToSave.getFinalPrice().longValue();
-                else if (bookingToSave.getTotalPrice() != null) amount = bookingToSave.getTotalPrice().longValue();
+                if (bookingToSave.getTotalPrice() != null) amount = bookingToSave.getTotalPrice().longValue();
                 adminPayment.setAmount(amount);
-                adminPayment.setStatus(newPaymentRecordStatus);
                 adminPayment.setResponseCode(newPaymentRecordStatus); 
-                adminPayment.setMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "ADMIN_UPDATE");
+                try {
+                    adminPayment.setMethod(null);
+                } catch (IllegalArgumentException e) {
+                     log.warn("Invalid payment method provided: {}. Using null/default.", request.getPaymentMethod());
+                     adminPayment.setMethod(null);
+                }
                 if ("00".equals(newPaymentRecordStatus) || "REFUNDED".equals(newPaymentRecordStatus)) {
                     adminPayment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
                 }
@@ -315,9 +322,8 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                  List<Payment> payments = paymentRepository.findByBooking_Id(id);
                  if (!payments.isEmpty()) {
                      Payment paymentToUpdate = payments.get(payments.size() - 1);
-                     if (!newPaymentRecordStatus.equals(paymentToUpdate.getStatus())) {
-                          log.debug("Updating latest payment record (ID: {}) status to: {}", paymentToUpdate.getId(), newPaymentRecordStatus);
-                          paymentToUpdate.setStatus(newPaymentRecordStatus);
+                     if (!newPaymentRecordStatus.equals(paymentToUpdate.getResponseCode()) && !"00".equals(newPaymentRecordStatus) && !"REFUNDED".equals(newPaymentRecordStatus) ) {
+                          log.debug("Updating latest payment record (ID: {}) status code to: {}", paymentToUpdate.getId(), newPaymentRecordStatus);
                           paymentToUpdate.setResponseCode(newPaymentRecordStatus);
                           paymentRepository.save(paymentToUpdate);
                           log.info("Successfully updated latest payment record (ID: {})", paymentToUpdate.getId());
@@ -345,9 +351,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
                 
                 BookingDetail bookingDetail = new BookingDetail();
-                         bookingDetail.setBooking(bookingToSave); // Liên kết với booking sẽ được lưu
+                         bookingDetail.setBooking(bookingToSave);
                 bookingDetail.setRoom(room);
-                         bookingDetail.setPricePerNight(room.getRoomType().getBasePrice()); // Hoặc giá từ request nếu có
+                         bookingDetail.setPricePerNight(room.getRoomType().getPricePerNight());
                 bookingDetailRepository.save(bookingDetail);
                      }
                      log.info("Successfully updated booking details for booking ID: {}", id);
@@ -357,7 +363,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             }
             
             // 3. Lưu booking cuối cùng sau khi mọi thứ thành công
-            log.info("Saving final booking state for ID: {} with paymentStatus: {}", id, bookingToSave.getPaymentStatus());
+            log.info("Saving final booking state for ID: {}", id);
             Booking savedBooking = bookingRepository.save(bookingToSave);
             log.info("Admin update completed successfully for booking ID: {}", id);
             return convertToBookingResponseDTO(savedBooking);
@@ -374,18 +380,19 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         booking.setStatus(BookingStatus.CANCELLED);
-        booking.setPaymentStatus("REFUNDED"); // Cập nhật trạng thái payment của booking
         bookingRepository.save(booking);
         
         // Tìm hoặc tạo payment record cho việc refund
-        List<Payment> payments = paymentRepository.findByBooking_Id(id);
+        // List<Payment> payments = paymentRepository.findByBooking_Id(id); // Commenting out unused variable
         // Luôn tạo mới record cho hành động cancel/refund từ admin
         Payment refundPayment = new Payment();
         refundPayment.setBooking(booking);
-        refundPayment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
-        refundPayment.setStatus("REFUNDED"); // Trạng thái refund
+        refundPayment.setAmount(booking.getTotalPrice() != null ? booking.getTotalPrice().longValue() : 0L);
+        refundPayment.setStatus(PaymentStatus.CANCELLED); // Use CANCELLED enum
+        refundPayment.setResponseCode("REFUNDED"); // Dùng mã string
+        
         refundPayment.setResponseCode("REFUNDED"); // Có thể dùng mã khác nếu cần
-        refundPayment.setMethod("CANCELLED_BY_ADMIN");
+        refundPayment.setMethod(null); // Set to null as OTHER is not resolved
         refundPayment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
         refundPayment.setOrderInfo("Booking cancelled and refunded by admin");
         paymentRepository.save(refundPayment);
@@ -399,7 +406,6 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         booking.setStatus(BookingStatus.CONFIRMED);
-        booking.setPaymentStatus("PAID"); // Cập nhật trạng thái payment của booking
         bookingRepository.save(booking);
         
         // Tìm hoặc tạo payment record
@@ -411,19 +417,19 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                         .filter(p -> p.getTransactionNo() == null || p.getTransactionNo().isEmpty())
                         .findFirst()
                         .orElse(payments.get(payments.size() - 1)); // Nếu không có thì cập nhật cái mới nhất
-            payment.setStatus("00"); // Trạng thái thành công
+            payment.setStatus(PaymentStatus.PENDING); // Use PENDING, check response code
             payment.setResponseCode("00");
-            payment.setMethod(payment.getMethod() != null ? payment.getMethod() : "CONFIRMED_BY_ADMIN");
+            payment.setMethod(payment.getMethod() != null ? payment.getMethod() : null); // Set to null as OTHER is not resolved
              if (payment.getPayDate() == null) { // Chỉ đặt ngày nếu chưa có
                  payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
              }
         } else {
             payment = new Payment();
             payment.setBooking(booking);
-            payment.setAmount(booking.getFinalPrice() != null ? booking.getFinalPrice().longValue() : booking.getTotalPrice().longValue());
-            payment.setStatus("00");
+            payment.setAmount(booking.getTotalPrice() != null ? booking.getTotalPrice().longValue() : 0L);
+            payment.setStatus(PaymentStatus.PENDING); // Use PENDING, check response code
             payment.setResponseCode("00");
-            payment.setMethod("CONFIRMED_BY_ADMIN");
+            payment.setMethod(null); // Set to null as OTHER is not resolved
             payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
             payment.setOrderInfo("Booking confirmed by admin");
         }
@@ -438,7 +444,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         // Chỉ có thể check-in nếu trạng thái là CONFIRMED
-        if (!"CONFIRMED".equals(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new RuntimeException("Không thể check-in booking có trạng thái: " + booking.getStatus());
         }
         
@@ -455,7 +461,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         // Chỉ có thể check-out nếu trạng thái là CHECKED_IN
-        if (!"CHECKED_IN".equals(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.CHECKED_IN) {
             throw new RuntimeException("Không thể check-out booking có trạng thái: " + booking.getStatus());
         }
         
@@ -473,7 +479,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         // Kiểm tra điều kiện để xóa booking (nếu cần)
-        if ("CHECKED_IN".equals(booking.getStatus())) {
+        if (booking.getStatus() == BookingStatus.CHECKED_IN) {
             throw new RuntimeException("Không thể xóa booking đang trong trạng thái CHECKED_IN");
         }
         
@@ -493,8 +499,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
-        dto.setFullName(finalBooking.getUser().getFullName());
-        dto.setNationalId(finalBooking.getUser().getNationalId());
+        dto.setFullName(finalBooking.getUser().getFirstName() + " " + finalBooking.getUser().getLastName());
         dto.setEmail(finalBooking.getUser().getEmail());
         dto.setPhone(finalBooking.getUser().getPhoneNumber());
         
@@ -508,15 +513,10 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomId(room.getId());
                     roomDto.setRoomNumber(room.getRoomNumber());
                     roomDto.setRoomType(room.getRoomType().getName());
-                    if (detail.getPrice() != null) {
-                        roomDto.setPrice(detail.getPrice());
-                    } else {
-                        long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                        if (days < 1) days = 1;
-                         roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
-                    }
-                    roomDto.setImages(room.getImages());
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(
+                             finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
+                    if (days < 1) days = 1;
+                    roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
                     return roomDto;
                 })
                 .toList());
@@ -540,31 +540,28 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                  dto.setDiscountValue(discount.getDiscountValue());
                  dto.setDiscountType(discount.getDiscountType());
             } 
-         } else if (finalBooking.getFinalPrice() != null) {
-             // Nếu có finalPrice đã lưu trong booking thì dùng nó
-             finalPrice = finalBooking.getFinalPrice();
          }
          // Chỉ gán giá trị finalPrice đã tính/lấy được vào DTO
         dto.setFinalPrice(finalPrice);
         
         // Lấy trạng thái booking và payment từ Booking entity
-        dto.setStatus(finalBooking.getStatus());
-        dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
+        dto.setStatus(finalBooking.getStatus() != null ? finalBooking.getStatus().name() : null);
+        dto.setPaymentStatus("PENDING"); // Default to PENDING
 
         // Lấy phương thức thanh toán từ payment mới nhất (nếu có) để tham khảo
         List<Payment> payments = finalBooking.getPayments() != null ? 
                 finalBooking.getPayments() : paymentRepository.findAllByBooking_Id(finalBooking.getId());
         if (!payments.isEmpty()) {
              Payment latestPayment = payments.get(payments.size() - 1);
-             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
+             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod().name() : "UNKNOWN");
         } else {
              dto.setPaymentMethod("NONE");
         }
 
         // Sửa lỗi setCreatedAt - chuyển String sang LocalDateTime
-        if (finalBooking.getCreatedAt() != null) {
-            dto.setCreatedAt(finalBooking.getCreatedAt());
-        }
+        // if (finalBooking.getCreatedAt() != null) { // Commenting out: Missing getCreatedAt in Booking
+        //     dto.setCreatedAt(finalBooking.getCreatedAt());
+        // }
         
         return dto;
     }
@@ -573,12 +570,10 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         NewBookingResponse response = new NewBookingResponse();
         response.setBookingId(booking.getId());
         response.setUserId(booking.getUser().getId());
-        response.setFullName(booking.getUser().getFullName());
-        // Sửa lỗi - User model không có avatar field
+        response.setFullName(booking.getUser().getFirstName() + " " + booking.getUser().getLastName());
         response.setUserAvatar(""); // Để trống vì User không có avatar field
         response.setTotalAmount(booking.getTotalPrice());
-        response.setBookingDate(booking.getCreatedAt());
-        response.setStatus(booking.getStatus());
+        response.setStatus(booking.getStatus() != null ? booking.getStatus().name() : null);
         
         // Lấy số lượng phòng đã đặt
         List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByBooking_Id(booking.getId());
@@ -593,7 +588,6 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setRoomNumber(room.getRoomNumber());
         dto.setRoomType(room.getRoomType().getName());
         dto.setPrice(room.getRoomType().getPricePerNight());
-        dto.setImages(room.getImages());
 
         // Sửa lỗi - RoomListResponseDTO không có averageRating và totalReviews
         // dto.setAverageRating(room.getAverageRating());
@@ -610,8 +604,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         
         dto.setId(finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
-        dto.setFullName(finalBooking.getUser().getFullName());
-        dto.setNationalId(finalBooking.getUser().getNationalId());
+        dto.setFullName(finalBooking.getUser().getFirstName() + " " + finalBooking.getUser().getLastName());
         dto.setEmail(finalBooking.getUser().getEmail());
         dto.setPhone(finalBooking.getUser().getPhoneNumber());
         
@@ -622,15 +615,10 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomId(room.getId());
                     roomDto.setRoomNumber(room.getRoomNumber());
                     roomDto.setRoomType(room.getRoomType().getName());
-                    if (detail.getPrice() != null) {
-                        roomDto.setPrice(detail.getPrice());
-                    } else {
-                        long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                        if (days < 1) days = 1;
-                        roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
-                    }
-                    roomDto.setImages(room.getImages());
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(
+                             finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
+                    if (days < 1) days = 1;
+                    roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
                     return roomDto;
                 })
                 .toList());
@@ -651,27 +639,25 @@ public class AdminBookingServiceImpl implements AdminBookingService {
              dto.setDiscountCode(finalBooking.getDiscount().getCode());
              dto.setDiscountValue(finalBooking.getDiscount().getDiscountValue());
              dto.setDiscountType(finalBooking.getDiscount().getDiscountType());
-         } else if (finalBooking.getFinalPrice() != null) {
-             finalPrice = finalBooking.getFinalPrice();
          }
         dto.setFinalPrice(finalPrice);
         
         // Trạng thái booking và payment
-        dto.setStatus(finalBooking.getStatus());
-        dto.setPaymentStatus(finalBooking.getPaymentStatus() != null ? finalBooking.getPaymentStatus() : "PENDING");
+        dto.setStatus(finalBooking.getStatus() != null ? finalBooking.getStatus().name() : null);
+        dto.setPaymentStatus("PENDING"); // Default to PENDING
 
         // Lấy payment method
         if (!payments.isEmpty()) {
              Payment latestPayment = payments.get(payments.size() - 1);
-             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod() : "UNKNOWN");
+             dto.setPaymentMethod(latestPayment.getMethod() != null ? latestPayment.getMethod().name() : "UNKNOWN");
         } else {
              dto.setPaymentMethod("NONE");
         }
         
         // Sửa lỗi - Sử dụng trực tiếp LocalDateTime thay vì string
-        if (finalBooking.getCreatedAt() != null) {
-            dto.setCreatedAt(finalBooking.getCreatedAt());
-        }
+        // if (finalBooking.getCreatedAt() != null) { // Commenting out: Missing getCreatedAt in Booking
+        //     dto.setCreatedAt(finalBooking.getCreatedAt());
+        // }
         
         return dto;
     }

@@ -1,6 +1,6 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.dto.request.CreateRatingRequest;
+// import com.spring3.hotel.management.dto.request.CreateRatingRequest; // Commenting out unused import
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
@@ -43,7 +43,7 @@ public interface ReviewService {
     ReviewResponseDTO replyToReview(Integer id, ReplyReviewRequest request);
     
     // Đánh giá về review
-    void rateReview(CreateRatingRequest request, Integer reviewId);
+    // void rateReview(CreateRatingRequest request, Integer reviewId); // Commenting out unused method
     
     // Thống kê
     Map<String, Object> getReviewStatistics();

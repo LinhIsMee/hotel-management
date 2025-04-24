@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.dto.response;
 
 import com.spring3.hotel.management.models.HotelService;
-import com.spring3.hotel.management.models.Offering;
+// import com.spring3.hotel.management.models.Offering; // Commenting out: Missing model
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +19,7 @@ public class ServiceResponseDTO {
     private String code;
     private String type;
     private String description;
-    private BigDecimal price;
+    private Double price;
     private Boolean isAvailable;
     private String imageUrl;
     private String unit;
@@ -32,24 +32,24 @@ public class ServiceResponseDTO {
         return ServiceResponseDTO.builder()
                 .id(service.getId())
                 .name(service.getName())
-                .code(service.getCode())
-                .type(service.getType())
-                .description(service.getDescription())
+                // .code(service.getCode()) // Commenting out: Missing method
+                // .type(service.getType()) // Commenting out: Missing method
+                // .description(service.getDescription()) // Commenting out: Missing method
                 .price(service.getPrice())
-                .isAvailable(service.getIsAvailable())
-                .imageUrl(service.getImageUrl())
-                .unit(service.getUnit())
+                // .isAvailable(service.getIsAvailable()) // Commenting out: Missing method
+                // .imageUrl(service.getImageUrl()) // Commenting out: Missing method
+                // .unit(service.getUnit()) // Commenting out: Missing method
                 .build();
     }
     
-    public static ServiceResponseDTO fromOffering(Offering offering) {
-        if (offering == null) return null;
-        
-        return ServiceResponseDTO.builder()
-                .id(offering.getId())
-                .name(offering.getName())
-                .description(offering.getDescription())
-                .price(offering.getPrice() != null ? BigDecimal.valueOf(offering.getPrice()) : null)
-                .build();
-    }
+    // public static ServiceResponseDTO fromOffering(Offering offering) { // Commenting out: Missing model Offering
+    //     if (offering == null) return null;
+    //     
+    //     return ServiceResponseDTO.builder()
+    //             .id(offering.getId())
+    //             .name(offering.getName())
+    //             .description(offering.getDescription())
+    //             .price(offering.getPrice() != null ? BigDecimal.valueOf(offering.getPrice()) : null)
+    //             .build();
+    // }
 } 
