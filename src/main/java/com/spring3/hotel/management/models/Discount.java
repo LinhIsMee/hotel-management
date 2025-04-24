@@ -22,6 +22,10 @@ public class Discount {
     @NotNull(message = "Mã giảm giá không được để trống")
     private String code;
 
+    @Column(name = "discount_type", nullable = false)
+    @NotNull(message = "Loại giảm giá không được để trống")
+    private String discountType;
+
     @Column(name = "discount_value", nullable = false)
     @NotNull(message = "Giá trị giảm giá không được để trống")
     private Double discountValue;
@@ -33,4 +37,10 @@ public class Discount {
     @Column(name = "valid_to", nullable = false)
     @NotNull(message = "Ngày kết thúc hiệu lực không được để trống")
     private LocalDate validTo;
+    
+    @Column(name = "max_uses", nullable = false)
+    private int maxUses = 1;
+    
+    @Column(name = "used_count", nullable = false)
+    private int usedCount = 0;
 }

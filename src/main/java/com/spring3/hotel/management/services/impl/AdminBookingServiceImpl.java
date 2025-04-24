@@ -4,6 +4,9 @@ import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.enums.BookingStatus;
+import com.spring3.hotel.management.enums.PaymentStatus;
+import com.spring3.hotel.management.enums.RoomStatus;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.AdminBookingService;
@@ -111,7 +114,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     }
 
     @Override
-    public List<BookingResponseDTO> getBookingsByStatus(String status) {
+    public List<BookingResponseDTO> getBookingsByStatus(BookingStatus status) {
         return bookingRepository.findByStatus(status)
                 .stream()
                 .map(this::convertToBookingResponseDTO)
@@ -139,7 +142,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     public List<RoomListResponseDTO> getBookedRoomsByDateRange(LocalDate startDate, LocalDate endDate) {
         List<Booking> bookings = bookingRepository.findAll().stream()
                 .filter(booking -> 
-                    !"CANCELLED".equals(booking.getStatus())
+                    booking.getStatus() != BookingStatus.CANCELLED
                     && (
                         (booking.getCheckInDate().isEqual(startDate) || booking.getCheckInDate().isAfter(startDate)) 
                             && (booking.getCheckInDate().isEqual(endDate) || booking.getCheckInDate().isBefore(endDate))
@@ -370,7 +373,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
-        booking.setStatus("CANCELLED");
+        booking.setStatus(BookingStatus.CANCELLED);
         booking.setPaymentStatus("REFUNDED"); // Cập nhật trạng thái payment của booking
         bookingRepository.save(booking);
         
@@ -395,7 +398,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
-        booking.setStatus("CONFIRMED");
+        booking.setStatus(BookingStatus.CONFIRMED);
         booking.setPaymentStatus("PAID"); // Cập nhật trạng thái payment của booking
         bookingRepository.save(booking);
         
@@ -440,7 +443,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         }
         
         // Cập nhật trạng thái booking thành CHECKED_IN
-        booking.setStatus("CHECKED_IN");
+        booking.setStatus(BookingStatus.CHECKED_IN);
         bookingRepository.save(booking);
         
         return convertToBookingResponseDTO(booking);
@@ -457,7 +460,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         }
         
         // Cập nhật trạng thái booking thành COMPLETED
-        booking.setStatus("COMPLETED");
+        booking.setStatus(BookingStatus.COMPLETED);
         bookingRepository.save(booking);
         
         return convertToBookingResponseDTO(booking);

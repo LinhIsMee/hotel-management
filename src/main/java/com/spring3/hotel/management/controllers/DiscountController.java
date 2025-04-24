@@ -189,12 +189,9 @@ public class DiscountController {
         DiscountDTO dto = new DiscountDTO();
         dto.setId(discount.getId());
         dto.setCode(discount.getCode());
-        dto.setDiscountType(discount.getDiscountType());
         dto.setDiscountValue(discount.getDiscountValue());
         dto.setValidFrom(discount.getValidFrom());
         dto.setValidTo(discount.getValidTo());
-        dto.setMaxUses(discount.getMaxUses());
-        dto.setUsedCount(discount.getUsedCount());
         
         // Kiểm tra tính hợp lệ
         boolean isValid = discountService.isDiscountValid(discount.getCode());

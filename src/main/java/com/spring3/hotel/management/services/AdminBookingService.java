@@ -4,6 +4,7 @@ import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.enums.BookingStatus;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -13,7 +14,7 @@ public interface AdminBookingService {
     List<NewBookingResponse> getRecentBookings();
     BookingResponseDTO getBookingById(Integer id);
     List<BookingResponseDTO> getAllBookings(int page, int size);
-    List<BookingResponseDTO> getBookingsByStatus(String status);
+    List<BookingResponseDTO> getBookingsByStatus(BookingStatus status);
     List<BookingResponseDTO> getBookingsByDateRange(LocalDate startDate, LocalDate endDate);
     List<RoomListResponseDTO> getBookedRoomsByDateRange(LocalDate startDate, LocalDate endDate);
     

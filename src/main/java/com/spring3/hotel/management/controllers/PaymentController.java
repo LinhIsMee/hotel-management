@@ -35,6 +35,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.spring3.hotel.management.enums.BookingStatus;
+import com.spring3.hotel.management.enums.PaymentMethod;
+import com.spring3.hotel.management.enums.PaymentStatus;
+
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
@@ -191,7 +195,7 @@ public class PaymentController {
         booking.setUser(user);
         booking.setCheckInDate(checkInDate);
         booking.setCheckOutDate(checkOutDate);
-        booking.setStatus("PENDING");
+        booking.setStatus(BookingStatus.PENDING);
         booking.setNotes(notes);
         
         if (!fullName.isEmpty()) booking.setCustomerName(fullName);
@@ -338,7 +342,7 @@ public class PaymentController {
                         .orElse(null);
                     
                     if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
-                        booking.setStatus("CONFIRMED");
+                        booking.setStatus(BookingStatus.CONFIRMED);
                         bookingRepository.save(booking);
                         log.info("Đã cập nhật booking ID {} thành CONFIRMED", booking.getId());
                     }
@@ -502,7 +506,7 @@ public class PaymentController {
             if ("00".equals(status)) {
                 Booking booking = payment.getBooking();
                 if (booking != null && !"CONFIRMED".equals(booking.getStatus())) {
-                    booking.setStatus("CONFIRMED");
+                    booking.setStatus(BookingStatus.CONFIRMED);
                     bookingRepository.save(booking);
                 }
             }
@@ -600,7 +604,7 @@ public class PaymentController {
             Booking booking = bookingOpt.get();
             
             // Cập nhật trạng thái booking
-            booking.setStatus("CONFIRMED");
+            booking.setStatus(BookingStatus.CONFIRMED);
             bookingRepository.save(booking);
             
             // Tìm và cập nhật payment nếu có

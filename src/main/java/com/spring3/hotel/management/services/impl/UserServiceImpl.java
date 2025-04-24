@@ -24,12 +24,8 @@ import com.spring3.hotel.management.dto.response.UserResponse;
 import com.spring3.hotel.management.exceptions.BadRequestException;
 import com.spring3.hotel.management.exceptions.DuplicateResourceException;
 import com.spring3.hotel.management.exceptions.NotFoundException;
-import com.spring3.hotel.management.models.PasswordResetToken;
-import com.spring3.hotel.management.models.Role;
 import com.spring3.hotel.management.models.User;
-import com.spring3.hotel.management.repositories.PasswordResetTokenRepository;
 import com.spring3.hotel.management.repositories.RefreshTokenRepository;
-import com.spring3.hotel.management.repositories.RoleRepository;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.EmailService;
 import com.spring3.hotel.management.services.UserService;
@@ -43,12 +39,6 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     UserRepository userRepository;
-    
-    @Autowired
-    RoleRepository roleRepository;
-    
-    @Autowired
-    PasswordResetTokenRepository passwordResetTokenRepository;
     
     @Autowired
     RefreshTokenRepository refreshTokenRepository;
@@ -79,20 +69,9 @@ public class UserServiceImpl implements UserService {
         user.setEmail(registerRequest.getEmail());
         user.setFullName(registerRequest.getFullName());
         user.setPhoneNumber(registerRequest.getPhoneNumber());
-        user.setGender(registerRequest.getGender());
         
-        if (registerRequest.getDateOfBirth() != null && !registerRequest.getDateOfBirth().isEmpty()) {
-            user.setDateOfBirth(LocalDate.parse(registerRequest.getDateOfBirth()));
-        }
-        
-        user.setAddress(registerRequest.getAddress());
-        user.setNationalId(registerRequest.getNationalId());
-        user.setCreatedAt(LocalDateTime.now());
-        
-        // Set default role to USER
-        Role userRole = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("Error: Role USER is not found."));
-        user.setRole(userRole);
+        // Set default role to "CUSTOMER" (String)
+        user.setRole("CUSTOMER"); 
         
         User savedUser = userRepository.save(user);
         
@@ -101,13 +80,14 @@ public class UserServiceImpl implements UserService {
                 .id(savedUser.getId().toString())
                 .username(savedUser.getUsername())
                 .email(savedUser.getEmail())
-                .role("ROLE_USER")
-                .active(true)
+                .role(savedUser.getRole()) // Lấy role kiểu String
+                .active(true) // Giả sử mặc định là active
                 .build();
     }
 
     @Override
     public UserResponse saveUser(UserRequest userRequest) {
+        // Kiểm tra các trường bắt buộc
         if(userRequest.getUsername() == null){
             throw new RuntimeException("Parameter username is not found in request..!!");
         } else if(userRequest.getPassword() == null){
@@ -115,16 +95,11 @@ public class UserServiceImpl implements UserService {
         }
 
         User savedUser = null;
-
-        User user = modelMapper.map(userRequest, User.class);
+        User user = modelMapper.map(userRequest, User.class); // Map từ DTO sang Entity
         user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
         
-        // Thiết lập vai trò mặc định là ROLE_USER nếu không có role trong request
-        if (user.getRole() == null) {
-            Role userRole = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("Error: Role USER is not found."));
-            user.setRole(userRole);
-        }
+        // Sử dụng role kiểu String từ request hoặc đặt mặc định "CUSTOMER"
+        user.setRole(userRequest.getRole() != null ? userRequest.getRole() : "CUSTOMER");
         
         if(userRequest.getId() != null){
             User oldUser = userRepository.findFirstById(userRequest.getId());
@@ -134,27 +109,20 @@ public class UserServiceImpl implements UserService {
                 oldUser.setUsername(user.getUsername());
                 oldUser.setEmail(user.getEmail());
                 oldUser.setFullName(user.getFullName());
-                
-                // Cập nhật role nếu có
-                if (user.getRole() != null) {
-                    oldUser.setRole(user.getRole());
-                } else {
-                    // Giữ nguyên role cũ nếu không có role mới
-                    if (oldUser.getRole() == null) {
-                        Role userRole = roleRepository.findByName("ROLE_USER")
-                            .orElseThrow(() -> new RuntimeException("Error: Role USER is not found."));
-                        oldUser.setRole(userRole);
-                    }
-                }
-                
-                oldUser.setUpdatedAt(LocalDateTime.now());
+                oldUser.setPhoneNumber(user.getPhoneNumber()); // Thêm cập nhật SĐT
+                oldUser.setRole(user.getRole()); // Cập nhật role
                 savedUser = userRepository.save(oldUser);
             } else {
                 throw new RuntimeException("Can't find record with identifier: " + userRequest.getId());
             }
         } else {
-            // Thiết lập ngày tạo cho người dùng mới
-            user.setCreatedAt(LocalDateTime.now());
+            // Kiểm tra trùng lặp cho user mới
+            if (userRepository.existsByUsername(user.getUsername())) {
+                throw new DuplicateResourceException("Username already exists");
+            }
+            if (user.getEmail() != null && userRepository.existsByEmail(user.getEmail())) {
+                 throw new DuplicateResourceException("Email already exists");
+            }
             savedUser = userRepository.save(user);
         }
         
@@ -163,8 +131,8 @@ public class UserServiceImpl implements UserService {
                 .id(savedUser.getId().toString())
                 .username(savedUser.getUsername())
                 .email(savedUser.getEmail())
-                .role(savedUser.getRole() != null ? savedUser.getRole().getName() : null)
-                .active(true)
+                .role(savedUser.getRole()) // Lấy role kiểu String
+                .active(true) // Giả sử active
                 .build();
     }
 
@@ -180,8 +148,8 @@ public class UserServiceImpl implements UserService {
                 .id(user.getId().toString())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .role(user.getRole() != null ? user.getRole().getName() : null)
-                .active(true)
+                .role(user.getRole()) // Lấy role kiểu String
+                .active(true) // Giả sử active
                 .build();
     }
 
@@ -193,8 +161,8 @@ public class UserServiceImpl implements UserService {
                     .id(user.getId().toString())
                     .username(user.getUsername())
                     .email(user.getEmail())
-                    .role(user.getRole() != null ? user.getRole().getName() : null)
-                    .active(true)
+                    .role(user.getRole()) // Lấy role kiểu String
+                    .active(true) // Giả sử active
                     .build())
             .collect(Collectors.toList());
     }
@@ -209,9 +177,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserProfileResponse> getUserList() {
-        // Kiểm tra quyền admin
-        checkAdminRole();
-        
         List<User> users = userRepository.findAll();
         return users.stream()
             .map(this::mapToUserProfileResponse)
@@ -233,7 +198,7 @@ public class UserServiceImpl implements UserService {
         if (user == null) {
             throw new RuntimeException("User not found with username: " + username);
         }
-        return user.getRole().getName();
+        return user.getRole(); // Trả về role kiểu String
     }
 
     @Override
@@ -246,226 +211,98 @@ public class UserServiceImpl implements UserService {
         }
         log.info("Found user: {}", user);
 
-        user.setFullName(request.getFullName());
-        user.setAddress(request.getAddress());
-        user.setEmail(request.getEmail());
-        user.setPhoneNumber(request.getPhone());
-        user.setGender(request.getGender());
-        log.info("Setting date of birth: {}", request.getDateOfBirth());
-        if (request.getDateOfBirth() != null) {
-            user.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
-        }else {
-            user.setDateOfBirth(null);
+        // Chỉ cập nhật các trường có trong request và User model
+        if (request.getFullName() != null) user.setFullName(request.getFullName());
+        if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());
+
+        // Cập nhật email nếu có và kiểm tra trùng lặp
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                 throw new DuplicateResourceException("Email already exists");
+            }
+            user.setEmail(request.getEmail());
         }
-        user.setNationalId(request.getNationalId());
-        user.setUpdatedAt(LocalDateTime.now());
 
-        log.info("Saving user: {}", user);
-        User savedUser = userRepository.save(user);
-        log.info("User saved successfully: {}", savedUser);
+        // Cập nhật role nếu có trong request (kiểu String)
+        if (request.getRole() != null) {
+             user.setRole(request.getRole());
+        }
 
-        return mapToUserProfileResponse(savedUser);
+        User updatedUser = userRepository.save(user);
+        log.info("User updated successfully: {}", updatedUser);
+        return mapToUserProfileResponse(updatedUser);
     }
 
     @Override
     @Transactional
     public UserProfileResponse createUser(CreateUserRequest request) {
-        // Kiểm tra quyền admin
-        checkAdminRole();
-        
-        // Kiểm tra username đã tồn tại chưa
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new DuplicateResourceException("Username already exists");
-        }
-        
-        // Kiểm tra email đã tồn tại chưa
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateResourceException("Email already exists");
-        }
-        
-        // Tạo người dùng mới
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setEmail(request.getEmail());
-        user.setFullName(request.getFullName());
-        user.setPhoneNumber(request.getPhone());
-        user.setGender(request.getGender());
-        user.setAddress(request.getAddress());
-        user.setNationalId(request.getNationalId());
-        
-        if (request.getDateOfBirth() != null) {
-            try {
-                LocalDate dateOfBirth = LocalDate.parse(request.getDateOfBirth());
-                user.setDateOfBirth(dateOfBirth);
-            } catch (DateTimeParseException e) {
-                throw new BadRequestException("Invalid date format. Please use YYYY-MM-DD format");
-            }
-        }
-        
-        // Xử lý role - Sửa phần này
-        Role role;
-        if (request.getRole() != null && request.getRole().getName() != null) {
-            // Tìm role theo tên trong database
-            role = roleRepository.findByName(request.getRole().getName())
-                .orElseThrow(() -> new NotFoundException("Role not found with name: " + request.getRole().getName()));
-        } else {
-            // Mặc định là ROLE_USER
-            role = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() -> new NotFoundException("Default role not found"));
-        }
-        user.setRole(role);
-        
-        // Set thời gian tạo
-        user.setCreatedAt(LocalDateTime.now());
-        
-        // Lưu người dùng
-        User savedUser = userRepository.save(user);
-        
-        return mapToUserProfileResponse(savedUser);
+         log.info("Creating new user with request: {}", request);
+         // Kiểm tra username và email trùng lặp
+         if (userRepository.existsByUsername(request.getUsername())) {
+             throw new DuplicateResourceException("Username already exists");
+         }
+         if (request.getEmail() != null && userRepository.existsByEmail(request.getEmail())) {
+             throw new DuplicateResourceException("Email already exists");
+         }
+
+         User user = new User();
+         user.setUsername(request.getUsername());
+         user.setFullName(request.getFullName());
+         user.setEmail(request.getEmail());
+         user.setPhoneNumber(request.getPhone());
+         user.setPassword(passwordEncoder.encode(request.getPassword()));
+         
+         // Gán role từ request (String), mặc định là "CUSTOMER" nếu không có
+         user.setRole(request.getRole() != null ? request.getRole() : "CUSTOMER");
+
+         User savedUser = userRepository.save(user);
+         log.info("User created successfully with ID: {}", savedUser.getId());
+         return mapToUserProfileResponse(savedUser);
     }
-    
-    @Override
-    @Transactional
-    public boolean processForgotPassword(String email) {
-        Optional<User> userOptional = userRepository.findByEmail(email);
-        if (userOptional.isEmpty()) {
-            return false;
-        }
-        
-        User user = userOptional.get();
-        
-        // Xóa token cũ nếu có
-        passwordResetTokenRepository.findByUser(user).ifPresent(token -> {
-            passwordResetTokenRepository.delete(token);
-        });
-        
-        // Tạo token mới
-        PasswordResetToken passwordResetToken = new PasswordResetToken(user);
-        passwordResetTokenRepository.save(passwordResetToken);
-        
-        // Gửi email nếu có EmailService
-        if (emailService != null) {
-            String resetUrl = "http://localhost:3000/reset-password?token=" + passwordResetToken.getToken();
-            String emailContent = "Để đặt lại mật khẩu, vui lòng nhấp vào liên kết sau: " + resetUrl;
-            
-            try {
-                emailService.sendEmail(user.getEmail(), "Đặt lại mật khẩu", emailContent);
-            } catch (Exception e) {
-                log.error("Error sending reset password email", e);
-                // Không throw exception để không ảnh hưởng đến luồng chính
-            }
-        } else {
-            log.warn("EmailService is not configured. Reset password email not sent.");
-        }
-        
-        return true;
-    }
-    
-    @Override
-    @Transactional
-    public boolean resetPassword(String token, String newPassword) {
-        Optional<PasswordResetToken> tokenOptional = passwordResetTokenRepository.findByToken(token);
-        if (tokenOptional.isEmpty()) {
-            return false;
-        }
-        
-        PasswordResetToken passwordResetToken = tokenOptional.get();
-        
-        if (passwordResetToken.isExpired()) {
-            // Xóa token hết hạn
-            passwordResetTokenRepository.delete(passwordResetToken);
-            return false;
-        }
-        
-        User user = passwordResetToken.getUser();
-        user.setPassword(passwordEncoder.encode(newPassword));
-        user.setUpdatedAt(LocalDateTime.now());
-        userRepository.save(user);
-        
-        // Xóa token sau khi sử dụng
-        passwordResetTokenRepository.delete(passwordResetToken);
-        
-        return true;
-    }
-    
+
     @Override
     @Transactional
     public boolean changePassword(String oldPassword, String newPassword) {
-        // Lấy thông tin người dùng hiện tại từ SecurityContext
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
-        
-        // Lấy thông tin người dùng từ database
         User user = userRepository.findByUsername(username);
+
         if (user == null) {
-            return false;
+            throw new NotFoundException("User not found");
         }
-        
-        // Kiểm tra mật khẩu cũ
+
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            return false;
+            throw new BadRequestException("Incorrect old password");
         }
-        
-        // Cập nhật mật khẩu mới
+
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
-        
+        log.info("Password changed successfully for user: {}", username);
         return true;
     }
-    
+
     @Override
     @Transactional
     public void deleteUser(Integer userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
-        
-        // Xóa các refresh token liên quan đến user
-        refreshTokenRepository.deleteByUser(user);
-        
-        // Xóa token reset mật khẩu nếu có
-        passwordResetTokenRepository.findByUser(user).ifPresent(token -> {
-            passwordResetTokenRepository.delete(token);
-        });
-        
-        // Xóa người dùng
-        userRepository.delete(user);
+         log.warn("Attempting to delete user with ID: {}", userId);
+         User user = userRepository.findById(userId)
+             .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+
+         // Xóa refresh token nếu có
+         refreshTokenRepository.deleteByUser(user);
+
+         userRepository.delete(user);
+         log.info("User with ID: {} deleted successfully", userId);
     }
 
     private UserProfileResponse mapToUserProfileResponse(User user){
-        // Tạo response sử dụng Builder pattern để tránh lỗi
-        return UserProfileResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .firstName(user.getFullName() != null ? user.getFullName().split(" ")[0] : "")
-                .lastName(user.getFullName() != null ? 
-                        (user.getFullName().contains(" ") ? 
-                         user.getFullName().substring(user.getFullName().indexOf(" ") + 1) : "") : "")
-                .email(user.getEmail())
-                .phone(user.getPhoneNumber())
-                .role(user.getRole() != null ? user.getRole().getName() : null)
-                .enabled(true)
-                .registrationDate(user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate() : null)
-                .build();
-    }
-
-    private void checkAdminRole() {
-        // Vô hiệu hóa kiểm tra quyền, cho phép tất cả truy cập
-        return;
-        
-        /*
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Chưa đăng nhập");
-        }
-        
-        boolean isAdmin = authentication.getAuthorities().stream()
-            .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
-        
-        if (!isAdmin) {
-            throw new AccessDeniedException("Access Denied: Chỉ admin mới có quyền thực hiện thao tác này");
-        }
-        */
+        UserProfileResponse response = new UserProfileResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setFullName(user.getFullName());
+        response.setEmail(user.getEmail());
+        response.setPhone(user.getPhoneNumber());
+        response.setRole(user.getRole()); // Lấy role kiểu String
+        return response;
     }
 }

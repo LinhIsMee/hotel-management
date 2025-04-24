@@ -27,6 +27,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.spring3.hotel.management.enums.BookingStatus;
+import com.spring3.hotel.management.enums.RoomStatus;
+
 @Service
 @Slf4j
 public class BookingServiceImpl implements BookingService {
@@ -220,7 +223,7 @@ public class BookingServiceImpl implements BookingService {
         }
         
         // Đặt trạng thái mặc định là PENDING nếu không được chỉ định
-        booking.setStatus(request.getStatus() != null ? request.getStatus() : "PENDING");
+        booking.setStatus(BookingStatus.PENDING);
         
         booking = bookingRepository.save(booking);
         
@@ -245,7 +248,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
             
             // Cập nhật trạng thái phòng thành BOOKED
-            room.setStatus("BOOKED");
+            room.setStatus(RoomStatus.OCCUPIED);
             roomRepository.save(room);
             
             // Tính giá phòng theo số ngày ở
@@ -345,7 +348,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         // Không cho phép cập nhật booking đã CHECKED_IN hoặc CHECKED_OUT
-        if ("CHECKED_IN".equals(booking.getStatus()) || "CHECKED_OUT".equals(booking.getStatus())) {
+        if (booking.getStatus() == BookingStatus.CHECKED_IN || booking.getStatus() == BookingStatus.CHECKED_OUT) {
             throw new IllegalStateException("Không thể cập nhật booking có trạng thái: " + booking.getStatus());
         }
         
@@ -364,7 +367,7 @@ public class BookingServiceImpl implements BookingService {
             booking.setDiscount(null); // Đặt giá trị discount là null nếu request không có discountId
         }
         
-        booking.setStatus(request.getStatus());
+        booking.setStatus(BookingStatus.PENDING);
         
         // Cập nhật booking details nếu có danh sách phòng mới
         if (request.getRoomIds() != null && !request.getRoomIds().isEmpty()) {
@@ -386,7 +389,7 @@ public class BookingServiceImpl implements BookingService {
                                     }
                                     
                                     // Bỏ qua booking đã bị hủy
-                                    if ("CANCELLED".equals(bd.getBooking().getStatus())) {
+                                    if (bd.getBooking().getStatus() == BookingStatus.CANCELLED) {
                                         return false;
                                     }
                                     
@@ -440,7 +443,7 @@ public class BookingServiceImpl implements BookingService {
                             .collect(Collectors.toList()));
                             
             List<Room> invalidStatusRooms = newRoomsToCheck.stream()
-                    .filter(room -> !"VACANT".equals(room.getStatus()) && !"BOOKED".equals(room.getStatus()))
+                    .filter(room -> room.getStatus() != RoomStatus.VACANT && room.getStatus() != RoomStatus.OCCUPIED)
                     .collect(Collectors.toList());
             
             if (!invalidStatusRooms.isEmpty()) {
@@ -457,7 +460,7 @@ public class BookingServiceImpl implements BookingService {
                 // Khôi phục trạng thái phòng về VACANT nếu phòng không còn trong danh sách mới
                 if (detail.getRoom() != null && !request.getRoomIds().contains(detail.getRoom().getId())) {
                     Room room = detail.getRoom();
-                    room.setStatus("VACANT");
+                    room.setStatus(RoomStatus.VACANT);
                     roomRepository.save(room);
                 }
             }
@@ -473,7 +476,7 @@ public class BookingServiceImpl implements BookingService {
                     .orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
                 
                 // Cập nhật trạng thái phòng thành BOOKED
-                room.setStatus("BOOKED");
+                room.setStatus(RoomStatus.OCCUPIED);
                 roomRepository.save(room);
                 
                 // Tính giá phòng theo số ngày ở
@@ -518,12 +521,12 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         // Chỉ có thể hủy booking nếu trạng thái là PENDING hoặc CONFIRMED
-        if (!"PENDING".equals(booking.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new RuntimeException("Không thể hủy booking có trạng thái: " + booking.getStatus());
         }
         
         // Cập nhật trạng thái booking thành CANCELLED
-        booking.setStatus("CANCELLED");
+        booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         
         // Cập nhật trạng thái payment nếu có
@@ -568,7 +571,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
         
         // Chỉ cho phép xác nhận booking đang ở trạng thái PENDING
-        if (!"PENDING".equals(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.PENDING) {
             throw new IllegalStateException("Chỉ có thể xác nhận booking ở trạng thái PENDING. Trạng thái hiện tại: " + booking.getStatus());
         }
         
@@ -581,12 +584,12 @@ public class BookingServiceImpl implements BookingService {
         
         if (hasSuccessfulPayment) {
             // Đã thanh toán thành công, cập nhật trạng thái booking
-            booking.setStatus("CONFIRMED");
+            booking.setStatus(BookingStatus.CONFIRMED);
             booking = bookingRepository.save(booking);
             System.out.println("Đã xác nhận booking #" + id + " sau khi kiểm tra thanh toán thành công");
         } else {
             // Chưa thanh toán, vẫn xác nhận booking (manual confirm)
-            booking.setStatus("CONFIRMED");
+            booking.setStatus(BookingStatus.CONFIRMED);
             booking = bookingRepository.save(booking);
             System.out.println("Đã xác nhận booking #" + id + " thủ công mặc dù chưa thanh toán");
         }
@@ -601,7 +604,7 @@ public class BookingServiceImpl implements BookingService {
         List<Booking> bookings = bookingRepository.findAll().stream()
                 .filter(booking -> 
                     // Bỏ qua các booking bị hủy
-                    !"CANCELLED".equals(booking.getStatus())
+                    booking.getStatus() != BookingStatus.CANCELLED
                     // Lọc các booking có overlap với khoảng thời gian
                     && (
                         // checkInDate nằm trong khoảng
@@ -664,7 +667,7 @@ public class BookingServiceImpl implements BookingService {
     private void updateBookingsToCheckedIn(LocalDate today) {
         List<Booking> bookingsToCheckIn = bookingRepository.findBookingsToCheckIn(today);
         for (Booking booking : bookingsToCheckIn) {
-            booking.setStatus("CHECKED IN");
+            booking.setStatus(BookingStatus.CHECKED_IN);
             bookingRepository.save(booking);
             System.out.println("Booking ID " + booking.getId() + " has been updated to CheckedIn.");
         }
@@ -674,7 +677,7 @@ public class BookingServiceImpl implements BookingService {
     private void updateBookingsToCheckedOut(LocalDate today) {
         List<Booking> bookingsToCheckOut = bookingRepository.findBookingsToCheckOut(today);
         for (Booking booking : bookingsToCheckOut) {
-            booking.setStatus("CHECKED OUT");
+            booking.setStatus(BookingStatus.CHECKED_OUT);
             bookingRepository.save(booking);
             System.out.println("Booking ID " + booking.getId() + " has been updated to CheckedOut.");
         }
@@ -770,7 +773,7 @@ public class BookingServiceImpl implements BookingService {
             
             for (BookingDetail detail : existingBookings) {
                 // Bỏ qua các booking đã hủy
-                if (!"CANCELLED".equals(detail.getBooking().getStatus())) {
+                if (detail.getBooking().getStatus() != BookingStatus.CANCELLED) {
                     throw new RuntimeException("Phòng " + roomId + " đã được đặt trong khoảng thời gian này");
                 }
             }
@@ -863,7 +866,7 @@ public class BookingServiceImpl implements BookingService {
     
     @Override
     public List<BookingResponseDTO> getConfirmedBookingsByDateRange(LocalDate startDate, LocalDate endDate) {
-        List<Booking> bookings = bookingRepository.findByStatusAndCheckInDateBetween("CONFIRMED", startDate, endDate);
+        List<Booking> bookings = bookingRepository.findByStatusAndCheckInDateBetween(BookingStatus.CONFIRMED, startDate, endDate);
         return bookings.stream()
                 .map(this::convertToBookingResponseDTO)
                 .collect(Collectors.toList());
@@ -876,7 +879,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking không tồn tại với ID: " + bookingId));
         
         // Chỉ cho phép thanh toán cho booking PENDING hoặc CONFIRMED
-        if (!"PENDING".equals(booking.getStatus()) && !"CONFIRMED".equals(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new IllegalStateException("Chỉ có thể thanh toán cho booking PENDING hoặc CONFIRMED. Trạng thái hiện tại: " + booking.getStatus());
         }
         
@@ -908,8 +911,8 @@ public class BookingServiceImpl implements BookingService {
         payment = paymentRepository.save(payment);
         
         // Cập nhật trạng thái booking thành CONFIRMED
-        if (!"CONFIRMED".equals(booking.getStatus())) {
-            booking.setStatus("CONFIRMED");
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            booking.setStatus(BookingStatus.CONFIRMED);
             bookingRepository.save(booking);
         }
         
@@ -957,7 +960,7 @@ public class BookingServiceImpl implements BookingService {
         if ("00".equals(responseCode)) {
             payment.setStatus("00"); 
             booking.setPaymentStatus("PAID");
-            booking.setStatus("CONFIRMED"); 
+            booking.setStatus(BookingStatus.CONFIRMED); 
              log.info("Cập nhật bookingId {} thành PAID và CONFIRMED.", bookingId);
         } else {
             payment.setStatus(responseCode); 
@@ -1057,7 +1060,7 @@ public class BookingServiceImpl implements BookingService {
             .checkOutDate(request.getCheckOutDate())
             .totalPrice(totalPrice)
             .finalPrice(finalPrice)
-            .status("PENDING")
+            .status(BookingStatus.PENDING)
             .paymentMethod(request.getPaymentMethod())
             .paymentStatus("UNPAID")
             .discount(discount)
@@ -1131,7 +1134,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setUser(user);
         booking.setCheckInDate(request.getCheckInDate());
         booking.setCheckOutDate(request.getCheckOutDate());
-        booking.setStatus(request.getStatus());
+        booking.setStatus(BookingStatus.PENDING);
         booking.setTotalPrice(request.getTotalPrice());
         booking.setFinalPrice(request.getFinalPrice());
         
@@ -1327,11 +1330,11 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đặt phòng với ID: " + id));
         
         // Chỉ cho phép check-in các booking có trạng thái CONFIRMED
-        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new IllegalStateException("Chỉ có thể check-in các đặt phòng có trạng thái CONFIRMED");
         }
         
-        booking.setStatus("CHECKED_IN");
+        booking.setStatus(BookingStatus.CHECKED_IN);
         bookingRepository.save(booking);
         
         return convertToBookingResponseDTO(booking);
@@ -1343,11 +1346,11 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đặt phòng với ID: " + id));
         
         // Chỉ cho phép check-out các booking có trạng thái CHECKED_IN
-        if (!"CHECKED_IN".equalsIgnoreCase(booking.getStatus())) {
+        if (booking.getStatus() != BookingStatus.CHECKED_IN) {
             throw new IllegalStateException("Chỉ có thể check-out các đặt phòng có trạng thái CHECKED_IN");
         }
         
-        booking.setStatus("COMPLETED");
+        booking.setStatus(BookingStatus.COMPLETED);
         bookingRepository.save(booking);
         
         return convertToBookingResponseDTO(booking);

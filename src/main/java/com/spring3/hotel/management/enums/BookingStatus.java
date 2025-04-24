@@ -8,5 +8,6 @@ public enum BookingStatus {
     CONFIRMED,    // Đã xác nhận đặt phòng
     CHECKED_IN,   // Khách đã nhận phòng
     CHECKED_OUT,  // Khách đã trả phòng
-    CANCELLED     // Đơn đặt phòng đã bị hủy
+    CANCELLED,    // Đơn đặt phòng đã bị hủy
+    COMPLETED     // Đặt phòng đã hoàn thành
 } 

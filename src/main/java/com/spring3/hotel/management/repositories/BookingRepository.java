@@ -1,5 +1,6 @@
 package com.spring3.hotel.management.repositories;
 
+import com.spring3.hotel.management.enums.BookingStatus;
 import com.spring3.hotel.management.models.Booking;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,14 +18,14 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
 
     List<Booking> findByUserId(Integer userId);
 
-    List<Booking> findByStatus(String status);
+    List<Booking> findByStatus(BookingStatus status);
 
     // Tìm các booking có checkInDate bằng ngày hiện tại và trạng thái là 'pending' hoặc 'confirmed'
-    @Query("SELECT b FROM Booking b WHERE b.checkInDate = :today AND b.status IN ('PENDING', 'CONFIRMED')")
+    @Query("SELECT b FROM Booking b WHERE b.checkInDate = :today AND (b.status = com.spring3.hotel.management.enums.BookingStatus.PENDING OR b.status = com.spring3.hotel.management.enums.BookingStatus.CONFIRMED)")
     List<Booking> findBookingsToCheckIn(@Param("today") LocalDate today);
 
     // Tìm các booking có checkOutDate bằng ngày hiện tại và trạng thái là 'CHECKED_IN'
-    @Query("SELECT b FROM Booking b WHERE b.checkOutDate = :today AND b.status = 'CHECKED_IN'")
+    @Query("SELECT b FROM Booking b WHERE b.checkOutDate = :today AND b.status = com.spring3.hotel.management.enums.BookingStatus.CHECKED_IN")
     List<Booking> findBookingsToCheckOut(@Param("today") LocalDate today);
 
     // Tính tổng doanh thu trong khoảng thời gian (sử dụng finalPrice thay vì totalPrice)
@@ -63,7 +64,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Booking> findBookingsBetweenDates(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
     
     // Tìm các booking không bị hủy trong khoảng thời gian (để kiểm tra phòng đã đặt)
-    @Query("SELECT b FROM Booking b WHERE b.status != 'CANCELLED' AND " +
+    @Query("SELECT b FROM Booking b WHERE b.status != com.spring3.hotel.management.enums.BookingStatus.CANCELLED AND " +
            "((b.checkInDate >= :startDate AND b.checkInDate <= :endDate) OR " +
            "(b.checkOutDate >= :startDate AND b.checkOutDate <= :endDate) OR " +
            "(b.checkInDate <= :startDate AND b.checkOutDate >= :endDate))")
@@ -107,7 +108,7 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Object[]> findMostBookedRooms(Pageable pageable);
 
     // Tìm các booking đã được xác nhận (CONFIRMED) trong khoảng thời gian
-    List<Booking> findByStatusAndCheckInDateBetween(String status, LocalDate startDate, LocalDate endDate);
+    List<Booking> findByStatusAndCheckInDateBetween(BookingStatus status, LocalDate startDate, LocalDate endDate);
     
     // Tìm tất cả booking với eager loading của các entities liên quan để tối ưu hiệu suất
     @Query("SELECT DISTINCT b FROM Booking b " +

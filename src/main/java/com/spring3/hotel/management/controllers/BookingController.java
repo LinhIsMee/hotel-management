@@ -4,6 +4,7 @@ import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
 import com.spring3.hotel.management.dto.response.BookingResponseDTO;
 import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.enums.BookingStatus;
 import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.BookingService;
@@ -64,7 +65,7 @@ public class BookingController {
     @GetMapping
     public ResponseEntity<?> getBookings(
             @RequestParam(required = false) Integer userId,
-            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BookingStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "0") int page,
@@ -80,7 +81,7 @@ public class BookingController {
                 message = "Lấy danh sách đặt phòng theo người dùng thành công";
             }
             // Lọc theo trạng thái
-            else if (status != null && !status.isEmpty()) {
+            else if (status != null) {
                 bookings = bookingService.getBookingsByStatus(status);
                 message = "Lấy danh sách đặt phòng theo trạng thái thành công";
             }
@@ -178,7 +179,7 @@ public class BookingController {
      */
     @GetMapping("/status/{status}")
     @Deprecated
-    public ResponseEntity<List<BookingResponseDTO>> getBookingsByStatus(@PathVariable String status) {
+    public ResponseEntity<List<BookingResponseDTO>> getBookingsByStatus(@PathVariable BookingStatus status) {
         List<BookingResponseDTO> bookings = bookingService.getBookingsByStatus(status);
         return ResponseEntity.ok(bookings);
     }
