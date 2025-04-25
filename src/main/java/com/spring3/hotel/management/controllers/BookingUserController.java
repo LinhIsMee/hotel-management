@@ -416,7 +416,7 @@ public class BookingUserController {
              // long amountToPay = amount * 100; // VNPay yêu cầu đơn vị xu - Amount trong service đã xử lý nhân 100
              String orderInfo = "Thanh toan don hang #" + bookingId; 
              String ipAddress = getClientIp(request); // Lấy IP client
-             String returnUrl = "http://localhost:3000/payment/return"; // URL frontend để redirect sau thanh toán
+             String returnUrl = "http://localhost:5173/payment/return"; // URL frontend để redirect sau thanh toán
 
             // Gọi VNPayService
             PaymentResponse paymentResponse = vnPayService.createPayment(
@@ -465,7 +465,7 @@ public class BookingUserController {
     @GetMapping("/payment/vnpay_return")
     public RedirectView vnpayReturn(@RequestParam Map<String, String> queryParams) {
          // URL của frontend để chuyển hướng đến
-         String frontendReturnUrlBase = "http://localhost:3000/payment-result"; // Thay bằng URL thực tế của bạn
+         String frontendReturnUrlBase = "http://localhost:5173/payment-result"; // Thay bằng URL thực tế của bạn
          UriComponentsBuilder urlBuilder = UriComponentsBuilder.fromHttpUrl(frontendReturnUrlBase);
 
          try {

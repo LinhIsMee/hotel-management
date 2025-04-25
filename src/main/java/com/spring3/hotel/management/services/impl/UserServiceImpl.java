@@ -361,7 +361,7 @@ public class UserServiceImpl implements UserService {
         
         // Gửi email nếu có EmailService
         if (emailService != null) {
-            String resetUrl = "http://localhost:3000/reset-password?token=" + passwordResetToken.getToken();
+            String resetUrl = "http://localhost:5173/reset-password?token=" + passwordResetToken.getToken();
             String emailContent = "Để đặt lại mật khẩu, vui lòng nhấp vào liên kết sau: " + resetUrl;
             
             try {
