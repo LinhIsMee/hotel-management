@@ -367,23 +367,68 @@ public class StatisticServiceImpl implements StatisticService {
         
         // Nếu không có dữ liệu, tạo dữ liệu mẫu
         if (statusData == null || statusData.isEmpty()) {
-            Map<String, Long> sampleStats = new HashMap<>();
-            sampleStats.put("CANCELLED", 5L);
-            sampleStats.put("CONFIRMED", 23L);
-            sampleStats.put("CHECKED_OUT", 51L);
+            // Sử dụng LinkedHashMap để duy trì thứ tự thêm vào
+            Map<String, Long> sampleStats = new LinkedHashMap<>();
             sampleStats.put("PENDING", 24L);
+            sampleStats.put("CONFIRMED", 23L);
             sampleStats.put("CHECKED_IN", 7L);
+            sampleStats.put("CHECKED_OUT", 51L);
+            sampleStats.put("CANCELLED", 5L);
             return sampleStats;
         }
         
-        Map<String, Long> statusStats = new HashMap<>();
+        // Tạo map chuẩn hóa trạng thái
+        Map<String, String> normalizedStatus = new HashMap<>();
+        normalizedStatus.put("CHECKED IN", "CHECKED_IN");
+        normalizedStatus.put("CHECKED OUT", "CHECKED_OUT");
+        normalizedStatus.put("COMPLETE", "CHECKED_OUT");
+        normalizedStatus.put("COMPLETED", "CHECKED_OUT");
+        normalizedStatus.put("CANCEL", "CANCELLED");
+        
+        // Map tạm để tổng hợp số liệu
+        Map<String, Long> tempStatsMap = new HashMap<>();
+        
         for (Object[] result : statusData) {
             String status = (String) result[0];
             Long count = (Long) result[1];
-            statusStats.put(status, count);
+            
+            // Nếu status là null, bỏ qua
+            if (status == null) continue;
+            
+            // Chuẩn hóa trạng thái nếu cần
+            String normalizedKey = normalizedStatus.getOrDefault(status, status);
+            
+            // Cộng dồn số lượng nếu đã tồn tại trạng thái
+            tempStatsMap.put(normalizedKey, tempStatsMap.getOrDefault(normalizedKey, 0L) + count);
         }
         
-        return statusStats;
+        // Tạo LinkedHashMap để sắp xếp theo thứ tự quy trình đặt phòng
+        Map<String, Long> orderedStats = new LinkedHashMap<>();
+        
+        // Thêm các trạng thái theo thứ tự quy trình
+        String[] orderedStatuses = {
+            "PENDING", 
+            "CONFIRMED", 
+            "CHECKED_IN", 
+            "CHECKED_OUT", 
+            "CANCELLED"
+        };
+        
+        // Thêm vào map theo thứ tự
+        for (String status : orderedStatuses) {
+            if (tempStatsMap.containsKey(status)) {
+                orderedStats.put(status, tempStatsMap.get(status));
+            }
+        }
+        
+        // Thêm bất kỳ trạng thái nào còn lại không nằm trong danh sách đã định nghĩa
+        for (Map.Entry<String, Long> entry : tempStatsMap.entrySet()) {
+            if (!orderedStats.containsKey(entry.getKey())) {
+                orderedStats.put(entry.getKey(), entry.getValue());
+            }
+        }
+        
+        return orderedStats;
     }
 
     // Tác vụ chạy vào lúc 23:59 mỗi ngày

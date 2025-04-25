@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.annotation.PostConstruct;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -607,9 +608,9 @@ public class BookingServiceImpl implements BookingService {
     private void updateBookingsToCheckedIn(LocalDate today) {
         List<Booking> bookingsToCheckIn = bookingRepository.findBookingsToCheckIn(today);
         for (Booking booking : bookingsToCheckIn) {
-            booking.setStatus("CHECKED IN");
+            booking.setStatus("CHECKED_IN");
             bookingRepository.save(booking);
-            System.out.println("Booking ID " + booking.getId() + " has been updated to CheckedIn.");
+            System.out.println("Booking ID " + booking.getId() + " has been updated to CHECKED_IN.");
         }
     }
 
@@ -617,9 +618,9 @@ public class BookingServiceImpl implements BookingService {
     private void updateBookingsToCheckedOut(LocalDate today) {
         List<Booking> bookingsToCheckOut = bookingRepository.findBookingsToCheckOut(today);
         for (Booking booking : bookingsToCheckOut) {
-            booking.setStatus("CHECKED OUT");
+            booking.setStatus("CHECKED_OUT");
             bookingRepository.save(booking);
-            System.out.println("Booking ID " + booking.getId() + " has been updated to CheckedOut.");
+            System.out.println("Booking ID " + booking.getId() + " has been updated to CHECKED_OUT.");
         }
     }
 
@@ -964,5 +965,43 @@ public class BookingServiceImpl implements BookingService {
         paymentRepository.save(payment);
         bookingRepository.save(booking);
          log.info("Đã lưu cập nhật trạng thái cho payment ID {} và booking ID {}", payment.getId(), bookingId);
+    }
+
+    // Phương thức chuẩn hóa dữ liệu trạng thái - chạy khi khởi động ứng dụng
+    @PostConstruct
+    public void normalizeBookingStatuses() {
+        try {
+            log.info("Bắt đầu chuẩn hóa dữ liệu trạng thái booking...");
+            
+            // Tìm tất cả booking có trạng thái "CHECKED IN"
+            @SuppressWarnings("unchecked")
+            List<Booking> checkedInBookings = bookingRepository.findAll().stream()
+                .filter(b -> "CHECKED IN".equals(b.getStatus()))
+                .collect(Collectors.toList());
+                
+            // Cập nhật thành "CHECKED_IN"
+            for (Booking booking : checkedInBookings) {
+                booking.setStatus("CHECKED_IN");
+                bookingRepository.save(booking);
+                log.info("Chuẩn hóa booking ID {} từ 'CHECKED IN' thành 'CHECKED_IN'", booking.getId());
+            }
+            
+            // Tìm tất cả booking có trạng thái "CHECKED OUT"
+            @SuppressWarnings("unchecked")
+            List<Booking> checkedOutBookings = bookingRepository.findAll().stream()
+                .filter(b -> "CHECKED OUT".equals(b.getStatus()))
+                .collect(Collectors.toList());
+                
+            // Cập nhật thành "CHECKED_OUT"
+            for (Booking booking : checkedOutBookings) {
+                booking.setStatus("CHECKED_OUT");
+                bookingRepository.save(booking);
+                log.info("Chuẩn hóa booking ID {} từ 'CHECKED OUT' thành 'CHECKED_OUT'", booking.getId());
+            }
+            
+            log.info("Hoàn thành chuẩn hóa dữ liệu trạng thái booking");
+        } catch (Exception e) {
+            log.error("Lỗi khi chuẩn hóa dữ liệu trạng thái booking: {}", e.getMessage(), e);
+        }
     }
 }
