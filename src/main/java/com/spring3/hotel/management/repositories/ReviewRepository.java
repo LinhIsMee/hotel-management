@@ -15,9 +15,6 @@ import java.util.Optional;
 
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Integer> {
-    @Query("SELECT r FROM Review r WHERE CAST(r.roomNumber AS integer) = :roomId")
-    List<Review> findByRoomId(Integer roomId);
-
     @Query("SELECT COUNT(DISTINCT r) FROM Review r WHERE r.createdAt BETWEEN :startOfDay AND :endOfDay")
     Integer countDistinctRatesByDateRange(LocalDateTime startOfDay, LocalDateTime endOfDay);
 

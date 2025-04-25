@@ -449,13 +449,6 @@ public class ReviewServiceImpl implements ReviewService {
     }
     
     @Override
-    public List<ReviewResponseDTO> getReviewsByRoomId(Integer roomId) {
-        return reviewRepository.findByRoomId(roomId).stream()
-                .map(ReviewResponseDTO::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     public Map<String, Object> getReviewStatistics() {
         long totalReviews = reviewRepository.count();
         long pendingReviews = reviewRepository.countByStatus(ReviewStatus.PENDING);

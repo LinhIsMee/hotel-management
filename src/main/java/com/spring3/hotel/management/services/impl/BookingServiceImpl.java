@@ -628,6 +628,7 @@ public class BookingServiceImpl implements BookingService {
         final Booking finalBooking = booking;
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(finalBooking.getId());
+        dto.setBookingId("B" + finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
         dto.setFullName(finalBooking.getUser().getFullName());
         dto.setNationalId(finalBooking.getUser().getNationalId());

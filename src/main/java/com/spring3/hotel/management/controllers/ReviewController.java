@@ -42,7 +42,7 @@ public class ReviewController {
     }
 
     // Cập nhật thông tin review
-    @PutMapping("/update/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<ReviewResponseDTO> updateReview(
             @PathVariable Integer id,
             @RequestBody UpdateReviewRequest request) {
@@ -69,10 +69,10 @@ public class ReviewController {
         }
     }
 
-    // Lấy tất cả reviews của một phòng (room) bằng roomId
-    @GetMapping("/room/{roomId}")
-    public ResponseEntity<List<ReviewResponseDTO>> getReviewsByRoomId(@PathVariable Integer roomId) {
-        List<ReviewResponseDTO> reviews = reviewService.getReviewsByRoomId(roomId);
+    // Lấy tất cả reviews của một phòng (room) bằng roomNumber
+    @GetMapping("/room/number/{roomNumber}")
+    public ResponseEntity<List<ReviewResponseDTO>> getReviewsByRoomNumber(@PathVariable String roomNumber) {
+        List<ReviewResponseDTO> reviews = reviewService.getReviewsByRoomNumber(roomNumber);
         return ResponseEntity.ok(reviews);
     }
     

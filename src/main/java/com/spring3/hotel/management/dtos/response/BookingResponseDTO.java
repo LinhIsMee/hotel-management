@@ -15,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class BookingResponseDTO {
     private Integer id;
+    private String bookingId;
     private Integer userId;
     private String fullName;
     private String nationalId;

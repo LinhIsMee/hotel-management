@@ -32,8 +32,6 @@ public interface ReviewService {
     
     List<ReviewResponseDTO> getReviewsByRoomType(String roomType);
     
-    List<ReviewResponseDTO> getReviewsByRoomId(Integer roomId);
-    
     List<ReviewResponseDTO> getFeaturedReviews();
     
     Page<ReviewResponseDTO> getReviewsByMinRating(Integer minRating, Pageable pageable);

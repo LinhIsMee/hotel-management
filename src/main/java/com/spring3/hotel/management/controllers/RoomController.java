@@ -116,7 +116,7 @@ public class RoomController {
         for (RoomResponseDTO room : rooms) {
             try {
                 // Lấy tất cả đánh giá của phòng
-                List<Review> reviews = reviewRepository.findByRoomId(room.getId());
+                List<Review> reviews = reviewRepository.findByRoomNumber(room.getRoomNumber());
                 
                 // Kiểm tra đánh giá có tồn tại không
                 if (reviews != null && !reviews.isEmpty()) {

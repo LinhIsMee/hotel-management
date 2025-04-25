@@ -539,6 +539,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         final Booking finalBooking = booking; // Sử dụng biến final này xuyên suốt
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(finalBooking.getId());
+        dto.setBookingId("B" + finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
         dto.setFullName(finalBooking.getUser().getFullName());
         dto.setNationalId(finalBooking.getUser().getNationalId());
@@ -651,6 +652,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         BookingResponseDTO dto = new BookingResponseDTO();
         // ... (set các trường booking cơ bản từ finalBooking)
         dto.setId(finalBooking.getId());
+        dto.setBookingId("B" + finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
         dto.setFullName(finalBooking.getUser().getFullName());
         dto.setNationalId(finalBooking.getUser().getNationalId());
@@ -730,6 +732,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         BookingResponseDTO dto = new BookingResponseDTO();
         // ... (set các trường booking cơ bản từ finalBooking)
          dto.setId(finalBooking.getId());
+        dto.setBookingId("B" + finalBooking.getId());
         dto.setUserId(finalBooking.getUser().getId());
         dto.setFullName(finalBooking.getUser().getFullName());
         dto.setNationalId(finalBooking.getUser().getNationalId());
