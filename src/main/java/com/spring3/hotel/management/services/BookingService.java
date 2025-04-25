@@ -30,4 +30,7 @@ public interface BookingService {
     
     // Phương thức mới để xử lý callback VNPay
     void updatePaymentAndBookingStatusAfterVNPay(Integer bookingId, String transactionNo, String responseCode);
+    
+    // Phương thức mới để lấy các lịch đặt của một phòng cụ thể
+    List<Map<String, LocalDate>> getBookedDatesByRoomId(Integer roomId);
 }

@@ -915,56 +915,30 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public void updatePaymentAndBookingStatusAfterVNPay(Integer bookingId, String transactionNo, String responseCode) {
-        log.info("Cập nhật trạng thái sau VNPay callback cho bookingId: {}, transactionNo: {}, responseCode: {}", 
-                 bookingId, transactionNo, responseCode);
-        
-        // 1. Tìm Payment dựa trên transactionNo
-        Payment payment = paymentRepository.findByTransactionNo(transactionNo)
-            .orElse(null); 
+        try {
+            // Cập nhật thông tin thanh toán
+            List<Payment> payments = paymentRepository.findByBookingIdAndTransactionNo(bookingId, transactionNo);
+            if (payments.isEmpty()) {
+                throw new RuntimeException("Không tìm thấy thông tin thanh toán với ID đặt phòng: " + bookingId + " và mã giao dịch: " + transactionNo);
+            }
             
-        if (payment == null) {
-            log.warn("Không tìm thấy payment với transactionNo: {}. Thử tìm payment cuối cùng của bookingId: {}", transactionNo, bookingId);
-             List<Payment> payments = paymentRepository.findAllByBooking_Id(bookingId);
-             if (!payments.isEmpty()) {
-                 payment = payments.stream()
-                                   .filter(p -> p.getStatus() == null || p.getStatus().equals("01")) 
-                                   .findFirst()
-                                   .orElse(payments.get(payments.size() - 1)); 
-             } else {
-                 log.error("Không tìm thấy payment nào cho bookingId: {}", bookingId);
-                 return; 
-             }
+            Payment payment = payments.get(0);
+            payment.setResponseCode(responseCode);
+            payment.setStatus(responseCode);
+            payment.setPayDate(LocalDateTime.now().toString());
+            paymentRepository.save(payment);
+            
+            // Cập nhật trạng thái đặt phòng nếu thanh toán thành công
+            if ("00".equals(responseCode)) {
+                Booking booking = bookingRepository.findById(bookingId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy đặt phòng với ID: " + bookingId));
+                
+                booking.setStatus("CONFIRMED");
+                bookingRepository.save(booking);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi cập nhật trạng thái sau thanh toán: " + e.getMessage(), e);
         }
-        
-        // 2. Cập nhật thông tin Payment
-        payment.setResponseCode(responseCode);
-        payment.setTransactionNo(transactionNo); 
-        payment.setPayDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))); 
-
-        // 3. Tìm Booking để cập nhật
-        Booking booking = bookingRepository.findById(bookingId).orElse(null);
-        if (booking == null) {
-             log.error("Không tìm thấy booking với id: {} để cập nhật trạng thái sau VNPay.", bookingId);
-             paymentRepository.save(payment);
-             return;
-        }
-
-        // 4. Cập nhật trạng thái Payment và Booking dựa trên responseCode
-        if ("00".equals(responseCode)) {
-            payment.setStatus("00"); 
-            booking.setPaymentStatus("PAID");
-            booking.setStatus("CONFIRMED"); 
-             log.info("Cập nhật bookingId {} thành PAID và CONFIRMED.", bookingId);
-        } else {
-            payment.setStatus(responseCode); 
-            booking.setPaymentStatus("FAILED"); 
-             log.warn("Thanh toán thất bại cho bookingId {} với mã lỗi: {}. Cập nhật paymentStatus thành FAILED.", bookingId, responseCode);
-        }
-        
-        // 5. Lưu cả hai entity
-        paymentRepository.save(payment);
-        bookingRepository.save(booking);
-         log.info("Đã lưu cập nhật trạng thái cho payment ID {} và booking ID {}", payment.getId(), bookingId);
     }
 
     // Phương thức chuẩn hóa dữ liệu trạng thái - chạy khi khởi động ứng dụng
@@ -1003,5 +977,31 @@ public class BookingServiceImpl implements BookingService {
         } catch (Exception e) {
             log.error("Lỗi khi chuẩn hóa dữ liệu trạng thái booking: {}", e.getMessage(), e);
         }
+    }
+
+    @Override
+    public List<Map<String, LocalDate>> getBookedDatesByRoomId(Integer roomId) {
+        // Lấy tất cả BookingDetail cho phòng này
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findAllByRoom_Id(roomId);
+        
+        // Lọc ra những booking không bị hủy
+        List<Map<String, LocalDate>> bookedDates = new ArrayList<>();
+        
+        for (BookingDetail detail : bookingDetails) {
+            Booking booking = detail.getBooking();
+            
+            // Bỏ qua các booking đã hủy
+            if ("CANCELLED".equals(booking.getStatus())) {
+                continue;
+            }
+            
+            Map<String, LocalDate> dateRange = new HashMap<>();
+            dateRange.put("checkInDate", booking.getCheckInDate());
+            dateRange.put("checkOutDate", booking.getCheckOutDate());
+            
+            bookedDates.add(dateRange);
+        }
+        
+        return bookedDates;
     }
 }

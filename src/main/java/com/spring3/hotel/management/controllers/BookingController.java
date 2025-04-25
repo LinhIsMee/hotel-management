@@ -141,4 +141,13 @@ public class BookingController {
             return ResponseEntity.badRequest().body(Map.of("message", "Lỗi khi mô phỏng callback: " + e.getMessage()));
         }
     }
+    
+    /**
+     * Lấy các lịch đặt phòng (ngày check-in và check-out) của một phòng cụ thể
+     */
+    @GetMapping("/room/{roomId}/booked-dates")
+    public ResponseEntity<List<Map<String, LocalDate>>> getBookedDatesByRoomId(@PathVariable Integer roomId) {
+        List<Map<String, LocalDate>> bookedDates = bookingService.getBookedDatesByRoomId(roomId);
+        return ResponseEntity.ok(bookedDates);
+    }
 }

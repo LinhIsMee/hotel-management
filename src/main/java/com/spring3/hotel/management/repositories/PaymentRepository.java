@@ -49,4 +49,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
     // Thống kê số lượng giao dịch theo ngân hàng
     @Query("SELECT p.bankCode, COUNT(p) FROM Payment p WHERE p.bankCode IS NOT NULL GROUP BY p.bankCode")
     List<Object[]> countPaymentsByBank();
+    
+    // Tìm payment theo bookingId và transactionNo
+    @Query("SELECT p FROM Payment p WHERE p.booking.id = :bookingId AND p.transactionNo = :transactionNo")
+    List<Payment> findByBookingIdAndTransactionNo(@Param("bookingId") Integer bookingId, @Param("transactionNo") String transactionNo);
 }
