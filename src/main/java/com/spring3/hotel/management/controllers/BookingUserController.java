@@ -80,20 +80,36 @@ public class BookingUserController {
     }
 
     // Lấy danh sách booking của người dùng hiện tại
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('ROLE_USER') or hasRole('ROLE_ADMIN')")
     @GetMapping("/my-bookings")
-    public ResponseEntity<List<BookingResponseDTO>> getCurrentUserBookings() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        
-        // Tìm người dùng theo username thay vì chuyển đổi username thành số
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new RuntimeException("Không tìm thấy người dùng với username: " + username);
+    public ResponseEntity<?> getCurrentUserBookings() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // Kiểm tra xem người dùng đã xác thực chưa
+            if (username.equals("anonymousUser") || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "message", "Vui lòng đăng nhập để xem danh sách đặt phòng"));
+            }
+            
+            // Tìm người dùng theo email thay vì username
+            User user = userRepository.findByEmail(username)
+                .orElseGet(() -> userRepository.findByUsername(username));
+                
+            if (user == null) {
+                log.error("Không tìm thấy thông tin người dùng với username/email: {}", username);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("success", false, "message", "Không tìm thấy thông tin người dùng"));
+            }
+            
+            List<BookingResponseDTO> bookings = bookingService.getBookingsByUserId(user.getId());
+            return ResponseEntity.ok(bookings);
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy danh sách đặt phòng: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "message", "Lỗi máy chủ: " + e.getMessage()));
         }
-        
-        List<BookingResponseDTO> bookings = bookingService.getBookingsByUserId(user.getId());
-        return ResponseEntity.ok(bookings);
     }
 
     // Lấy danh sách phòng đã đặt trong khoảng thời gian (để kiểm tra trước khi đặt)
