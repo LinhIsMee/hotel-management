@@ -17,6 +17,7 @@ import java.util.List;
 public class ReviewResponseDTO {
     
     private Integer id;
+    private Integer userId;
     private String bookingId;
     private String guestName;
     private String displayName;
@@ -45,6 +46,7 @@ public class ReviewResponseDTO {
         
         ReviewResponseDTO dto = ReviewResponseDTO.builder()
                 .id(review.getId())
+                .userId(review.getUserId())
                 .bookingId(review.getBookingId())
                 .guestName(review.getGuestName())
                 .displayName(review.getDisplayName())

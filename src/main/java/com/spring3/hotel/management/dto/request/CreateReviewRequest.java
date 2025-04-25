@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.dtos.request;
+package com.spring3.hotel.management.dto.request;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -9,25 +9,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateReviewRequest {
     
+    @NotNull(message = "ID người dùng không được để trống")
+    private Integer userId;
+    
     @NotBlank(message = "Mã đặt phòng không được để trống")
     private String bookingId;
-    
-    @NotBlank(message = "Tên khách hàng không được để trống")
-    private String guestName;
-    
-    @NotBlank(message = "Số phòng không được để trống")
-    private String roomNumber;
-    
-    @NotBlank(message = "Loại phòng không được để trống")
-    private String roomType;
     
     @NotNull(message = "Đánh giá tổng thể không được để trống")
     @Min(value = 1, message = "Đánh giá tối thiểu là 1")
@@ -60,7 +52,6 @@ public class CreateReviewRequest {
     
     private String comment;
     
-    private List<String> images;
-    
+    @Builder.Default
     private Boolean isAnonymous = false;
 }

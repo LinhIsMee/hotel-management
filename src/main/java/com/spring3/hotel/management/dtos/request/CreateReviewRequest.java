@@ -1,31 +1,27 @@
-package com.spring3.hotel.management.dto.request;
+package com.spring3.hotel.management.dtos.request;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateReviewRequest {
+public class CreateReviewRequest {
     
+    @NotNull(message = "ID người dùng không được để trống")
     private Integer userId;
     
-    private String bookingId;
+    @NotNull(message = "ID đặt phòng không được để trống")
+    private Integer bookingId;
     
-    private String guestName;
-    
-    private String roomNumber;
-    
-    private String roomType;
-    
+    @NotNull(message = "Đánh giá tổng thể không được để trống")
     @Min(value = 1, message = "Đánh giá tối thiểu là 1")
     @Max(value = 5, message = "Đánh giá tối đa là 5")
     private Integer rating;
@@ -56,15 +52,5 @@ public class UpdateReviewRequest {
     
     private String comment;
     
-    private List<String> images;
-    
-    private String replyComment;
-    
-    private String replyBy;
-    
-    private Boolean isFeatured;
-    
-    private Boolean isAnonymous;
-    
-    private String status;
-}
+    private Boolean isAnonymous = false;
+} 

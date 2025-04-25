@@ -2,16 +2,18 @@ package com.spring3.hotel.management.services.implementations;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring3.hotel.management.dtos.request.CreateReviewRequest;
-import com.spring3.hotel.management.dtos.request.ReplyReviewRequest;
-import com.spring3.hotel.management.dtos.request.UpdateReviewRequest;
+import com.spring3.hotel.management.dto.request.CreateReviewRequest;
+import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
+import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
 import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.BookingDetail;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.models.Review.ReviewStatus;
+import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.BookingRepository;
 import com.spring3.hotel.management.repositories.ReviewRepository;
+import com.spring3.hotel.management.repositories.UserRepository;
 import com.spring3.hotel.management.services.interfaces.ReviewService;
 import com.spring3.hotel.management.utils.exceptions.ResourceNotFoundException;
 
@@ -39,6 +41,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final BookingRepository bookingRepository;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -172,40 +175,30 @@ public class ReviewServiceImpl implements ReviewService {
         Booking booking = bookingRepository.findById(Integer.valueOf(request.getBookingId().replace("B", "")))
                 .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + request.getBookingId()));
         
-        // Kiểm tra trạng thái booking - chỉ cho phép đánh giá khi đã CHECKED_OUT
-        if (!"CHECKED_OUT".equals(booking.getStatus())) {
+        // Kiểm tra trạng thái booking - chỉ cho phép đánh giá khi đã CHECKED_OUT hoặc COMPLETED
+        if (!"CHECKED_OUT".equals(booking.getStatus()) && !"COMPLETED".equals(booking.getStatus())) {
             throw new IllegalStateException("Chỉ có thể đánh giá khi đã trả phòng. Trạng thái hiện tại: " + booking.getStatus());
         }
         
-        // Kiểm tra phòng có tồn tại không
-        boolean roomExists = false;
-        String validRoomType = "";
+        // Lấy thông tin người dùng
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại với ID: " + request.getUserId()));
         
-        // Duyệt qua chi tiết đặt phòng để xác nhận thông tin phòng
-        for (BookingDetail detail : booking.getBookingDetails()) {
-            if (request.getRoomNumber().equals(detail.getRoomNumber())) {
-                roomExists = true;
-                validRoomType = detail.getRoomType();
-                break;
-            }
+        // Tự động lấy thông tin phòng từ booking
+        if (booking.getBookingDetails().isEmpty()) {
+            throw new IllegalStateException("Booking không có thông tin phòng");
         }
         
-        if (!roomExists) {
-            throw new ResourceNotFoundException("Phòng với số " + request.getRoomNumber() + " không tồn tại trong đặt phòng này");
-        }
-        
-        // Đảm bảo loại phòng nhất quán
-        if (!validRoomType.equals(request.getRoomType())) {
-            log.warn("Loại phòng trong yêu cầu ({}) không khớp với loại phòng thực tế ({}). Sử dụng loại phòng thực tế.", 
-                    request.getRoomType(), validRoomType);
-            request.setRoomType(validRoomType);
-        }
+        BookingDetail bookingDetail = booking.getBookingDetails().get(0);
+        String roomNumber = bookingDetail.getRoomNumber();
+        String roomType = bookingDetail.getRoomType();
         
         Review review = Review.builder()
+                .userId(request.getUserId())
                 .bookingId(request.getBookingId())
-                .guestName(request.getGuestName())
-                .roomNumber(request.getRoomNumber())
-                .roomType(request.getRoomType())
+                .guestName(user.getFullName())
+                .roomNumber(roomNumber)
+                .roomType(roomType)
                 .rating(request.getRating())
                 .cleanliness(request.getCleanliness())
                 .service(request.getService())
@@ -214,7 +207,6 @@ public class ReviewServiceImpl implements ReviewService {
                 .facilities(request.getFacilities())
                 .valueForMoney(request.getValueForMoney())
                 .comment(request.getComment())
-                .images(request.getImages())
                 .isAnonymous(request.getIsAnonymous())
                 .isFeatured(false)
                 .status(ReviewStatus.PENDING)
@@ -258,80 +250,77 @@ public class ReviewServiceImpl implements ReviewService {
                 throw new RuntimeException("Đã tồn tại đánh giá cho booking ID: " + request.getBookingId());
             }
             
-            try {
-                // Kiểm tra booking có tồn tại không
-                Booking booking = bookingRepository.findById(Integer.valueOf(request.getBookingId().replace("B", "")))
-                        .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + request.getBookingId()));
-                
-                review.setBookingId(request.getBookingId());
-                hasChanges = true;
-                
-                // Nếu cập nhật booking, đồng bộ lại thông tin phòng và loại phòng
-                if (booking.getBookingDetails() != null && !booking.getBookingDetails().isEmpty()) {
-                    BookingDetail detail = booking.getBookingDetails().get(0);
-                    review.setRoomNumber(detail.getRoomNumber());
-                    review.setRoomType(detail.getRoomType());
-                    log.info("Cập nhật tự động thông tin phòng theo booking mới: Phòng {}, Loại {}", 
-                            detail.getRoomNumber(), detail.getRoomType());
-                }
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Mã booking không hợp lệ: " + request.getBookingId());
+            // Kiểm tra booking có tồn tại không
+            Booking booking = bookingRepository.findById(Integer.valueOf(request.getBookingId().replace("B", "")))
+                    .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + request.getBookingId()));
+            
+            review.setBookingId(request.getBookingId());
+            hasChanges = true;
+            
+            // Nếu cập nhật booking, đồng bộ lại thông tin phòng và loại phòng
+            if (booking.getBookingDetails() != null && !booking.getBookingDetails().isEmpty()) {
+                BookingDetail detail = booking.getBookingDetails().get(0);
+                review.setRoomNumber(detail.getRoomNumber());
+                review.setRoomType(detail.getRoomType());
+                log.info("Cập nhật tự động thông tin phòng theo booking mới: Phòng {}, Loại {}", 
+                        detail.getRoomNumber(), detail.getRoomType());
             }
         } else if (request.getBookingId() != null) {
             review.setBookingId(request.getBookingId());
             hasChanges = true;
         }
         
-        if (request.getGuestName() != null) {
+        if (request.getUserId() != null) {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại với ID: " + request.getUserId()));
+            review.setUserId(request.getUserId());
+            review.setGuestName(user.getFullName());
+            hasChanges = true;
+        } else if (request.getGuestName() != null) {
             review.setGuestName(request.getGuestName());
             hasChanges = true;
         }
         
         // Nếu cập nhật thông tin phòng, kiểm tra tính hợp lệ
         if (request.getRoomNumber() != null || request.getRoomType() != null) {
-            try {
-                // Lấy booking hiện tại để kiểm tra
-                Booking booking = bookingRepository.findById(Integer.valueOf(review.getBookingId().replace("B", "")))
-                        .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + review.getBookingId()));
-                
-                String newRoomNumber = request.getRoomNumber() != null ? request.getRoomNumber() : review.getRoomNumber();
-                String newRoomType = request.getRoomType() != null ? request.getRoomType() : review.getRoomType();
-                
-                // Kiểm tra tính hợp lệ của thông tin phòng
-                boolean isValid = false;
-                String validRoomType = "";
-                
-                for (BookingDetail detail : booking.getBookingDetails()) {
-                    if (newRoomNumber.equals(detail.getRoomNumber())) {
-                        isValid = true;
-                        validRoomType = detail.getRoomType();
-                        break;
-                    }
+            // Lấy booking hiện tại để kiểm tra
+            Booking booking = bookingRepository.findById(Integer.valueOf(review.getBookingId().replace("B", "")))
+                    .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + review.getBookingId()));
+            
+            String newRoomNumber = request.getRoomNumber() != null ? request.getRoomNumber() : review.getRoomNumber();
+            String newRoomType = request.getRoomType() != null ? request.getRoomType() : review.getRoomType();
+            
+            // Kiểm tra tính hợp lệ của thông tin phòng
+            boolean isValid = false;
+            String validRoomType = "";
+            
+            for (BookingDetail detail : booking.getBookingDetails()) {
+                if (newRoomNumber.equals(detail.getRoomNumber())) {
+                    isValid = true;
+                    validRoomType = detail.getRoomType();
+                    break;
                 }
-                
-                if (!isValid) {
-                    throw new IllegalArgumentException("Phòng " + newRoomNumber + " không thuộc về booking này");
-                }
-                
-                // Đảm bảo loại phòng nhất quán
-                if (!validRoomType.equals(newRoomType)) {
-                    log.warn("Loại phòng yêu cầu ({}) không khớp với loại phòng thực tế ({}). Sử dụng loại phòng thực tế.",
-                            newRoomType, validRoomType);
-                    newRoomType = validRoomType;
-                }
-                
-                if (request.getRoomNumber() != null) {
-                    review.setRoomNumber(newRoomNumber);
-                    hasChanges = true;
-                }
-                
-                if (request.getRoomType() != null) {
-                    review.setRoomType(newRoomType);
-                    hasChanges = true;
-                }
-                
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Mã booking không hợp lệ: " + review.getBookingId());
+            }
+            
+            if (!isValid) {
+                throw new IllegalArgumentException("Phòng " + newRoomNumber + " không thuộc về booking này");
+            }
+            
+            // Đảm bảo loại phòng nhất quán
+            if (!validRoomType.equals(newRoomType)) {
+                log.warn("Loại phòng yêu cầu ({}) không khớp với loại phòng thực tế ({}). Sử dụng loại phòng thực tế.",
+                        newRoomType, validRoomType);
+                newRoomType = validRoomType;
+            }
+            
+            if (request.getRoomNumber() != null) {
+                review.setRoomNumber(newRoomNumber);
+                hasChanges = true;
+            }
+            
+            if (request.getRoomType() != null) {
+                review.setRoomType(newRoomType);
+                hasChanges = true;
             }
         }
         

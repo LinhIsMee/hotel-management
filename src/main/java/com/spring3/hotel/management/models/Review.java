@@ -23,6 +23,9 @@ public class Review {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
+    @Column(nullable = false)
+    private Integer userId;
+    
     @Column(nullable = false, unique = true)
     private String bookingId;
     
@@ -56,6 +59,7 @@ public class Review {
     @ElementCollection
     @CollectionTable(name = "review_images", joinColumns = @JoinColumn(name = "review_id"))
     @Column(name = "image_url")
+    @Builder.Default
     private List<String> images = new ArrayList<>();
     
     @Column(columnDefinition = "TEXT")
@@ -66,9 +70,11 @@ public class Review {
     private LocalDateTime replyDate;
 
     @Column(name = "is_featured")
+    @Builder.Default
     private Boolean isFeatured = false;
     
     @Column(name = "is_anonymous")
+    @Builder.Default
     private Boolean isAnonymous = false;
     
     @Enumerated(EnumType.STRING)
