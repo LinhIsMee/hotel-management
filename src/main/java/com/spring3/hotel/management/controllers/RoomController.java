@@ -101,9 +101,35 @@ public class RoomController {
     @GetMapping("/featured")
     public ResponseEntity<List<RoomResponseDTO>> getFeaturedRooms() {
         log.info("Nhận yêu cầu lấy danh sách phòng nổi bật");
-        List<RoomResponseDTO> featuredRooms = roomService.getFeaturedRooms();
-        enrichWithReviewData(featuredRooms);
-        log.info("Trả về {} phòng nổi bật", featuredRooms.size());
+        // Lấy tất cả phòng
+        List<RoomResponseDTO> allRooms = roomService.getFeaturedRooms();
+        
+        // Làm phong phú dữ liệu đánh giá
+        enrichWithReviewData(allRooms);
+        log.info("Đã làm phong phú dữ liệu đánh giá cho {} phòng", allRooms.size());
+        
+        // Lọc chỉ lấy phòng có đánh giá tốt (> 3.5 sao)
+        List<RoomResponseDTO> featuredRooms = allRooms.stream()
+            .filter(room -> room.getAverageRating() != null 
+                && room.getAverageRating() > 3.5 
+                && room.getTotalReviews() != null 
+                && room.getTotalReviews() > 0)
+            .sorted((r1, r2) -> {
+                // Ưu tiên phòng có rating cao
+                int ratingCompare = Double.compare(r2.getAverageRating(), r1.getAverageRating());
+                if (ratingCompare != 0) return ratingCompare;
+                
+                // Sau đó xét số lượng đánh giá
+                int reviewCompare = Integer.compare(r2.getTotalReviews(), r1.getTotalReviews());
+                if (reviewCompare != 0) return reviewCompare;
+                
+                // Cuối cùng xét giá phòng
+                return Double.compare(r2.getPricePerNight(), r1.getPricePerNight());
+            })
+            .limit(6) // Giới hạn 6 phòng nổi bật
+            .collect(Collectors.toList());
+        
+        log.info("Trả về {} phòng nổi bật sau khi lọc theo đánh giá (> 3.5 sao)", featuredRooms.size());
         return ResponseEntity.ok(featuredRooms);
     }
     
@@ -124,8 +150,13 @@ public class RoomController {
                     OptionalDouble avgRating = reviews.stream()
                             .mapToDouble(Review::getRating)
                             .average();
-                    room.setAverageRating(avgRating.isPresent() ? avgRating.getAsDouble() : null);
+                    double averageRating = avgRating.isPresent() ? avgRating.getAsDouble() : 0.0;
+                    room.setAverageRating(averageRating);
                     room.setTotalReviews(reviews.size());
+                    
+                    // Debug
+                    log.info("Phòng {}: Tìm thấy {} đánh giá, rating trung bình: {}", 
+                            room.getRoomNumber(), reviews.size(), averageRating);
                     
                     // Lấy 3 đánh giá gần nhất 
                     List<ReviewResponseDTO> recentReviews = reviews.stream()
@@ -136,14 +167,16 @@ public class RoomController {
                     room.setRecentReviews(recentReviews);
                 } else {
                     // Đặt giá trị mặc định nếu không có đánh giá
-                    room.setAverageRating(null);
+                    room.setAverageRating(0.0);
                     room.setTotalReviews(0);
                     room.setRecentReviews(List.of());
+                    
+                    log.info("Phòng {}: Không tìm thấy đánh giá nào", room.getRoomNumber());
                 }
             } catch (Exception e) {
                 // Xử lý ngoại lệ một cách an toàn
                 log.error("Lỗi khi làm phong phú dữ liệu cho phòng ID {}: {}", room.getId(), e.getMessage());
-                room.setAverageRating(null);
+                room.setAverageRating(0.0);
                 room.setTotalReviews(0);
                 room.setRecentReviews(List.of());
             }
