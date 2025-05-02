@@ -1,8 +1,8 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.dtos.response.RevenueByRoomTypeResponse;
-
 import java.util.List;
+
+import com.spring3.hotel.management.dto.response.RevenueByRoomTypeResponse;
 
 public interface RevenueByRoomTypeService {
     List<RevenueByRoomTypeResponse> getAllRevenueByRoomType();

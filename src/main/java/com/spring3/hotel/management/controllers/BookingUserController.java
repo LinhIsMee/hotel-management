@@ -1,10 +1,10 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.PaymentLinkResponse;
-import com.spring3.hotel.management.dtos.response.PaymentResponse;
-import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.PaymentLinkResponse;
+import com.spring3.hotel.management.dto.response.PaymentResponse;
+import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.User;
 import com.spring3.hotel.management.repositories.UserRepository;

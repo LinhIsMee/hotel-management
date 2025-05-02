@@ -18,7 +18,7 @@ public class CreateReviewRequest {
     @NotNull(message = "ID người dùng không được để trống")
     private Integer userId;
     
-    @NotBlank(message = "Mã đặt phòng không được để trống")
+    @NotNull(message = "ID đặt phòng không được để trống")
     private String bookingId;
     
     @NotNull(message = "Đánh giá tổng thể không được để trống")
@@ -52,6 +52,5 @@ public class CreateReviewRequest {
     
     private String comment;
     
-    @Builder.Default
     private Boolean isAnonymous = false;
-}
+} 

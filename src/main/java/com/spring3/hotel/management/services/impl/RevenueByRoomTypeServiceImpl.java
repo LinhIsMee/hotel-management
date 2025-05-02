@@ -1,6 +1,6 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dtos.response.RevenueByRoomTypeResponse;
+import com.spring3.hotel.management.dto.response.RevenueByRoomTypeResponse;
 import com.spring3.hotel.management.models.RevenueByRoomType;
 import com.spring3.hotel.management.repositories.RevenueByRoomTypeRepository;
 import com.spring3.hotel.management.services.RevenueByRoomTypeService;

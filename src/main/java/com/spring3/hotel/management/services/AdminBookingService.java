@@ -1,9 +1,9 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.dtos.request.AdminBookingRequest;
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
-import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 
 import java.time.LocalDate;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.spring3.hotel.management.dtos.request;
+package com.spring3.hotel.management.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

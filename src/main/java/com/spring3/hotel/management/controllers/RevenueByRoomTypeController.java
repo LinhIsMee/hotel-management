@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.controllers;
 
 
-import com.spring3.hotel.management.dtos.response.RevenueByRoomTypeResponse;
+import com.spring3.hotel.management.dto.response.RevenueByRoomTypeResponse;
 import com.spring3.hotel.management.services.RevenueByRoomTypeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

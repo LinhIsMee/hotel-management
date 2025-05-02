@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
-import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
+import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.BookingDetail;
 import com.spring3.hotel.management.models.Review;
@@ -172,7 +172,9 @@ public class ReviewServiceImpl implements ReviewService {
         }
         
         // Kiểm tra booking có tồn tại không
-        Booking booking = bookingRepository.findById(Integer.valueOf(request.getBookingId().replace("B", "")))
+        String bookingIdWithoutPrefix = request.getBookingId().replace("B", "");
+        int bookingId = Integer.parseInt(bookingIdWithoutPrefix);
+        Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + request.getBookingId()));
         
         // Kiểm tra trạng thái booking - chỉ cho phép đánh giá khi đã CHECKED_OUT hoặc COMPLETED
@@ -251,7 +253,9 @@ public class ReviewServiceImpl implements ReviewService {
             }
             
             // Kiểm tra booking có tồn tại không
-            Booking booking = bookingRepository.findById(Integer.valueOf(request.getBookingId().replace("B", "")))
+            String newBookingIdWithoutPrefix = request.getBookingId().replace("B", "");
+            int newBookingId = Integer.parseInt(newBookingIdWithoutPrefix);
+            Booking booking = bookingRepository.findById(newBookingId)
                     .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + request.getBookingId()));
             
             review.setBookingId(request.getBookingId());
@@ -284,7 +288,9 @@ public class ReviewServiceImpl implements ReviewService {
         // Nếu cập nhật thông tin phòng, kiểm tra tính hợp lệ
         if (request.getRoomNumber() != null || request.getRoomType() != null) {
             // Lấy booking hiện tại để kiểm tra
-            Booking booking = bookingRepository.findById(Integer.valueOf(review.getBookingId().replace("B", "")))
+            String currentBookingIdWithoutPrefix = review.getBookingId().replace("B", "");
+            int currentBookingId = Integer.parseInt(currentBookingIdWithoutPrefix);
+            Booking booking = bookingRepository.findById(currentBookingId)
                     .orElseThrow(() -> new ResourceNotFoundException("Booking không tồn tại với ID: " + review.getBookingId()));
             
             String newRoomNumber = request.getRoomNumber() != null ? request.getRoomNumber() : review.getRoomNumber();

@@ -17,12 +17,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.AccessDeniedException;
 
-import com.spring3.hotel.management.dtos.request.CreateUserRequest;
-import com.spring3.hotel.management.dtos.request.RegisterRequest;
-import com.spring3.hotel.management.dtos.request.UpdateUserRequest;
-import com.spring3.hotel.management.dtos.request.UserRequest;
-import com.spring3.hotel.management.dtos.response.UserProfileResponse;
-import com.spring3.hotel.management.dtos.response.UserResponse;
+import com.spring3.hotel.management.dto.request.CreateUserRequest;
+import com.spring3.hotel.management.dto.request.RegisterRequest;
+import com.spring3.hotel.management.dto.request.UpdateUserRequest;
+import com.spring3.hotel.management.dto.request.UserRequest;
+import com.spring3.hotel.management.dto.response.UserProfileResponse;
+import com.spring3.hotel.management.dto.response.UserResponse;
 import com.spring3.hotel.management.exceptions.BadRequestException;
 import com.spring3.hotel.management.exceptions.DuplicateResourceException;
 import com.spring3.hotel.management.exceptions.NotFoundException;
@@ -80,7 +80,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         user.setEmail(registerRequest.getEmail());
         user.setFullName(registerRequest.getFullName());
-        user.setPhoneNumber(registerRequest.getPhoneNumber());
+        user.setPhoneNumber(registerRequest.getPhone());
         user.setGender(registerRequest.getGender());
         
         if (registerRequest.getDateOfBirth() != null && !registerRequest.getDateOfBirth().isEmpty()) {

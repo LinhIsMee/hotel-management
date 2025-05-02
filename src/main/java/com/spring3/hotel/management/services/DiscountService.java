@@ -1,6 +1,6 @@
 package com.spring3.hotel.management.services;
 
-import com.spring3.hotel.management.dtos.request.UpsertDiscountRequest;
+import com.spring3.hotel.management.dto.request.UpsertDiscountRequest;
 import com.spring3.hotel.management.models.Discount;
 
 import java.util.List;

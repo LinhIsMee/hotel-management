@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
-import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
+import com.spring3.hotel.management.dto.response.RoomResponseDTO;
 import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;

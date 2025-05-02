@@ -2,9 +2,9 @@ package com.spring3.hotel.management.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
-import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
-import com.spring3.hotel.management.dtos.response.BookingPeriodDTO;
+import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
+import com.spring3.hotel.management.dto.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;

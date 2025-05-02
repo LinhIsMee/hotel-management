@@ -1,10 +1,10 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dtos.request.UpsertBookingRequest;
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
-import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
-import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertBookingRequest;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.BookingService;
@@ -44,10 +44,6 @@ public class BookingServiceImpl implements BookingService {
     private RoomRepository roomRepository;
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
-    @Autowired
-    private BookingServiceRepository bookingServiceRepository;
-    @Autowired
-    private OfferingRepository offeringRepository;
 
     @Override
     public BookingResponseDTO getBookingById(Integer id) {
@@ -196,37 +192,6 @@ public class BookingServiceImpl implements BookingService {
             bookingDetailRepository.save(bookingDetail);
         }
         
-        // Xử lý các dịch vụ bổ sung nếu có
-        if (request.getAdditionalServices() != null && !request.getAdditionalServices().isEmpty()) {
-            for (String serviceId : request.getAdditionalServices()) {
-                try {
-                    Integer offeringId = Integer.parseInt(serviceId);
-                    Offering offering = offeringRepository.findById(offeringId)
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy dịch vụ với id: " + offeringId));
-                    
-                    // Mặc định số lượng là 1 nếu không được chỉ định
-                    int quantity = 1;
-                    double serviceTotalPrice = offering.getPrice() * quantity;
-                    
-                    // Tạo BookingService
-                    com.spring3.hotel.management.models.BookingService bookingService 
-                        = new com.spring3.hotel.management.models.BookingService();
-                    bookingService.setBooking(booking);
-                    bookingService.setOffering(offering);
-                    bookingService.setQuantity(quantity);
-                    bookingService.setTotalPrice(serviceTotalPrice);
-                    bookingServiceRepository.save(bookingService);
-                    
-                    // Cập nhật tổng giá booking
-                    totalPriceCalculated += serviceTotalPrice;
-                } catch (NumberFormatException e) {
-                    log.error("Lỗi chuyển đổi ID dịch vụ: " + serviceId, e);
-                } catch (Exception e) {
-                    log.error("Lỗi khi thêm dịch vụ vào booking: " + e.getMessage(), e);
-                }
-            }
-        }
-        
         // Kiểm tra và cập nhật tổng giá nếu cần
         if (Math.abs(totalPriceCalculated - booking.getTotalPrice()) > 0.01) {
             booking.setTotalPrice(totalPriceCalculated);
@@ -248,18 +213,13 @@ public class BookingServiceImpl implements BookingService {
             Booking savedBooking = bookingRepository.save(booking);
             
             // Cập nhật lại payment nếu có
-            final Integer bookingId = savedBooking.getId();
-            List<Payment> payments = paymentRepository.findByBooking_Id(bookingId);
-            if (!payments.isEmpty()) {
-                Payment paymentRecord = payments.get(0);
-                paymentRecord.setAmount(savedBooking.getFinalPrice().longValue());
-                paymentRepository.save(paymentRecord);
+            if (payment != null) {
+                payment.setAmount(savedBooking.getFinalPrice().longValue());
+                paymentRepository.save(payment);
             }
-            
-            return convertToBookingResponseDTO(savedBooking);
         }
         
-        return convertToBookingResponseDTO(bookingRepository.save(booking));
+        return convertToBookingResponseDTO(booking);
     }
 
     @Override
@@ -697,21 +657,6 @@ public class BookingServiceImpl implements BookingService {
         if (finalBooking.getCreatedAt() != null) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
             dto.setCreatedAt(finalBooking.getCreatedAt().format(formatter));
-        }
-        
-        // Lấy danh sách dịch vụ đã đặt
-        List<com.spring3.hotel.management.models.BookingService> bookingServices = bookingServiceRepository.findByBooking(finalBooking);
-        if (bookingServices != null && !bookingServices.isEmpty()) {
-            List<ServiceResponseDTO> services = bookingServices.stream().map(bs -> {
-                Offering offering = bs.getOffering();
-                ServiceResponseDTO serviceDTO = ServiceResponseDTO.fromOffering(offering);
-                serviceDTO.setQuantity(bs.getQuantity());
-                serviceDTO.setTotalPrice(bs.getTotalPrice());
-                return serviceDTO;
-            }).collect(Collectors.toList());
-            dto.setServices(services);
-        } else {
-            dto.setServices(Collections.emptyList());
         }
         
         return dto;

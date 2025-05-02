@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.services.interfaces;
 
-import com.spring3.hotel.management.dtos.request.UpsertRoomRequest;
-import com.spring3.hotel.management.dtos.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 
 import java.time.LocalDate;
 import java.util.List;

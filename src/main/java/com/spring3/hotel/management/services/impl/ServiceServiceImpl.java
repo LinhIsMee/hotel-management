@@ -2,8 +2,8 @@ package com.spring3.hotel.management.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring3.hotel.management.dtos.request.UpsertServiceRequest;
-import com.spring3.hotel.management.dtos.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.response.ServiceResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertServiceRequest;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Service;
 import com.spring3.hotel.management.repositories.ServiceRepository;

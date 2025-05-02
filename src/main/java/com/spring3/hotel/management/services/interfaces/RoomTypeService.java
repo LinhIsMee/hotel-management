@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.services.interfaces;
 
-import com.spring3.hotel.management.dtos.request.UpsertRoomTypeRequest;
-import com.spring3.hotel.management.dtos.response.RoomTypeResponseDTO;
+import com.spring3.hotel.management.dto.response.RoomTypeResponseDTO;
+import com.spring3.hotel.management.dto.request.UpsertRoomTypeRequest;
 import com.spring3.hotel.management.models.RoomType;
 
 import java.util.List;

@@ -1,6 +1,6 @@
 package com.spring3.hotel.management.controllers;
 
-import com.spring3.hotel.management.dtos.response.PaymentLinkResponse;
+import com.spring3.hotel.management.dto.response.PaymentLinkResponse;
 import com.spring3.hotel.management.models.Booking;
 import com.spring3.hotel.management.models.Payment;
 import com.spring3.hotel.management.repositories.BookingRepository;

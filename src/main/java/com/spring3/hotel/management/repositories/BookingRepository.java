@@ -1,7 +1,7 @@
 package com.spring3.hotel.management.repositories;
 
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
 import com.spring3.hotel.management.models.Booking;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -115,26 +115,30 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     
     // Tìm tất cả booking với eager loading của các entities liên quan để tối ưu hiệu suất
     @Query("SELECT DISTINCT b FROM Booking b " +
-           "LEFT JOIN FETCH b.user " +
-           "LEFT JOIN FETCH b.discount")
+           "LEFT JOIN FETCH b.user u " +
+           "LEFT JOIN FETCH b.discount d " +
+           "ORDER BY b.createdAt DESC")
     Page<Booking> findAllWithDetails(Pageable pageable);
     
     // Tìm tất cả booking không phân trang (lấy ALL)
     @Query("SELECT DISTINCT b FROM Booking b " +
-           "LEFT JOIN FETCH b.user " +
-           "LEFT JOIN FETCH b.discount " +
+           "LEFT JOIN FETCH b.user u " +
+           "LEFT JOIN FETCH b.discount d " +
            "ORDER BY b.createdAt DESC")
     List<Booking> findAllWithDetailsNoPage();
     
     // Truy vấn bổ sung để lấy booking details
     @Query("SELECT DISTINCT b FROM Booking b " +
-           "LEFT JOIN FETCH b.bookingDetails " +
+           "LEFT JOIN FETCH b.bookingDetails bd " +
+           "LEFT JOIN FETCH bd.room r " +
+           "LEFT JOIN FETCH r.roomType " +
            "WHERE b.id IN :ids")
     List<Booking> findBookingsWithDetails(List<Integer> ids);
     
     // Truy vấn bổ sung để lấy payments
     @Query("SELECT DISTINCT b FROM Booking b " +
-           "LEFT JOIN FETCH b.payments " +
-           "WHERE b.id IN :ids")
+           "LEFT JOIN FETCH b.payments p " +
+           "WHERE b.id IN :ids " +
+           "ORDER BY p.id DESC")
     List<Booking> findBookingsWithPayments(List<Integer> ids);
 }

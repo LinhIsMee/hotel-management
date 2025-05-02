@@ -3,7 +3,7 @@ package com.spring3.hotel.management.controllers;
 import com.spring3.hotel.management.dto.request.CreateReviewRequest;
 import com.spring3.hotel.management.dto.request.ReplyReviewRequest;
 import com.spring3.hotel.management.dto.request.UpdateReviewRequest;
-import com.spring3.hotel.management.dtos.response.ReviewResponseDTO;
+import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
 import com.spring3.hotel.management.services.interfaces.ReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

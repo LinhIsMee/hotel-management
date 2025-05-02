@@ -1,9 +1,9 @@
 package com.spring3.hotel.management.services.impl;
 
-import com.spring3.hotel.management.dtos.request.AdminBookingRequest;
-import com.spring3.hotel.management.dtos.response.BookingResponseDTO;
-import com.spring3.hotel.management.dtos.response.NewBookingResponse;
-import com.spring3.hotel.management.dtos.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.response.BookingResponseDTO;
+import com.spring3.hotel.management.dto.response.NewBookingResponse;
+import com.spring3.hotel.management.dto.response.RoomListResponseDTO;
+import com.spring3.hotel.management.dto.request.AdminBookingRequest;
 import com.spring3.hotel.management.models.*;
 import com.spring3.hotel.management.repositories.*;
 import com.spring3.hotel.management.services.AdminBookingService;
@@ -69,46 +69,55 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     @Override
     public List<BookingResponseDTO> getAllBookings(int page, int size) {
         try {
-            // Step 1: Get basic booking information with user and discount
+            log.info("Bắt đầu lấy danh sách booking với phân trang: page={}, size={}", page, size);
+            long startTime = System.currentTimeMillis();
+            
+            // Step 1: Tạo pageable và thực hiện truy vấn chính với JOIN FETCH để giảm số lượng truy vấn
             Pageable pageable = PageRequest.of(page, size);
             Page<Booking> bookingsPage = bookingRepository.findAllWithDetails(pageable);
             List<Booking> bookings = bookingsPage.getContent();
             
             if (bookings.isEmpty()) {
+                log.info("Không tìm thấy booking nào");
                 return new ArrayList<>();
             }
             
-            // Step 2: Extract booking IDs
+            log.info("Tìm thấy {} booking từ DB", bookings.size());
+            
+            // Step 2: Extract booking IDs cho các truy vấn tiếp theo
             List<Integer> bookingIds = bookings.stream()
                     .map(Booking::getId)
                     .collect(Collectors.toList());
             
-            // Step 3: Load booking details in a separate query
-            List<Booking> bookingsWithDetails = bookingRepository.findBookingsWithDetails(bookingIds);
+            // Step 3: Lấy booking details trong một truy vấn riêng biệt (được cache)
             Map<Integer, List<BookingDetail>> detailsMap = new java.util.HashMap<>();
-            for (Booking b : bookingsWithDetails) {
-                detailsMap.put(b.getId(), b.getBookingDetails());
-            }
+            log.debug("Thực hiện truy vấn để lấy booking details");
+            bookingRepository.findBookingsWithDetails(bookingIds).forEach(b -> 
+                detailsMap.put(b.getId(), b.getBookingDetails() != null ? b.getBookingDetails() : new ArrayList<>()));
             
-            // Step 4: Load payments in a separate query
-            List<Booking> bookingsWithPayments = bookingRepository.findBookingsWithPayments(bookingIds);
+            // Step 4: Lấy payments trong một truy vấn riêng biệt (được cache)
             Map<Integer, List<Payment>> paymentsMap = new java.util.HashMap<>();
-            for (Booking b : bookingsWithPayments) {
-                paymentsMap.put(b.getId(), b.getPayments());
-            }
+            log.debug("Thực hiện truy vấn để lấy payments");
+            bookingRepository.findBookingsWithPayments(bookingIds).forEach(b -> 
+                paymentsMap.put(b.getId(), b.getPayments() != null ? b.getPayments() : new ArrayList<>()));
             
-            // Step 5: Convert to DTOs with all the data
-            return bookings.stream()
+            // Step 5: Chuyển đổi thành DTO với tất cả dữ liệu đã được nạp trước
+            List<BookingResponseDTO> results = bookings.stream()
                     .map(booking -> {
-                        // Attach the separately loaded collections
+                        // Gán các collections đã được tải riêng
                         List<BookingDetail> details = detailsMap.getOrDefault(booking.getId(), new ArrayList<>());
                         List<Payment> payments = paymentsMap.getOrDefault(booking.getId(), new ArrayList<>());
                         
-                        // Convert to DTO
+                        // Chuyển đổi thành DTO
                         return convertToBookingResponseDTOWithCollections(booking, details, payments);
                     })
                     .collect(Collectors.toList());
+            
+            long endTime = System.currentTimeMillis();
+            log.info("Hoàn thành việc lấy danh sách booking trong {} ms", (endTime - startTime));
+            return results;
         } catch (Exception e) {
+            log.error("Lỗi khi lấy danh sách booking: {}", e.getMessage(), e);
             throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
         }
     }
@@ -492,44 +501,53 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     @Override
     public List<BookingResponseDTO> getAllBookingsNoPage() {
         try {
-            // Step 1: Get all bookings with user and discount
+            log.info("Bắt đầu lấy tất cả booking không phân trang");
+            long startTime = System.currentTimeMillis();
+            
+            // Step 1: Lấy tất cả booking với user và discount trong một truy vấn
             List<Booking> bookings = bookingRepository.findAllWithDetailsNoPage();
             
             if (bookings.isEmpty()) {
+                log.info("Không tìm thấy booking nào");
                 return new ArrayList<>();
             }
             
-            // Step 2: Extract booking IDs
+            log.info("Tìm thấy {} booking từ DB", bookings.size());
+            
+            // Step 2: Extract booking IDs cho các truy vấn tiếp theo
             List<Integer> bookingIds = bookings.stream()
                     .map(Booking::getId)
                     .collect(Collectors.toList());
             
-            // Step 3: Load booking details in a separate query
-            List<Booking> bookingsWithDetails = bookingRepository.findBookingsWithDetails(bookingIds);
-            Map<Integer, List<BookingDetail>> detailsMap = new java.util.HashMap<>();
-            for (Booking b : bookingsWithDetails) {
-                detailsMap.put(b.getId(), b.getBookingDetails());
-            }
+            // Step 3: Sử dụng stream và parallel để tải booking details một cách hiệu quả
+            log.debug("Thực hiện truy vấn để lấy booking details");
+            Map<Integer, List<BookingDetail>> detailsMap = new java.util.concurrent.ConcurrentHashMap<>();
+            bookingRepository.findBookingsWithDetails(bookingIds).parallelStream().forEach(b -> 
+                detailsMap.put(b.getId(), b.getBookingDetails() != null ? b.getBookingDetails() : new ArrayList<>()));
             
-            // Step 4: Load payments in a separate query
-            List<Booking> bookingsWithPayments = bookingRepository.findBookingsWithPayments(bookingIds);
-            Map<Integer, List<Payment>> paymentsMap = new java.util.HashMap<>();
-            for (Booking b : bookingsWithPayments) {
-                paymentsMap.put(b.getId(), b.getPayments());
-            }
+            // Step 4: Sử dụng stream và parallel để tải payments một cách hiệu quả
+            log.debug("Thực hiện truy vấn để lấy payments");
+            Map<Integer, List<Payment>> paymentsMap = new java.util.concurrent.ConcurrentHashMap<>();
+            bookingRepository.findBookingsWithPayments(bookingIds).parallelStream().forEach(b -> 
+                paymentsMap.put(b.getId(), b.getPayments() != null ? b.getPayments() : new ArrayList<>()));
             
-            // Step 5: Convert to DTOs with all the data
-            return bookings.stream()
+            // Step 5: Chuyển đổi thành DTO song song để tăng tốc độ xử lý
+            List<BookingResponseDTO> results = bookings.parallelStream()
                     .map(booking -> {
-                        // Attach the separately loaded collections
+                        // Gán các collections đã được tải riêng
                         List<BookingDetail> details = detailsMap.getOrDefault(booking.getId(), new ArrayList<>());
                         List<Payment> payments = paymentsMap.getOrDefault(booking.getId(), new ArrayList<>());
                         
-                        // Convert to DTO
+                        // Chuyển đổi thành DTO
                         return convertToBookingResponseDTOWithCollections(booking, details, payments);
                     })
                     .collect(Collectors.toList());
+            
+            long endTime = System.currentTimeMillis();
+            log.info("Hoàn thành việc lấy tất cả booking trong {} ms", (endTime - startTime));
+            return results;
         } catch (Exception e) {
+            log.error("Lỗi khi lấy tất cả booking: {}", e.getMessage(), e);
             throw new RuntimeException("Lỗi khi lấy danh sách booking: " + e.getMessage());
         }
     }
@@ -640,9 +658,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setPrice(room.getRoomType().getPricePerNight());
         dto.setImages(room.getImages());
 
-        // Lấy rating trực tiếp từ Room entity
-        dto.setAverageRating(room.getAverageRating());
-        dto.setTotalReviews(room.getRatingCount());
+        // Sử dụng giá trị mặc định cho rating
+        dto.setAverageRating(0.0);
+        dto.setTotalReviews(0);
         
         return dto;
     }
