@@ -1,6 +1,7 @@
 package com.spring3.hotel.management.controllers;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,11 @@ import com.spring3.hotel.management.models.RefreshToken;
 import com.spring3.hotel.management.services.JwtService;
 import com.spring3.hotel.management.services.RefreshTokenService;
 import com.spring3.hotel.management.services.UserService;
+import com.spring3.hotel.management.models.User;
+import com.spring3.hotel.management.models.Role;
+import com.spring3.hotel.management.repositories.UserRepository;
+import com.spring3.hotel.management.repositories.RoleRepository;
+import com.spring3.hotel.management.exceptions.NotFoundException;
 
 
 @RestController
@@ -57,6 +63,12 @@ public class UserController {
 
     @Autowired
     private  AuthenticationManager authenticationManager;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
 
     /**
      * Đăng ký tài khoản mới
@@ -351,6 +363,40 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Lỗi khi xóa người dùng: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Cập nhật quyền cho người dùng
+     */
+    @PutMapping("/users/{userId}/role/{roleName}")
+    public ResponseEntity<?> updateUserRole(@PathVariable Integer userId, @PathVariable String roleName) {
+        try {
+            // Kiểm tra role hợp lệ
+            if (!roleName.equals("ROLE_USER") && !roleName.equals("ROLE_EMPLOYEE") && !roleName.equals("ROLE_ADMIN")) {
+                return ResponseEntity.badRequest()
+                    .body(new MessageResponse("Role không hợp lệ. Chỉ chấp nhận: ROLE_USER, ROLE_EMPLOYEE, ROLE_ADMIN"));
+            }
+            
+            // Lấy thông tin người dùng
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng với ID: " + userId));
+            
+            // Lấy role từ database
+            Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy role: " + roleName));
+            
+            // Cập nhật role
+            user.setRole(role);
+            user.setUpdatedAt(LocalDateTime.now());
+            User updatedUser = userRepository.save(user);
+            
+            // Tạo response
+            UserProfileResponse response = userService.getUserProfile(updatedUser.getId());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new MessageResponse("Lỗi khi cập nhật role: " + e.getMessage()));
         }
     }
 

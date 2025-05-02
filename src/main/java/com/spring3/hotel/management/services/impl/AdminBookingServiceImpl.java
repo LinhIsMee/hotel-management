@@ -576,9 +576,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomType(room.getRoomType().getName());
                     
                     // Tính giá dựa trên số ngày đặt
-                    long days = java.time.temporal.ChronoUnit.DAYS.between(
-                            finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                    if (days < 1) days = 1;
+                        long days = java.time.temporal.ChronoUnit.DAYS.between(
+                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
+                        if (days < 1) days = 1;
                     roomDto.setPrice(room.getRoomType().getBasePrice() * days);
                     
                     roomDto.setImages(room.getImages());
@@ -765,9 +765,9 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomType(room.getRoomType().getName());
                     
                     // Tính giá dựa trên số ngày đặt
-                    long days = java.time.temporal.ChronoUnit.DAYS.between(
-                            finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                    if (days < 1) days = 1;
+                        long days = java.time.temporal.ChronoUnit.DAYS.between(
+                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
+                        if (days < 1) days = 1;
                     roomDto.setPrice(room.getRoomType().getBasePrice() * days);
                     
                     roomDto.setImages(room.getImages());

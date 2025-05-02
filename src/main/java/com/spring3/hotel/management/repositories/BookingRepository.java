@@ -104,9 +104,10 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     List<Object[]> countBookingsByStatus();
     
     // Thống kê các phòng được đặt nhiều nhất
-    @Query(value = "SELECT bd.room_number, COUNT(*) as count, SUM(bd.price) as total " +
+    @Query(value = "SELECT r.room_number, COUNT(*) as count, SUM(r.room_type_id) as room_type_id " +
            "FROM booking_details bd " +
-           "GROUP BY bd.room_number " +
+           "JOIN rooms r ON bd.room_id = r.id " +
+           "GROUP BY r.room_number " +
            "ORDER BY count DESC", nativeQuery = true)
     List<Object[]> findMostBookedRooms(Pageable pageable);
 

@@ -42,7 +42,7 @@ public class Room {
     
     @Column
     private String description;
-
+    
     @Builder.Default
     @ElementCollection
     @CollectionTable(name = "room_images", joinColumns = @JoinColumn(name = "room_id"))

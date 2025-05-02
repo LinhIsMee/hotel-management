@@ -19,4 +19,8 @@ public class RegisterRequest {
         this.phone = phone;
         this.phoneNumber = phone;
     }
+    
+    public String getPhone() {
+        return phone != null ? phone : phoneNumber;
+    }
 } 

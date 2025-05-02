@@ -161,18 +161,25 @@ public class StatisticServiceImpl implements StatisticService {
             for (Object[] result : mostBookedRooms) {
                 String roomNumber = (String) result[0];
                 Long bookingCount = (Long) result[1];
-                Double totalRevenue = (Double) result[2];
+                Integer roomTypeId = ((Number) result[2]).intValue();
                 
                 // Kiểm tra nếu dữ liệu hợp lệ
-                if (roomNumber != null && bookingCount != null && totalRevenue != null) {
+                if (roomNumber != null && bookingCount != null) {
                     hasValidData = true;
                     
                     // Tìm thông tin của phòng
                     Optional<Room> roomOpt = roomRepository.findByRoomNumber(roomNumber);
                     String roomType = "Unknown";
+                    Double totalRevenue = 0.0;
+                    
                     if (roomOpt.isPresent()) {
                         Room room = roomOpt.get();
-                        roomType = room.getRoomType().getName(); 
+                        roomType = room.getRoomType().getName();
+                        
+                        // Tính toán doanh thu dựa trên giá phòng và số lượng đặt
+                        Double basePrice = room.getRoomType().getBasePrice();
+                        // Giả định mỗi lượt đặt phòng kéo dài trung bình 2 ngày
+                        totalRevenue = basePrice * bookingCount * 2; 
                     }
                     
                     // Tính tỷ lệ lấp đầy

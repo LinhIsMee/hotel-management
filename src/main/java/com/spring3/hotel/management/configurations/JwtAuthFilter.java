@@ -17,11 +17,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthFilter.class);
+    
+    // Danh sách các đường dẫn không cần xác thực
+    private static final List<String> PUBLIC_ENDPOINTS = Arrays.asList(
+            "/api/v1/register",
+            "/api/v1/login",
+            "/api/v1/test",
+            "/api/v1/forgot-password"
+    );
 
     @Autowired
     private JwtService jwtService;
@@ -33,6 +43,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String requestPath = request.getRequestURI();
         logger.info("Processing request for path: {}", requestPath);
+        
+        // Kiểm tra nếu đường dẫn không cần xác thực thì bỏ qua
+        if (PUBLIC_ENDPOINTS.contains(requestPath)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         
         String authHeader = request.getHeader("Authorization");
         String token = null;
