@@ -187,8 +187,6 @@ public class BookingServiceImpl implements BookingService {
             BookingDetail bookingDetail = new BookingDetail();
             bookingDetail.setBooking(booking);
             bookingDetail.setRoom(room);
-            bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
-            bookingDetail.setPrice(roomPrice);
             bookingDetailRepository.save(bookingDetail);
         }
         
@@ -379,8 +377,6 @@ public class BookingServiceImpl implements BookingService {
                 BookingDetail bookingDetail = new BookingDetail();
                 bookingDetail.setBooking(booking);
                 bookingDetail.setRoom(room);
-                bookingDetail.setPricePerNight(room.getRoomType().getBasePrice());
-                bookingDetail.setPrice(roomPrice);
                 bookingDetailRepository.save(bookingDetail);
             }
             

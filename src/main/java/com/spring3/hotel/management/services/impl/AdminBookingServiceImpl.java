@@ -574,14 +574,13 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomId(room.getId());
                     roomDto.setRoomNumber(room.getRoomNumber());
                     roomDto.setRoomType(room.getRoomType().getName());
-                    if (detail.getPrice() != null) {
-                        roomDto.setPrice(detail.getPrice());
-                    } else {
-                        long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                        if (days < 1) days = 1;
-                         roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
-                    }
+                    
+                    // Tính giá dựa trên số ngày đặt
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(
+                            finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
+                    if (days < 1) days = 1;
+                    roomDto.setPrice(room.getRoomType().getBasePrice() * days);
+                    
                     roomDto.setImages(room.getImages());
                     return roomDto;
                 })
@@ -655,7 +654,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
         dto.setRoomId(room.getId());
         dto.setRoomNumber(room.getRoomNumber());
         dto.setRoomType(room.getRoomType().getName());
-        dto.setPrice(room.getRoomType().getPricePerNight());
+        dto.setPrice(room.getRoomType().getBasePrice());
         dto.setImages(room.getImages());
 
         // Sử dụng giá trị mặc định cho rating
@@ -764,14 +763,13 @@ public class AdminBookingServiceImpl implements AdminBookingService {
                     roomDto.setRoomId(room.getId());
                     roomDto.setRoomNumber(room.getRoomNumber());
                     roomDto.setRoomType(room.getRoomType().getName());
-                    if (detail.getPrice() != null) {
-                        roomDto.setPrice(detail.getPrice());
-                    } else {
-                        long days = java.time.temporal.ChronoUnit.DAYS.between(
-                                 finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
-                        if (days < 1) days = 1;
-                        roomDto.setPrice(room.getRoomType().getPricePerNight() * days);
-                    }
+                    
+                    // Tính giá dựa trên số ngày đặt
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(
+                            finalBooking.getCheckInDate(), finalBooking.getCheckOutDate());
+                    if (days < 1) days = 1;
+                    roomDto.setPrice(room.getRoomType().getBasePrice() * days);
+                    
                     roomDto.setImages(room.getImages());
                     return roomDto;
                 })

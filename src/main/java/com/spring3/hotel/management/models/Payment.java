@@ -37,15 +37,6 @@ public class Payment {
     @Column(name = "pay_date")
     private String payDate;
 
-    @Column(name = "transaction_type")
-    private String transactionType;
-
-    @Column(name = "transaction_status")
-    private String transactionStatus;
-
-    @Column(name = "tmn_code")
-    private String tmnCode;
-
     @Column(name = "method")
     private String method;
 

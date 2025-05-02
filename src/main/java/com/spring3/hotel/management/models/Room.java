@@ -39,20 +39,18 @@ public class Room {
     
     @Column
     private String notes;
-
     
+    @Column
+    private String description;
+
     @Builder.Default
     @ElementCollection
     @CollectionTable(name = "room_images", joinColumns = @JoinColumn(name = "room_id"))
     @Column(name = "image_url")
     private List<String> images = new ArrayList<>();
     
-    @ManyToMany
-    @JoinTable(
-        name = "room_services",
-        joinColumns = @JoinColumn(name = "room_id"),
-        inverseJoinColumns = @JoinColumn(name = "service_id")
-    )
+    @Transient
+    @Builder.Default
     private List<Service> services = new ArrayList<>();
     
     @Column

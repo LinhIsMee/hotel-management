@@ -476,9 +476,6 @@ public class VNPayService {
             payment.setResponseCode(vnp_ResponseCode);
             payment.setBankCode(vnp_BankCode);
             payment.setPayDate(vnp_PayDate);
-            payment.setTransactionType(vnp_TransactionType);
-            payment.setTransactionStatus(vnp_TransactionStatus);
-            payment.setTmnCode(vnp_TmnCode);
             payment.setOrderInfo(vnp_OrderInfo);
             
             // Lưu payment

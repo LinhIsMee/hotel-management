@@ -176,7 +176,7 @@ public class PaymentController {
             for (Integer roomId : roomIds) {
                 Room room = roomRepository.findById(roomId)
                         .orElseThrow(() -> new RuntimeException("Không tìm thấy phòng với id: " + roomId));
-                totalPrice += room.getRoomType().getPricePerNight() * nights;
+                totalPrice += room.getRoomType().getBasePrice() * nights;
             }
 
             // Kiểm tra và áp dụng mã giảm giá nếu có
