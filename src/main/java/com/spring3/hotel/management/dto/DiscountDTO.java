@@ -21,4 +21,5 @@ public class DiscountDTO {
     
     // Trường bổ sung chỉ có trong DTO để kiểm tra tính hợp lệ
     private boolean isValid;
+    private boolean active = true;
 } 

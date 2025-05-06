@@ -30,7 +30,6 @@ public class DiscountServiceImpl implements DiscountService {
     @Override
     public List<DiscountDTO> getAllDiscounts() {
         return discountRepository.findAll().stream()
-                .filter(Discount::isActive)
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -38,7 +37,7 @@ public class DiscountServiceImpl implements DiscountService {
     @Override
     public DiscountDTO getDiscountById(Integer id) {
         Optional<Discount> discount = discountRepository.findById(id);
-        if (discount.isEmpty() || !discount.get().isActive()) {
+        if (discount.isEmpty()) {
             throw new DiscountNotFoundException(id);
         }
         return convertToDTO(discount.get());
@@ -47,7 +46,7 @@ public class DiscountServiceImpl implements DiscountService {
     @Override
     public DiscountDTO getDiscountByCode(String code) {
         Optional<Discount> discount = discountRepository.findByCode(code);
-        if (discount.isEmpty() || !discount.get().isActive()) {
+        if (discount.isEmpty()) {
             throw new DiscountNotFoundException(code, "code");
         }
         return convertToDTO(discount.get());
@@ -89,6 +88,11 @@ public class DiscountServiceImpl implements DiscountService {
         existingDiscount.setMaxUses(discountDTO.getMaxUses());
         existingDiscount.setUsedCount(discountDTO.getUsedCount());
         
+        // Đồng bộ trạng thái valid và active
+        boolean isValid = discountDTO.isValid();
+        existingDiscount.setValid(isValid);
+        existingDiscount.setActive(isValid); // active luôn đồng bộ với valid
+        
         existingDiscount = discountRepository.save(existingDiscount);
         return convertToDTO(existingDiscount);
     }
@@ -108,45 +112,26 @@ public class DiscountServiceImpl implements DiscountService {
     public boolean isDiscountValid(String discountCode) {
         Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
         
-        if (discountOpt.isEmpty() || !discountOpt.get().isActive()) {
+        if (discountOpt.isEmpty()) {
             return false;
         }
         
         Discount discount = discountOpt.get();
-        LocalDate today = LocalDate.now();
-        
-        // Kiểm tra ngày hết hạn
-        if (today.isBefore(discount.getValidFrom()) || today.isAfter(discount.getValidTo())) {
-            return false;
-        }
-        
-        // Kiểm tra số lần sử dụng
-        if (discount.getUsedCount() >= discount.getMaxUses()) {
-            return false;
-        }
-        
-        return true;
+        return discount.isValid() && discount.isActive();
     }
 
     @Override
     public double applyDiscount(String discountCode, double amount) {
         Optional<Discount> discountOpt = discountRepository.findByCode(discountCode);
         
-        if (discountOpt.isEmpty() || !discountOpt.get().isActive()) {
+        if (discountOpt.isEmpty()) {
             throw new DiscountNotFoundException(discountCode, "code");
         }
         
         Discount discount = discountOpt.get();
-        LocalDate today = LocalDate.now();
         
-        // Kiểm tra ngày hết hạn
-        if (today.isBefore(discount.getValidFrom()) || today.isAfter(discount.getValidTo())) {
-            throw new DiscountExpiredException("Mã giảm giá '" + discountCode + "' đã hết hạn sử dụng");
-        }
-        
-        // Kiểm tra số lần sử dụng
-        if (discount.getUsedCount() >= discount.getMaxUses()) {
-            throw new DiscountUsageExceededException("Mã giảm giá '" + discountCode + "' đã đạt giới hạn số lần sử dụng");
+        if (!discount.isValid() || !discount.isActive()) {
+            throw new DiscountExpiredException("Mã giảm giá '" + discountCode + "' không hợp lệ hoặc đã hết hạn");
         }
         
         // Áp dụng giảm giá
@@ -239,13 +224,8 @@ public class DiscountServiceImpl implements DiscountService {
         dto.setValidTo(discount.getValidTo());
         dto.setMaxUses(discount.getMaxUses());
         dto.setUsedCount(discount.getUsedCount());
-        
-        // Kiểm tra tính hợp lệ
-        LocalDate today = LocalDate.now();
-        dto.setValid(today.isAfter(discount.getValidFrom().minusDays(1)) &&
-                    today.isBefore(discount.getValidTo().plusDays(1)) &&
-                    discount.getUsedCount() < discount.getMaxUses());
-        
+        dto.setActive(discount.isActive());
+        dto.setValid(discount.isValid());
         return dto;
     }
     
@@ -260,6 +240,8 @@ public class DiscountServiceImpl implements DiscountService {
         discount.setValidTo(dto.getValidTo());
         discount.setMaxUses(dto.getMaxUses());
         discount.setUsedCount(dto.getUsedCount());
+        discount.setActive(dto.isActive());
+        discount.setValid(dto.isValid());
         return discount;
     }
 }

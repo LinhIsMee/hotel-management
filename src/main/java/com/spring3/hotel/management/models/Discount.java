@@ -42,4 +42,7 @@ public class Discount {
     
     @Column(name = "active", nullable = false)
     private boolean active = true;
+
+    @Column(name = "valid", nullable = false)
+    private boolean valid = true;
 }
