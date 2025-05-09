@@ -75,6 +75,7 @@ public class RoomServiceImpl implements RoomService {
     public List<RoomResponseDTO> getRoomsByRoomType(Integer roomTypeId) {
         return roomRepository.findByRoomTypeId(roomTypeId)
                 .stream()
+                .filter(Room::getIsActive)
                 .map(RoomResponseDTO::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -83,6 +84,7 @@ public class RoomServiceImpl implements RoomService {
     public List<RoomResponseDTO> getRoomsByStatus(String status) {
         return roomRepository.findByStatus(status)
                 .stream()
+                .filter(Room::getIsActive)
                 .map(RoomResponseDTO::fromEntity)
                 .collect(Collectors.toList());
     }

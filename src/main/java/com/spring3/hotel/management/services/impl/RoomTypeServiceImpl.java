@@ -133,7 +133,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
 
     @Override
     public List<RoomTypeResponseDTO> getAllRoomTypes() {
-        return roomTypeRepository.findAll()
+        return roomTypeRepository.findByIsActiveTrue()
                 .stream()
                 .map(RoomTypeResponseDTO::fromEntity)
                 .collect(Collectors.toList());
