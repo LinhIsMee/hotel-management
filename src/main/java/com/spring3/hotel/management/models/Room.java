@@ -70,5 +70,8 @@ public class Room {
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDate.now();
+        if (this.isActive == null) {
+            this.isActive = true;
+        }
     }
 }

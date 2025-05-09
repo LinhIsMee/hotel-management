@@ -53,16 +53,16 @@ public class RoomController {
     
     // Lấy danh sách tất cả phòng
     @GetMapping
-    public ResponseEntity<List<RoomResponseDTO>> getAllActiveRooms() {
-        log.info("Nhận yêu cầu lấy danh sách tất cả phòng đang hoạt động");
+    public ResponseEntity<List<RoomResponseDTO>> getAllRoomsEndpoint() {
+        log.info("Nhận yêu cầu lấy danh sách tất cả phòng (bao gồm active và inactive)");
         try {
-            List<RoomResponseDTO> rooms = roomService.getAllActiveRooms();
+            List<RoomResponseDTO> rooms = roomService.getAllRooms();
             log.info("Tìm thấy {} phòng từ DB", rooms.size());
             
             if (rooms.isEmpty()) {
                 log.info("Gọi API reload-data để khởi tạo dữ liệu ban đầu do danh sách phòng trống");
                 roomService.initRoomsFromJson();
-                rooms = roomService.getAllActiveRooms();
+                rooms = roomService.getAllRooms();
                 log.info("Sau khi khởi tạo lại: {} phòng", rooms.size());
             }
             
@@ -70,7 +70,7 @@ public class RoomController {
             log.info("Trả về {} phòng sau khi làm phong phú dữ liệu", rooms.size());
             return ResponseEntity.ok(rooms);
         } catch (Exception e) {
-            log.error("Lỗi khi lấy danh sách phòng: {}", e.getMessage(), e);
+            log.error("Lỗi khi lấy danh sách tất cả phòng: {}", e.getMessage(), e);
             return ResponseEntity.ok(List.of()); // Trả về danh sách rỗng thay vì lỗi
         }
     }
