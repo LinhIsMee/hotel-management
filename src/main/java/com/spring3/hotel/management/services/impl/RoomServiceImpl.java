@@ -51,7 +51,7 @@ public class RoomServiceImpl implements RoomService {
     
     @Override
     public List<RoomResponseDTO> getAllRooms() {
-        return roomRepository.findAll()
+        return roomRepository.findByIsActiveTrue()
                 .stream()
                 .map(RoomResponseDTO::fromEntity)
                 .collect(Collectors.toList());
