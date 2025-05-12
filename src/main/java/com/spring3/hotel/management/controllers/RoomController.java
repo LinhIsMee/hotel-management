@@ -101,35 +101,8 @@ public class RoomController {
     @GetMapping("/featured")
     public ResponseEntity<List<RoomResponseDTO>> getFeaturedRooms() {
         log.info("Nhận yêu cầu lấy danh sách phòng nổi bật");
-        // Lấy tất cả phòng
-        List<RoomResponseDTO> allRooms = roomService.getFeaturedRooms();
-        
-        // Làm phong phú dữ liệu đánh giá
-        enrichWithReviewData(allRooms);
-        log.info("Đã làm phong phú dữ liệu đánh giá cho {} phòng", allRooms.size());
-        
-        // Lọc chỉ lấy phòng có đánh giá tốt (> 3.5 sao)
-        List<RoomResponseDTO> featuredRooms = allRooms.stream()
-            .filter(room -> room.getAverageRating() != null 
-                && room.getAverageRating() > 3.5 
-                && room.getTotalReviews() != null 
-                && room.getTotalReviews() > 0)
-            .sorted((r1, r2) -> {
-                // Ưu tiên phòng có rating cao
-                int ratingCompare = Double.compare(r2.getAverageRating(), r1.getAverageRating());
-                if (ratingCompare != 0) return ratingCompare;
-                
-                // Sau đó xét số lượng đánh giá
-                int reviewCompare = Integer.compare(r2.getTotalReviews(), r1.getTotalReviews());
-                if (reviewCompare != 0) return reviewCompare;
-                
-                // Cuối cùng xét giá phòng
-                return Double.compare(r2.getPricePerNight(), r1.getPricePerNight());
-            })
-            .limit(6) // Giới hạn 6 phòng nổi bật
-            .collect(Collectors.toList());
-        
-        log.info("Trả về {} phòng nổi bật sau khi lọc theo đánh giá (> 3.5 sao)", featuredRooms.size());
+        List<RoomResponseDTO> featuredRooms = roomService.getFeaturedRooms();
+        log.info("Trả về {} phòng nổi bật", featuredRooms.size());
         return ResponseEntity.ok(featuredRooms);
     }
     

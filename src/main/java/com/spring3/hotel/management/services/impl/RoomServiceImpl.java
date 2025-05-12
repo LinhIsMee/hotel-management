@@ -4,16 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring3.hotel.management.dto.response.BookingPeriodDTO;
 import com.spring3.hotel.management.dto.response.RoomResponseDTO;
+import com.spring3.hotel.management.dto.response.ReviewResponseDTO;
 import com.spring3.hotel.management.dto.request.UpsertRoomRequest;
 import com.spring3.hotel.management.exceptions.ResourceNotFoundException;
 import com.spring3.hotel.management.models.Room;
 import com.spring3.hotel.management.models.RoomType;
 import com.spring3.hotel.management.models.Service;
 import com.spring3.hotel.management.models.Booking;
+import com.spring3.hotel.management.models.Review;
 import com.spring3.hotel.management.repositories.RoomRepository;
 import com.spring3.hotel.management.repositories.RoomTypeRepository;
 import com.spring3.hotel.management.repositories.ServiceRepository;
 import com.spring3.hotel.management.repositories.BookingDetailRepository;
+import com.spring3.hotel.management.repositories.ReviewRepository;
 import com.spring3.hotel.management.services.interfaces.RoomService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.OptionalDouble;
 
 @Slf4j
 @org.springframework.stereotype.Service
@@ -45,6 +49,9 @@ public class RoomServiceImpl implements RoomService {
     
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
+    
+    @Autowired
+    private ReviewRepository reviewRepository;
     
     @Autowired
     private ObjectMapper objectMapper;
@@ -443,30 +450,69 @@ public class RoomServiceImpl implements RoomService {
     public List<RoomResponseDTO> getFeaturedRooms() {
         log.info("Lấy danh sách phòng nổi bật");
         
+        // Lấy tất cả đánh giá
+        List<Review> allReviews = reviewRepository.findAll();
+        log.info("Tìm thấy {} đánh giá", allReviews.size());
+        
+        // Nhóm đánh giá theo số phòng và tính rating trung bình
+        Map<String, List<Review>> reviewsByRoom = allReviews.stream()
+            .collect(Collectors.groupingBy(Review::getRoomNumber));
+        
         // Lấy tất cả phòng đang hoạt động
         List<Room> allRooms = roomRepository.findByIsActiveTrue();
+        log.info("Tìm thấy {} phòng đang hoạt động", allRooms.size());
         
-        // Lọc và sắp xếp phòng theo tiêu chí nổi bật:
-        // 1. Phòng có rating cao
-        // 2. Phòng có nhiều đánh giá
-        // 3. Phòng có giá trị cao
-        return allRooms.stream()
-            .map(RoomResponseDTO::fromEntity)
-            .sorted((r1, r2) -> {
-                // Ưu tiên phòng có rating cao
-                if (r1.getAverageRating() != null && r2.getAverageRating() != null) {
-                    int ratingCompare = Double.compare(r2.getAverageRating(), r1.getAverageRating());
-                    if (ratingCompare != 0) return ratingCompare;
+        // Chuyển đổi thành DTO và làm giàu dữ liệu review
+        List<RoomResponseDTO> roomDTOs = allRooms.stream()
+            .map(room -> {
+                RoomResponseDTO dto = RoomResponseDTO.fromEntity(room);
+                List<Review> roomReviews = reviewsByRoom.getOrDefault(room.getRoomNumber(), new ArrayList<>());
+                
+                if (!roomReviews.isEmpty()) {
+                    // Tính rating trung bình
+                    double averageRating = roomReviews.stream()
+                        .mapToDouble(Review::getRating)
+                        .average()
+                        .orElse(0.0);
+                    
+                    dto.setAverageRating(averageRating);
+                    dto.setTotalReviews(roomReviews.size());
+                    
+                    // Lấy 3 đánh giá gần nhất
+                    List<ReviewResponseDTO> recentReviews = roomReviews.stream()
+                        .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
+                        .limit(3)
+                        .map(ReviewResponseDTO::fromEntity)
+                        .collect(Collectors.toList());
+                    dto.setRecentReviews(recentReviews);
+                    
+                    log.info("Phòng {}: {} đánh giá, rating trung bình: {}", 
+                        room.getRoomNumber(), roomReviews.size(), averageRating);
+                } else {
+                    dto.setAverageRating(0.0);
+                    dto.setTotalReviews(0);
+                    dto.setRecentReviews(new ArrayList<>());
                 }
                 
-                // Sau đó xét số lượng đánh giá
-                int reviewCompare = Integer.compare(r2.getTotalReviews(), r1.getTotalReviews());
-                if (reviewCompare != 0) return reviewCompare;
+                return dto;
+            })
+            .collect(Collectors.toList());
+        
+        // Lọc và sắp xếp phòng theo tiêu chí nổi bật
+        List<RoomResponseDTO> featuredRooms = roomDTOs.stream()
+            .filter(room -> room.getTotalReviews() > 0 && room.getAverageRating() >= 4.0)
+            .sorted((r1, r2) -> {
+                // Ưu tiên phòng có rating cao
+                int ratingCompare = Double.compare(r2.getAverageRating(), r1.getAverageRating());
+                if (ratingCompare != 0) return ratingCompare;
                 
-                // Cuối cùng xét giá phòng
-                return Double.compare(r2.getPricePerNight(), r1.getPricePerNight());
+                // Sau đó xét số lượng đánh giá
+                return Integer.compare(r2.getTotalReviews(), r1.getTotalReviews());
             })
             .limit(6) // Giới hạn 6 phòng nổi bật
             .collect(Collectors.toList());
+        
+        log.info("Trả về {} phòng nổi bật", featuredRooms.size());
+        return featuredRooms;
     }
 }
