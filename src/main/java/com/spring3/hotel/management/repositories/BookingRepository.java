@@ -43,16 +43,16 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
     @Query("SELECT COUNT(DISTINCT b.user.id) FROM Booking b WHERE b.createdAt BETWEEN :startDate AND :endDate")
     Integer countDistinctCustomersByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    // Đếm tổng số khách hàng
-    @Query("SELECT COUNT(DISTINCT b.user.id) FROM Booking b where b.user.role.name = 'ROLE_CUSTOMER'")
+    // Đếm số lượng khách hàng duy nhất
+    @Query(value = "SELECT COUNT(DISTINCT user_id) FROM bookings WHERE user_id IS NOT NULL", nativeQuery = true)
     Integer countDistinctCustomers();
 
     // Đếm tổng số đặt phòng
     @Query("SELECT COUNT(b) FROM Booking b")
     Integer countAllBookings();
 
-    // Tính tổng doanh thu (chỉ tính các đơn đã xác nhận và thanh toán)
-    @Query("SELECT SUM(b.finalPrice) FROM Booking b WHERE b.status IN ('CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT') AND b.paymentStatus = 'PAID'")
+    // Tính tổng doanh thu (tính các đơn đã hoàn thành hoặc đang thực hiện)
+    @Query("SELECT COALESCE(SUM(b.finalPrice), 0) FROM Booking b WHERE b.status IN ('COMPLETED', 'CHECKED_OUT', 'CONFIRMED', 'CHECKED_IN')")
     Double caculateTotalRevenue();
 
     // Lấy ra danh sách booking mới nhất trong 7 ngày
@@ -81,28 +81,99 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
            "ORDER BY MIN(created_at)", nativeQuery = true)
     List<Object[]> countBookingsByDayInCurrentMonth();
     
-    // Thống kê doanh thu theo ngày trong tháng hiện tại và tháng trước (chỉ tính các đơn đã xác nhận và thanh toán)
-    @Query(value = "SELECT DATE_FORMAT(created_at, '%d/%m/%Y') as booking_date, SUM(final_price) as daily_revenue " +
-           "FROM bookings " +
-           "WHERE status IN ('CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT') " +
-           "AND payment_status = 'PAID' " +
-           "AND DATE_FORMAT(created_at, '%Y%m') IN (DATE_FORMAT(CURDATE(), '%Y%m'), DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')) " +
-           "GROUP BY booking_date " +
-           "ORDER BY MIN(created_at)", nativeQuery = true)
+    // Thống kê doanh thu theo ngày trong 12 ngày gần nhất
+    @Query(value = "WITH RECURSIVE dates AS (\n" +
+           "    SELECT CURDATE() as date\n" +
+           "    UNION ALL\n" +
+           "    SELECT DATE_SUB(date, INTERVAL 1 DAY)\n" +
+           "    FROM dates\n" +
+           "    WHERE DATE_SUB(date, INTERVAL 1 DAY) >= DATE_SUB(CURDATE(), INTERVAL 11 DAY)\n" +
+           "),\n" +
+           "booking_days AS (\n" +
+           "    SELECT b.id,\n" +
+           "           b.final_price,\n" +
+           "           COALESCE(b.check_in_date, CURDATE()) as check_in_date,\n" +
+           "           COALESCE(b.check_out_date, DATE_ADD(CURDATE(), INTERVAL 1 DAY)) as check_out_date,\n" +
+           "           GREATEST(DATEDIFF(COALESCE(b.check_out_date, DATE_ADD(CURDATE(), INTERVAL 1 DAY)), \n" +
+           "                            COALESCE(b.check_in_date, CURDATE())), 1) as total_days\n" +
+           "    FROM bookings b\n" +
+           "    WHERE b.status IN ('COMPLETED', 'CHECKED_OUT', 'CONFIRMED', 'CHECKED_IN')\n" +
+           "    AND b.final_price > 0\n" +
+           "),\n" +
+           "daily_revenue AS (\n" +
+           "    SELECT d.date,\n" +
+           "           COALESCE(SUM(\n" +
+           "               CASE\n" +
+           "                   WHEN d.date >= bd.check_in_date AND d.date < bd.check_out_date\n" +
+           "                   THEN bd.final_price / bd.total_days\n" +
+           "                   ELSE 0\n" +
+           "               END\n" +
+           "           ), 0) as revenue\n" +
+           "    FROM dates d\n" +
+           "    LEFT JOIN booking_days bd ON d.date >= bd.check_in_date AND d.date < bd.check_out_date\n" +
+           "    GROUP BY d.date\n" +
+           ")\n" +
+           "SELECT DATE_FORMAT(date, '%d/%m/%Y') as booking_date,\n" +
+           "       revenue\n" +
+           "FROM daily_revenue\n" +
+           "ORDER BY date ASC", nativeQuery = true)
     List<Object[]> sumRevenueByDayInCurrentMonth();
     
-    // Thống kê doanh thu tháng hiện tại (chỉ tính các đơn đã xác nhận và thanh toán)
-    @Query(value = "SELECT SUM(final_price) FROM bookings " +
-           "WHERE status IN ('CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT') " +
-           "AND payment_status = 'PAID' " +
-           "AND DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m')", nativeQuery = true)
+    // Thống kê doanh thu tháng hiện tại (tính từ đầu tháng đến ngày hiện tại)
+    @Query(value = 
+           "WITH monthly_bookings AS (\n" +
+           "    SELECT\n" +
+           "        b.id,\n" +
+           "        b.final_price,\n" +
+           "        b.check_in_date,\n" +
+           "        b.check_out_date,\n" +
+           "        GREATEST(DATEDIFF(b.check_out_date, b.check_in_date), 1) as total_days\n" +
+           "    FROM bookings b\n" +
+           "    WHERE b.status IN ('COMPLETED', 'CHECKED_OUT', 'CONFIRMED', 'CHECKED_IN')\n" +
+           "      AND b.final_price > 0\n" +
+           "      AND b.check_out_date > DATE_FORMAT(CURDATE() ,\'%Y-%m-01\')\n" +
+           "      AND b.check_in_date <= CURDATE()\n" +
+           "),\n" +
+           "daily_revenue AS (\n" +
+           "    SELECT\n" +
+           "        id,\n" +
+           "        final_price / total_days as daily_price,\n" +
+           "        GREATEST(check_in_date, DATE_FORMAT(CURDATE(), \'%Y-%m-01\')) as effective_start_date,\n" +
+           "        LEAST(check_out_date, DATE_ADD(CURDATE(), INTERVAL 1 DAY)) as effective_end_date\n" +
+           "    FROM monthly_bookings\n" +
+           ")\n" +
+           "SELECT COALESCE(SUM(\n" +
+           "           daily_price * GREATEST(DATEDIFF(effective_end_date, effective_start_date), 0)\n" +
+           "       ), 0) as current_month_revenue_to_date\n" +
+           "FROM daily_revenue\n" +
+           "WHERE effective_end_date > effective_start_date\n", nativeQuery = true)
     Double calculateCurrentMonthRevenue();
     
-    // Thống kê doanh thu tháng trước (chỉ tính các đơn đã xác nhận và thanh toán)
-    @Query(value = "SELECT SUM(final_price) FROM bookings " +
-           "WHERE status IN ('CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT') " +
-           "AND payment_status = 'PAID' " +
-           "AND DATE_FORMAT(created_at, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')", nativeQuery = true)
+    // Thống kê doanh thu tháng trước
+    @Query(value = "WITH daily_revenue AS (\n" +
+           "    SELECT b.id,\n" +
+           "           b.final_price,\n" +
+           "           COALESCE(b.check_in_date, CURDATE()) as check_in_date,\n" +
+           "           COALESCE(b.check_out_date, DATE_ADD(CURDATE(), INTERVAL 1 DAY)) as check_out_date,\n" +
+           "           GREATEST(DATEDIFF(COALESCE(b.check_out_date, DATE_ADD(CURDATE(), INTERVAL 1 DAY)), \n" +
+           "                            COALESCE(b.check_in_date, CURDATE())), 1) as total_days\n" +
+           "    FROM bookings b\n" +
+           "    WHERE b.status IN ('COMPLETED', 'CHECKED_OUT', 'CONFIRMED', 'CHECKED_IN')\n" +
+           "    AND b.final_price > 0\n" +
+           ")\n" +
+           "SELECT COALESCE(SUM(\n" +
+           "    CASE\n" +
+           "        WHEN DATE_FORMAT(check_in_date, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')\n" +
+           "        AND DATE_FORMAT(check_out_date, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')\n" +
+           "        THEN final_price\n" +
+           "        WHEN DATE_FORMAT(check_in_date, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')\n" +
+           "        THEN (final_price / total_days) * (DAY(LAST_DAY(check_in_date)) - DAY(check_in_date) + 1)\n" +
+           "        WHEN DATE_FORMAT(check_out_date, '%Y%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y%m')\n" +
+           "        THEN (final_price / total_days) * DAY(check_out_date)\n" +
+           "        ELSE 0\n" +
+           "    END\n" +
+           "), 0) as monthly_revenue\n" +
+           "FROM daily_revenue", nativeQuery = true)
     Double calculatePreviousMonthRevenue();
     
     // Đếm số booking theo trạng thái

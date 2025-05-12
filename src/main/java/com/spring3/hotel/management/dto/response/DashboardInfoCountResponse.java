@@ -1,5 +1,6 @@
 package com.spring3.hotel.management.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,5 +14,6 @@ public class DashboardInfoCountResponse { // Dữ liệu trả về cho dashboar
     private Integer totalBookings;
     private Integer totalCustomers;
     private Integer totalRates;
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Double totalRevenue;
 }

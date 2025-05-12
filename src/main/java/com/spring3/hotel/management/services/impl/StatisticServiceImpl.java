@@ -85,13 +85,14 @@ public class StatisticServiceImpl implements StatisticService {
         Integer totalBookings = bookingRepository.countAllBookings();
         Integer totalCustomers = bookingRepository.countDistinctCustomers();
         Integer totalRates = reviewRepository.countAllReviews();
+        // Lấy tổng doanh thu của tất cả các tháng
         Double totalRevenue = bookingRepository.caculateTotalRevenue();
         
         // Đảm bảo có giá trị mặc định nếu truy vấn không trả về kết quả hoặc trả về 0
-        dashboardInfoCountResponse.setTotalBookings(totalBookings != null && totalBookings > 0 ? totalBookings : 110);
-        dashboardInfoCountResponse.setTotalCustomers(totalCustomers != null && totalCustomers > 0 ? totalCustomers : 85);
-        dashboardInfoCountResponse.setTotalRates(totalRates != null && totalRates > 0 ? totalRates : 65);
-        dashboardInfoCountResponse.setTotalRevenue(totalRevenue != null && totalRevenue > 0 ? totalRevenue : 140000000.0);
+        dashboardInfoCountResponse.setTotalBookings(totalBookings != null && totalBookings > 0 ? totalBookings : 0);
+        dashboardInfoCountResponse.setTotalCustomers(totalCustomers != null && totalCustomers > 0 ? totalCustomers : 0);
+        dashboardInfoCountResponse.setTotalRates(totalRates != null && totalRates > 0 ? totalRates : 0);
+        dashboardInfoCountResponse.setTotalRevenue(totalRevenue != null ? totalRevenue : 0.0);
         
         return dashboardInfoCountResponse;
     }
@@ -241,49 +242,30 @@ public class StatisticServiceImpl implements StatisticService {
         return response;
     }
     
-    // Thống kê doanh thu theo ngày trong tháng hiện tại
+    // Thống kê doanh thu theo ngày trong 12 ngày gần nhất
     @Override
     public Map<String, Double> getRevenueByDay() {
         // Lấy dữ liệu từ cơ sở dữ liệu
         List<Object[]> revenueData = bookingRepository.sumRevenueByDayInCurrentMonth();
-        
         Map<String, Double> revenueByDay = new LinkedHashMap<>();
         
-        // Nếu có dữ liệu từ cơ sở dữ liệu
+        // Tạo danh sách 12 ngày gần nhất
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        
+        // Khởi tạo map với 12 ngày gần nhất, giá trị mặc định là 0
+        for (int i = 11; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            revenueByDay.put(date.format(formatter), 0.0);
+        }
+        
+        // Cập nhật dữ liệu thực từ database
         if (revenueData != null && !revenueData.isEmpty()) {
-            // Xử lý dữ liệu từ cơ sở dữ liệu
             for (Object[] result : revenueData) {
                 String date = (String) result[0];
                 Double amount = (Double) result[1];
-                double revenue = amount != null ? amount : 0.0;
-                revenueByDay.put(date, revenue);
-            }
-        }
-        
-        // Nếu không có dữ liệu hoặc dữ liệu từ cơ sở dữ liệu không đủ
-        if (revenueByDay.isEmpty() || revenueByDay.size() < 10) {
-            // Tạo dữ liệu mẫu cho tháng trước và tháng hiện tại
-            LocalDate today = LocalDate.now();
-            LocalDate firstDayOfLastMonth = today.minusMonths(1).withDayOfMonth(1);
-            LocalDate firstDayOfCurrentMonth = today.withDayOfMonth(1);
-            
-            // Tạo dữ liệu cho tháng trước nếu chưa có
-            for (int i = 0; i < 5; i++) {
-                LocalDate date = firstDayOfLastMonth.plusDays(i);
-                String formattedDate = date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                if (!revenueByDay.containsKey(formattedDate)) {
-                    double revenue = 20000000 + (i * 5000000);
-                    revenueByDay.put(formattedDate, revenue);
-                }
-            }
-            
-            // Tạo dữ liệu cho tháng hiện tại nếu chưa có
-            for (int i = 0; i < 5; i++) {
-                LocalDate date = firstDayOfCurrentMonth.plusDays(i);
-                String formattedDate = date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                if (!revenueByDay.containsKey(formattedDate)) {
-                    double revenue = 40000000 + (i * 10000000);
-                    revenueByDay.put(formattedDate, revenue);
+                if (revenueByDay.containsKey(date)) {
+                    revenueByDay.put(date, amount != null ? amount : 0.0);
                 }
             }
         }
@@ -347,16 +329,12 @@ public class StatisticServiceImpl implements StatisticService {
         Double currentMonthRevenue = bookingRepository.calculateCurrentMonthRevenue();
         Double previousMonthRevenue = bookingRepository.calculatePreviousMonthRevenue();
         
-        // Đảm bảo có giá trị mặc định nếu truy vấn không trả về kết quả
-        if (currentMonthRevenue == null) currentMonthRevenue = 140000000.0;
-        if (previousMonthRevenue == null) previousMonthRevenue = 65000000.0;
-        
         // Tính phần trăm thay đổi
-        double percentChange;
+        double percentChange = 0.0;
         if (previousMonthRevenue > 0) {
             percentChange = ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
-        } else {
-            percentChange = 100.0; // Nếu tháng trước không có doanh thu
+        } else if (currentMonthRevenue > 0) {
+            percentChange = 100.0;
         }
         
         Map<String, Double> comparison = new HashMap<>();
